@@ -1,0 +1,87 @@
+c
+c NuWLS based on TT-Open-WBO-Inc:	 an Anytime MaxSAT Solver --- based on Glucose4.1 (core version)
+c Version:	 MaxSAT Evaluation 2021
+c Author of NuWLS:	 Yi Chu, Xiang He
+c Author of TT-Open-WBO-Inc:	 Alexander Nadel
+c Authors of the baseline solver Open-WBO-Inc:	 Saurabh Joshi, Prateek Kumar, Ruben Martins, Sukrut Rao
+c WARNING: for repeatability, setting FPU to use double precision
+c |                                                                                                       |
+c ========================================[ Problem Statistics ]===========================================
+c |                                                                                                       |
+c |  Problem Format:             MaxSAT                                                                   |
+c |  Problem Type:           Unweighted                                                                   |
+c |  Number of variables:       3042600                                                                   |
+c |  Number of hard clauses:    6193465                                                                   |
+c |  Number of soft clauses:       3732                                                                   |
+c |  Number of cardinality:           0                                                                   |
+c |  Number of PB :                   0                                                                   |
+c |  Parse time:                   0.64 s                                                                 |
+c |                                                                                                       |
+c | best-alg-selector overriden target_vars_bump_val to 0, since it hadn't been set by the user |
+c | best-alg-selector overriden ms_model_per_sec_thr to 2, since it hadn't been set by the user |
+c | best-alg-selector overriden ms_mutation_classes to 0, since it hadn't been set by the user |
+c | best-alg-selector overriden ms_chrono to 100, since it hadn't been set by the user |
+c ==========================================[ Solver Settings ]============================================
+c |                                                                                                       |
+c |  Algorithm:                     OBV                                                                   |
+c |  Cardinality Encoding:       Modulo Totalizer                                                         |
+c |  Limit number conflicts:       1000                                                                   |
+c |  Limit number iterations: 2147483647                                                                   |
+c |  Global limit number conflicts:   F                                                                   |
+c |                                                                                                       |
+c Mrs. Beaver incomplete stage
+o 279
+c total_lit_count 24092876
+c before build neighbor
+c build instime is 0.34
+c using neighbor 
+c build NuWLS instance done!
+c changing to NuWLS solver!!!
+c problem weighted = 0
+o 279
+o 278
+o 277
+o 276
+o 275
+o 274
+o 273
+o 272
+o 271
+o 270
+o 269
+o 268
+o 267
+c nuwls search done!
+o 267
+c Predicted size is 1985424 vs. the size-based limit 1000000
+o 240
+c Predicted size is 1783896 vs. the size-based limit 1000000
+o 221
+c Predicted size is 1642080 vs. the size-based limit 1000000
+o 212
+c Predicted size is 1574904 vs. the size-based limit 1000000
+o 207
+c Predicted size is 1537584 vs. the size-based limit 1000000
+o 199
+c Predicted size is 1477872 vs. the size-based limit 1000000
+o 197
+c Predicted size is 1462944 vs. the size-based limit 1000000
+o 189
+c Predicted size is 1403232 vs. the size-based limit 1000000
+o 185
+c Predicted size is 1373376 vs. the size-based limit 1000000
+o 184
+c Predicted size is 1365912 vs. the size-based limit 1000000
+o 180
+c Predicted size is 1336056 vs. the size-based limit 1000000
+o 175
+c Predicted size is 1298736 vs. the size-based limit 1000000
+o 174
+c Predicted size is 1291272 vs. the size-based limit 1000000
+o 170
+c Predicted size is 1261416 vs. the size-based limit 1000000
+o 168
+c Predicted size is 1246488 vs. the size-based limit 1000000
+o 164
+c Predicted size is 1216632 vs. the size-based limit 1000000
+o 163

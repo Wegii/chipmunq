@@ -1,0 +1,9 @@
+qreg q[9]
+stabilizer S1 (Z, q[0], 0), (Z, q[3], 1), (Z, q[1], 2), (Z, q[4], 3)
+stabilizer S2 (X, q[1], 0), (X, q[2], 1), (X, q[4], 2), (X, q[5], 3)
+stabilizer S3 (X, q[3], 0), (X, q[4], 1), (X, q[6], 2), (X, q[7], 3)
+stabilizer S4 (Z, q[4], 0), (Z, q[7], 1), (Z, q[5], 2), (Z, q[8], 3)
+stabilizer S5 (X, q[0], 2), (X, q[1], 3)
+stabilizer S6 (X, q[7], 0), (X, q[8], 1)
+stabilizer S7 (Z, q[3], 2), (Z, q[6], 3)
+stabilizer S8 (Z, q[2], 0), (Z, q[5], 1)

@@ -9,23 +9,23 @@ import logging
 import numpy as np
 
 # MECH
-sys.path.append(os.path.join(os.getcwd(), "./src/baseline/MECH"))
-from src.baseline.MECH.Circuit import *
-from src.baseline.MECH.Chiplet import *
-from src.baseline.MECH.HighwayOccupancy import *
-from src.baseline.MECH.Router import *
-from src.baseline.MECH.MECHBenchmarks import *
-from src.baseline.MECH.transpile_mech import transpile_circuit_MECH
+sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
+from external.baseline.MECH.Circuit import *
+from external.baseline.MECH.Chiplet import *
+from external.baseline.MECH.HighwayOccupancy import *
+from external.baseline.MECH.Router import *
+from external.baseline.MECH.MECHBenchmarks import *
+from external.baseline.MECH.transpile_mech import transpile_circuit_MECH
 import networkx as nx
 from networkx.classes import Graph
 
 # QECC-Synth
-sys.path.append(os.path.join(os.getcwd(), "./src/baseline/QECC_Synth/SurfStitch/MyCode/src"))
-from src.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth import transpile_circuit_QECCSynth
+sys.path.append(os.path.join(os.getcwd(), "./external/baseline/QECC_Synth/SurfStitch/MyCode/src"))
+from external.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth import transpile_circuit_QECCSynth
 
 # SABRE
 sys.path.append(os.path.join(os.getcwd(), "./src/baseline/SABRE"))
-from src.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
+from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
 
 # Eccentric_bench
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
