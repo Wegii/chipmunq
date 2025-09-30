@@ -211,3 +211,6 @@ __marimo__/
 
 # Pickle files
 *.pkl
+
+# Images
+*.png
