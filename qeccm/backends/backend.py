@@ -18,12 +18,18 @@ import numpy as np
 # Create different coupling maps
 #   - Monolithical
 #   - Chiplet
+#       - heterogeneous with different chips of different connectivities
 #
 # G(V, E)
 # Vertices: V
+#   - as property also error; readout error; one and two-qubit error
+#   - if the qubit is measured, weight the readout error more
 # Edges: E (what gates can be performed on them?)
 #   - Remote edges normally only SWAP
+#       - IBM Flamingo technical report [21], reports CNOT gates on coupler links with a 3.5% error rate
+#       - Also possible to perform cnot gate -> test mapping with and without CNOT (and then only SWAP)
 #   - All other normally all (CNOT + single qubit rotation)
+#   
 # Two types of connections
 # Intermodule connections
 
@@ -47,6 +53,8 @@ def get_edge_coordinates(n, m, offset=0) -> tuple:
     cl_idx = (np.floor(n/2) * m).astype(int)
 
     return cb_idx + offset, ct_idx + offset, cr_idx + offset, cl_idx + offset
+
+# TODO: add class or function for constructing different connectivity graphs (grid, ring, heavyhex) 
 
 
 class GenericMonolythicalBackend(BackendV2):
@@ -233,6 +241,6 @@ if __name__== "__main__":
     # a.build_backend()
     # a.visualize_coupling_map()
 
-    a = GenericChipletBackend((4, 6, 5), 1)
+    a = GenericChipletBackend((4, 10, 10), 1)
     a.build_backend()
     a.visualize_coupling_map()

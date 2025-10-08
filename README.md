@@ -42,6 +42,13 @@ Mapping QECC to distributed systems
 
 # Installation
 
+## Dependencies
+
+Qiskit
+
+
+Install KaHyPar
+- See[KaHyPar](https://github.com/kahypar/kahypar)
+- See [Kaminpar](https://github.com/KaHIP/KaMinPar)
+
 ## Build from source
-Install rust
-- pip3 install maturin
