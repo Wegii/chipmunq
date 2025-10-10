@@ -17,6 +17,9 @@ class PartitionedMapRoute(TransformationPass):
     def __init__(self):
         super().__init__()
 
+        # TODO: The transpiler passes get a DAG instead of a circuit
+        # See: https://quantum.cloud.ibm.com/docs/en/guides/DAG-representation
+
     def run(self, circuit: qiskit.QuantumCircuit, type: str) -> qiskit.QuantumCircuit:
         if type == "basic":
             qc = _basic_mar(circuit)
