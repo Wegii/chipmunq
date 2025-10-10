@@ -69,6 +69,8 @@ class GenericMonolythicalBackend(BackendV2):
         self.n, self.m  = size
 
         self.G = None
+        # TODO:  Add a)Linear, (b) Ring, (c) Grid, and (d) Star.
+        self.typology = 'grid'
 
 
     def build_backend(self):
@@ -142,6 +144,9 @@ class GenericChipletBackend(BackendV2):
         except AssertionError:
             logging.warning(f"Number of interconnections must be smaller than width. Setting to {self.n}")
             self.n_intern = self.n
+
+        # TODO:  Add a) Linear, (b) Ring, (c) Grid, and (d) Star.
+        self.typology = 'grid'
 
     def _single_graph(self) -> rx.PyGraph:
 

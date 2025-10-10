@@ -1,5 +1,5 @@
 # Partitioning
-import kahypar as kahypar
+import mtkahypar as kahypar
 
 
 # Not all qubits have the same connectivity
@@ -7,7 +7,15 @@ import kahypar as kahypar
 # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
 class GenericHypergraphPartitioning():
-    pass
+    
+
+    def __init__(self):
+        pass
+
+    def calculate_partitions(self, circuit, backend) -> float:
+        # TODO: function that calculates (given a backend and circuit) into how many cuts it is necessary to partition the circuit
+
+        pass
 
 
 class KaHyParPartitioning(GenericHypergraphPartitioning):
@@ -15,4 +23,8 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
     See implementation details in `<https://kahypar.org/>`_ `<https://github.com/kahypar/kahypar>`_
     """
+
+    def __init__(self):
+        super().__init__()
+
     pass
