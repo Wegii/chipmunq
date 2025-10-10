@@ -48,7 +48,6 @@ class QECMemory():
         :rtype: qiskit.QuantumCircuit
         """
         d = get_max_d("surface", self.num_qubits)
-        print(d)
 
         if d < 3:
             logging.error(

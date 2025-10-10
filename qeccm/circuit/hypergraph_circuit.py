@@ -1,53 +1,46 @@
-from qiskit import QuantumCircuit
-
 # Circuit verification
-from circuit.circuit_verification import check_valid_1q_2q_gates
-from circuit.circuit_statistics import *
+from qeccm.circuit.circuit_verification import check_valid_1q_2q_gates
+from qeccm.circuit.circuit_statistics import *
 
 # Hypergraph
 import rustworkx as rx
-from itertools import count
+from rustworkx.visualization import graphviz_draw
+
+# Qiskit DAG
+import qiskit
+from qiskit.dagcircuit import DAGCircuit
+
+# Hashmap
+from collections import defaultdict
 
 
 class HyperGraph:
-    """Hypergraph build upon rustworx graph
-
-    Reference:
-    [1] Felix Burt, Kuan-Cheng Chen, Kin Leung, "Generalised Circuit Partitioning for Distributed Quantum Computing"
-    `arXiv:2408.01424 <https://arxiv.org/abs/2408.01424>` 
-    """
-    
-     # running id for hyper‑edges
-    _hid = count()                 
+    """Hypergraph build upon rustworx graph.
+    """             
 
     def __init__(self, multigraph=False):
+        self._hg = rx.PyGraph(multigraph=multigraph)
+        self.node_idx = defaultdict(int)   
 
-        self._g = rx.PyGraph(multigraph=multigraph)
-        # vertex label -> rustworkx index
-        self._idx_of = {}      
+    def add_hyperedge(self, root: int, targets: list) -> None:
+        if not root in self.node_idx:
+            node_idx = self._hg.add_node(str(root))
+            self.node_idx[root] = node_idx
 
-    def _index(self, v):
-        """Return rustworkx index for vertex label, creating the node if absent."""
-        if v not in self._idx_of:
-            self._idx_of[v] = self._g.add_node(v)
-        return self._idx_of[v]
-
-    def add_hyperedge(self, roots, targets, payload=None):
-        """Insert the hyper‑edge Roots ⟶ Targets and return its id."""
-        hid   = next(self._hid)
-        he_ix = self._g.add_node(("HE", hid, payload))   # tag helps identify later
-
-        for r in roots:
-            self._g.add_edge(self._index(r), he_ix, None)
+        # Add edges to all target nodes
         for t in targets:
-            self._g.add_edge(he_ix, self._index(t), None)
-        return hid
+            # Add target node if it does not exists yet
+            if not t in self.node_idx:
+                node_idx = self._hg.add_node(str(t))
+                self.node_idx[t] = node_idx
+
+            self._hg.add_edge(self.node_idx[root], self.node_idx[t], None)
 
 
 class HypergraphCircuit():
     """Quantum circuit represented as hypergraph.
 
-    ASD
+    TODO: Description
     
     References:
     [1] Felix Burt, Kuan-Cheng Chen, Kin Leung, "Generalised Circuit Partitioning for Distributed Quantum Computing"
@@ -58,7 +51,7 @@ class HypergraphCircuit():
     `arXiv:2305.14148 <https://arxiv.org/abs/2305.14148>`
     """
     
-    def __init__(self, circuit: QuantumCircuit):
+    def __init__(self, circuit: DAGCircuit):
 
         # Quantum circuit
         self.circuit = circuit
@@ -67,25 +60,33 @@ class HypergraphCircuit():
         self.hgc = HyperGraph(multigraph = True)
 
         # Circuit to hypergraph
-        self.hgc = self._qc_to_hypergraph()
+        self._qc_to_hypergraph()
 
     def _qc_to_hypergraph(self):
+        """ Create hypergraph given circuit as DAG.
+
+        It is possible to e.g. group gates together (these will then become hyperedges). For now, do not consider such
+        grouping mechanism.
+        """
 
         # Check if circuit consists of 1q and 2q gates only
         if check_valid_1q_2q_gates(self.circuit):
             raise Exception("Circuit contains >2q gates!")
 
-        # It is possible to e.g. group gates together (these will then become hyperedges). For now, do not consider such
-        # grouping mechanism.
+        control_map = defaultdict(list)
+        # Serial iteration over DAG using serial_layers. It is also possible to group all gates together (theoretical
+        # possible to run in parallel) using multigraph_layers.
+        for layer in self.circuit.serial_layers():
+            subdag = layer["graph"]
 
-        # Iterate over qubits
-        for qubit_index, qubit in enumerate(self.circuit.qubits):
-            # Each qubit can connect to other qubits (two-qubit gates)
-            # 1-qubit gates
-            # 2-qubit gates
-            pass
-        
-        pass
+            # Iterate over two-qubit gates
+            for gate in subdag.two_qubit_ops():
+                qc, qt = gate.qargs
+                control_map[qc._index].append(qt._index)
+
+        for control, targets in control_map.items():
+            self.hgc.add_hyperedge(control, targets)
+
 
     def hg_to_kahypar(self):
         # Translate hypergraph into graph format used by kahypar
@@ -111,7 +112,6 @@ class HypergraphCircuit():
 
         return simple_g
 
-
     def cost_analysis(self):
         # calculate gates (swap, two-qubits, etc.)
         
@@ -120,3 +120,26 @@ class HypergraphCircuit():
         # calc num qubits
 
         calculate_gates()
+
+    def draw_hg(self, filename=""):
+        """Draw hypergraph
+
+        :param filename: Path to write figure to, defaults to ""
+        :type filename: str, optional
+        """
+
+        def node_attr_fn(node):
+            attr_dict = {
+                "fontcolor": "white",
+                "color": "darkcyan", 
+                "fill_color": "darkcyan",
+                "style": "filled",
+                "shape": "circle",
+                "label": str(node),
+                "width": ".5",
+                "height": ".5",
+                "rank": "same"
+            }
+            return attr_dict
+        
+        graphviz_draw(self.hgc._hg, filename=filename, node_attr_fn=node_attr_fn)
