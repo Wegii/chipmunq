@@ -18,7 +18,7 @@ def test_surface_memory_circuit_to_hypergraph():
     circuit_generator = QECMemory(num_qubits)
     surface_memory_circuit = circuit_generator.generate_code_memory('surface')
 
-    # Convert circuit to DAG circuit
+    # Convert circuit to DAG circuit. In the qiskit transpilation passes, 
     surface_memory_circuit_dag = circuit_to_dag(surface_memory_circuit)
     # Construct hypergraph from circuit
     hgc = HypergraphCircuit(surface_memory_circuit_dag)

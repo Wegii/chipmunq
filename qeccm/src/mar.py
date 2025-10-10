@@ -1,10 +1,10 @@
 import abc
-from qecc_mapping.qeccm.circuit.hypergraph_circuit import HypergraphCircuit
-from qecc_mapping.qeccm.src.partitioners import *
+from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
+from qeccm.circuit.partitioners import KaHyParPartitioning
 import qiskit
 
 
-class GenericMapRoute(metaclass=abc.ABC):
+class GenericMapRoute(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self):
@@ -35,22 +35,38 @@ class BasicMapRoute(GenericMapRoute):
 
 class PartitionedMapRoute(GenericMapRoute):
 
-    def __init__(self):
-        pass
+    # Not all qubits have the same connectivity
+    # Only certain qubits are directly connected to the other chiplets
+    # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
-    def perform_mapping(self, hgc: HypergraphCircuit):
+    def __init__(self, hgc):
+        self.hgc = hgc
+        self.partitioned_hgc = None
+
+        self.kahypar_partitioner = KaHyParPartitioning(hgc)
+
+    def perform_mapping(self, kp: int = None) -> None:
 
         # The hypergraph circuit has multiple edges, since multigraph=True
         # Remove these duplicates, since these are not needed in the partitioning
         # In the local mapping these can be again quite interesting
 
-        kahypar_partitioner = KaHyParPartitioning()
-
-        # Calculate number of partitions based on circuit and backend
-        kp = kahypar_partitioner.calculate_partitions()
+        if kp is None:
+            # Calculate number of partitions based on circuit and backend
+            self.kahypar_partitioner.k = self.kahypar_partitioner.calculate_partitions()
+        else:
+            self.kahypar_partitioner.k = kp
 
         # Partitioned mapping
+        self.kahypar_partitioner.run()
+
+        # TODO: generate hypergraph from partition indices
+
 
     def perform_routing(self):
         # SABRE
+        pass
+
+    def draw_partitioned_hg(self):
+        self.partitioned_hgc
         pass

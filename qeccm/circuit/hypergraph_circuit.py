@@ -15,8 +15,7 @@ from collections import defaultdict
 
 
 class HyperGraph:
-    """Hypergraph build upon rustworx graph.
-    """             
+    """Hypergraph build upon rustworx graph."""             
 
     def __init__(self, multigraph=False):
         self._hg = rx.PyGraph(multigraph=multigraph)
@@ -35,6 +34,12 @@ class HyperGraph:
                 self.node_idx[t] = node_idx
 
             self._hg.add_edge(self.node_idx[root], self.node_idx[t], None)
+
+    def get_num_edges(self):
+        return self._hg.num_edges()
+
+    def get_num_vertices(self):
+        return self._hg.num_nodes()
 
 
 class HypergraphCircuit():
@@ -62,7 +67,7 @@ class HypergraphCircuit():
         # Circuit to hypergraph
         self._qc_to_hypergraph()
 
-    def _qc_to_hypergraph(self):
+    def _qc_to_hypergraph(self) -> None:
         """ Create hypergraph given circuit as DAG.
 
         It is possible to e.g. group gates together (these will then become hyperedges). For now, do not consider such
@@ -87,11 +92,32 @@ class HypergraphCircuit():
         for control, targets in control_map.items():
             self.hgc.add_hyperedge(control, targets)
 
-
     def hg_to_kahypar(self):
-        # Translate hypergraph into graph format used by kahypar
-        # See: https://github.com/CQCL/pytket-dqc/blob/main/src/pytket_dqc/circuits/hypergraph.py#L474
-        pass
+        """ Translate hypergraph to kahypar format
+
+        The hypergraph is converted into  a format that is similar to the CSR (Compressed Sparse Row) format. The 
+        edge_vector list defines all vertices of a hyperedge. The idx_vector marks where each hyperedge starts in the
+        edge_vector list
+
+        Reference:
+        - https://github.com/kahypar/kahypar/blob/master/python/module.cpp
+        - https://github.com/CQCL/pytket-dqc/blob/main/src/pytket_dqc/circuits/hypergraph.py#L474
+        
+        :return: _description_
+        :rtype: _type_
+        """
+        
+        # Construct edge_vector and index_vector
+        edges = self.hgc._hg.edge_list()
+        edge_vector = []
+        idx_vector = []
+        pos = 0
+        for u, v in edges:
+            idx_vector.append(pos)
+            edge_vector.extend([u, v])
+            pos += 2
+
+        return idx_vector, edge_vector
 
     def multigraph_to_singular(self):
         # Remove all duplicate edges added due to multigraph setting
@@ -120,6 +146,12 @@ class HypergraphCircuit():
         # calc num qubits
 
         calculate_gates()
+
+    def get_num_edges(self):
+        return self.hgc.get_num_edges()
+
+    def get_num_vertices(self):
+        return self.hgc.get_num_vertices()
 
     def draw_hg(self, filename=""):
         """Draw hypergraph
