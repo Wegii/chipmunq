@@ -14,6 +14,28 @@ from qiskit.dagcircuit import DAGCircuit
 from collections import defaultdict
 
 
+class PartitionedHyperGraph:
+    """Partitioned Hypergraph after partitioning a HyperGraph object
+
+    TODO: Current idea is to use this class for visualization of a hypergraph after partitioning. For visualization, 
+    it is possible to use a specific visualization library:
+    - https://github.com/HGX-Team/hypergraphx/
+    - https://github.com/pnnl/HyperNetX
+
+    TODO: A possible idea is to plot all nodes and overlay the nodes corresponding to the same partition with a color
+    """
+
+    def __init__(self, partition_id: list):
+        # This list contains the partition id for each node
+        self.partition_id = partition_id
+
+        pass
+
+    def draw_phg(self):
+        # TODO: Draw partitioned hypergraph
+        pass
+        
+
 class HyperGraph:
     """Hypergraph build upon rustworx graph."""             
 
