@@ -51,10 +51,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # TODO: Calculate from backend
         partition_sizes = [15, 15]
 
-        num_vertices = self.hypergraph.get_num_vertices() 
-        num_hyperedges = self.hypergraph.get_num_edges() - 1
-        # TODO: check if correct format
         index_vector, edge_vector = self.hypergraph.hg_to_kahypar()
+        num_vertices = self.hypergraph.get_num_vertices() 
+        num_hyperedges = len(index_vector)-1
 
         # For now, all hyperedges are assumed to have the same weight
         hyperedge_weights = [1 for i in range(0, num_hyperedges)]
@@ -83,19 +82,14 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         # Partition id for each vertice
         self.partition_id = [kahypar_hg.blockID(i) for i in range(kahypar_hg.numNodes())]
+        self.cost_analysis()
 
     def cost_analysis(self):
         """Calculate statistics of partitioned graph
         """
 
         # Output metrics
-        print("Partition Stats:")
-        print("Imbalance = " + str(self.partitioned_hgc.imbalance(self.khp_context)))
-        print("km1       = " + str(self.partitioned_hgc.km1()))
-        print("cut       = " + str(self.partitioned_hgc.cut()))
-        print("Block Weights:")
-        for i in self.partitioned_hgc.blocks():
-            print("Weight of Block " + str(i) + " = " + str(self.partitioned_hgc.block_weight(i)))
+        pass
 
     def calculate_partitions(self, backend: GenericChipletBackend) -> int:
 

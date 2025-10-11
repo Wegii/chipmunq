@@ -108,14 +108,25 @@ class HypergraphCircuit():
         """
         
         # Construct edge_vector and index_vector
-        edges = self.hgc._hg.edge_list()
+        
         edge_vector = []
         idx_vector = []
         pos = 0
-        for u, v in edges:
+        # Iterate over all vertices
+        for vertice in self.hgc.node_idx:
+            root_node = self.hgc.node_idx[vertice]
+
+            # Get all edges going out from this vertice
+            out_edges = self.hgc._hg.out_edges(root_node)
+            out_edges_target = [n[1] for n in out_edges]
+            # Need to be in ascending order
+            out_edges_target.sort()
+
             idx_vector.append(pos)
-            edge_vector.extend([u, v])
-            pos += 2
+            edge_vector.extend([root_node] + out_edges_target)
+            pos += len(out_edges_target) + 1
+
+            #print(f"{root_node}: {out_edges_target}")
 
         return idx_vector, edge_vector
 
