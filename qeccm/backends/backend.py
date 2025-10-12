@@ -195,16 +195,24 @@ class GenericChipletBackend(BackendV2):
 
 
         # Connect edges from center
-        cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
-        cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
-        cb_idx2, ct_idx2, cr_idx2, cl_idx2 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*2)
-        cb_idx3, ct_idx3, cr_idx3, cl_idx3 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*3)
+        if self.c == 4:
+            cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
+            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
+            cb_idx2, ct_idx2, cr_idx2, cl_idx2 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*2)
+            cb_idx3, ct_idx3, cr_idx3, cl_idx3 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*3)
 
-        # Connect graphs together
-        self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
-        self.G.add_edges_from([(cr_idx1, cl_idx2, LABEL_INTER_CHIP)])
-        self.G.add_edges_from([(cb_idx2, ct_idx3, LABEL_INTER_CHIP)])     
-        self.G.add_edges_from([(cl_idx3, cr_idx, LABEL_INTER_CHIP)])        
+            # Connect graphs together
+            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
+            self.G.add_edges_from([(cr_idx1, cl_idx2, LABEL_INTER_CHIP)])
+            self.G.add_edges_from([(cb_idx2, ct_idx3, LABEL_INTER_CHIP)])     
+            self.G.add_edges_from([(cl_idx3, cr_idx, LABEL_INTER_CHIP)])     
+        else:
+            cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
+            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
+
+            # Connect graphs together
+            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
+
 
     def get_chiplet_at(self, index: int):
         # Return nodes associated with specified chiplet

@@ -27,7 +27,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
     hgc = HypergraphCircuit(surface_memory_circuit_dag)
 
     # Initialize backend to map to
-    chiplet_backend = GenericChipletBackend((4, 5, 5), 1)
+    chiplet_backend = GenericChipletBackend((2, 5, 5), 1)
     chiplet_backend.build_backend()
 
     # Partition
@@ -37,8 +37,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
     # Perform mapping
     mar.perform_mapping(chiplet_backend, kp=k)    
     
-    # TODO: visualize mapping by placing the nodes on the backend map. Unused nodes are red, used nodes are green.
-    #       Inside the green nodes show qubit that is placed there as label
+    # Visualize the mapping 
     mar.mapper.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
 
 

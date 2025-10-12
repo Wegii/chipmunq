@@ -10,6 +10,9 @@ from qecc_mapping.qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 
 class PartitionedMapRoutePass(TransformationPass):
     """ Map input circuit onto a backend topology via insertion of SWAPs.
+
+    The `PartitionedMapRoutePass` pass acts both as a layout stage and a routing stage.
+
     
     References:
     https://quantum.cloud.ibm.com/docs/en/guides/create-transpiler-plugin
@@ -23,6 +26,8 @@ class PartitionedMapRoutePass(TransformationPass):
         # See: https://quantum.cloud.ibm.com/docs/en/guides/DAG-representation
 
     def run(self, circuit: DAGCircuit, type: str) -> DAGCircuit:
+
+        # TODO: fix input parameters to adhere to qiskit passmanager
         if type == "basic":
             qc = self._basic_mar(circuit)
         elif type == "partitioned":
@@ -32,6 +37,8 @@ class PartitionedMapRoutePass(TransformationPass):
 
     def _partitioned_mar(circuit: DAGCircuit) -> DAGCircuit:
     
+        # TODO: rewrite this in terms of passes
+
         hg_circuit = HypergraphCircuit(circuit)
 
         mar = PartitionedMapRoute()

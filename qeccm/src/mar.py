@@ -6,6 +6,7 @@ from qiskit.providers import BackendV2
 
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.src.mapper import CongestionMapper, RandomMapper
+from qeccm.src.router import BasicSwapRouter
 
 
 class GenericMapRoute(abc.ABC):
@@ -43,14 +44,17 @@ class PartitionedMapRoute(GenericMapRoute):
     # Only certain qubits are directly connected to the other chiplets
     # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
-    def __init__(self, hgc: qiskit.dagcircuit):
+    def __init__(self, hgc: qiskit.dagcircuit, coupling_map=None):
         self.hgc = hgc
-        self.partitioned_hgc = None
 
-        self.mapping = None
-
+        # Partitioning
         self.kahypar_partitioner = KaHyParPartitioning(hgc)
+        self.partitioned_hgc = None
+        # Mapping
         self.mapper = RandomMapper()
+        self.mapping = None
+        # Routing
+        self.router = BasicSwapRouter(coupling_map)
 
     def perform_mapping(self, backend: BackendV2, kp: int = None) -> None:
 
@@ -68,9 +72,10 @@ class PartitionedMapRoute(GenericMapRoute):
         self.partitioned_hgc = self.kahypar_partitioner.run()
 
         # Perform mapping
-        self.mapping = self.mapper.perform_mapping(backend, self.partitioned_hgc)
+        self.mapping = self.mapper.run(backend, self.partitioned_hgc)
 
 
     def perform_routing(self):
+
         # SABRE
         pass
