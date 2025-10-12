@@ -58,15 +58,9 @@ class PartitionedMapRoute(GenericMapRoute):
             self.kahypar_partitioner.k = kp
 
         # Partitioned mapping
-        self.kahypar_partitioner.run()
-
-        # TODO: generate hypergraph from partition indices
+        self.partitioned_hgc = self.kahypar_partitioner.run()
 
 
     def perform_routing(self):
         # SABRE
-        pass
-
-    def draw_partitioned_hg(self):
-        self.partitioned_hgc
         pass

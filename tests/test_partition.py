@@ -55,7 +55,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning():
     mar.perform_mapping(kp=k)
 
     # Draw partitioned graph
-    #mar.partitioned_hgc.draw()
+    mar.partitioned_hgc.draw_phg(filename="data/circuits/surface_memory_phg.png")
     
 
 if __name__ == "__main__":

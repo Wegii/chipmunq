@@ -5,6 +5,10 @@ from qeccm.circuit.circuit_statistics import *
 # Hypergraph
 import rustworkx as rx
 from rustworkx.visualization import graphviz_draw
+import kahypar
+# Visualization
+import matplotlib.pyplot as plt
+import hypernetx as hnx
 
 # Qiskit DAG
 import qiskit
@@ -17,23 +21,42 @@ from collections import defaultdict
 class PartitionedHyperGraph:
     """Partitioned Hypergraph after partitioning a HyperGraph object
 
-    TODO: Current idea is to use this class for visualization of a hypergraph after partitioning. For visualization, 
-    it is possible to use a specific visualization library:
-    - https://github.com/HGX-Team/hypergraphx/
-    - https://github.com/pnnl/HyperNetX
+    Visualization of hypergraph given kahypar partitioning using hypernetx. Translates partitioning format to dict
+    structure to then construct a hypergraph 
 
-    TODO: A possible idea is to plot all nodes and overlay the nodes corresponding to the same partition with a color
+    TODO: Potentially also use the hypergraph from hypernetx as hypergraph object, instead of using the rustworkx
+    pygraph. 
     """
 
-    def __init__(self, partition_id: list):
-        # This list contains the partition id for each node
-        self.partition_id = partition_id
+    def __init__(self, partitioned_hgc: kahypar.Hypergraph):
+        """Generate hypernetx hypergraph given a partitioned kahypar hypergraph
 
-        pass
+        :param partitioned_hgc: Hypergraph after partitioning
+        :type partitioned_hgc: kahypar.Hypergraph
+        """
+        
+        # Generate dictionary for each block as key containing all nodes
+        num_blocks = partitioned_hgc.numBlocks()
+        block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
+        for node in range(partitioned_hgc.numNodes()):
+            block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
 
-    def draw_phg(self):
-        # TODO: Draw partitioned hypergraph
-        pass
+        # Construct hypergraph from partitioned hypergraph
+        self._phg = hnx.Hypergraph(block_to_nodes)
+
+    def draw_phg(self, filename: str = "") -> None:
+        """Draw partitioned hypergraph
+
+        :param filename: Path to write figure to, defaults to ""
+        :type filename: str, optional
+        """
+
+        # TODO: Add some options (visualization) for plotting the graph more nicely
+        hnx.draw(self._phg)
+
+        if filename != "":
+            plt.savefig(fname=filename)
+        plt.close()
         
 
 class HyperGraph:
@@ -41,6 +64,7 @@ class HyperGraph:
 
     def __init__(self, multigraph=False):
         self._hg = rx.PyGraph(multigraph=multigraph)
+        # Mapping of qubit id to graph id
         self.node_idx = defaultdict(int)   
 
     def add_hyperedge(self, root: int, targets: list) -> None:

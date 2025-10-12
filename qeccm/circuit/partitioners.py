@@ -4,7 +4,7 @@ import logging
 import multiprocessing
 import mtkahypar as mtkahypar
 import kahypar as kahypar
-from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
+from qeccm.circuit.hypergraph_circuit import HypergraphCircuit, PartitionedHyperGraph
 from qeccm.backends.backend import GenericChipletBackend
 
 
@@ -80,9 +80,8 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # Partition hypergraph
         kahypar.partition(kahypar_hg, self.khp_context)
 
-        # Partition id for each vertice
-        self.partition_id = [kahypar_hg.blockID(i) for i in range(kahypar_hg.numNodes())]
-        self.cost_analysis()
+        return PartitionedHyperGraph(kahypar_hg)
+
 
     def cost_analysis(self):
         """Calculate statistics of partitioned graph
