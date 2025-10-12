@@ -45,10 +45,12 @@ Mapping QECC to distributed systems
 ## Dependencies
 
 Qiskit
+mtkahypar
 
 
 Install KaHyPar
 - See[KaHyPar](https://github.com/kahypar/kahypar)
+- mtkahypar
 - See [Kaminpar](https://github.com/KaHIP/KaMinPar)
 
 ## Build from source
