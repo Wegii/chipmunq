@@ -34,15 +34,17 @@ class PartitionedHyperGraph:
         :param partitioned_hgc: Hypergraph after partitioning
         :type partitioned_hgc: kahypar.Hypergraph
         """
-        
+
         # Generate dictionary for each block as key containing all nodes
         num_blocks = partitioned_hgc.numBlocks()
         block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
+        
         for node in range(partitioned_hgc.numNodes()):
             block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
 
         # Construct hypergraph from partitioned hypergraph
         self._phg = hnx.Hypergraph(block_to_nodes)
+        self._btn = block_to_nodes
 
     def draw_phg(self, filename: str = "") -> None:
         """Draw partitioned hypergraph
@@ -147,7 +149,6 @@ class HypergraphCircuit():
 
         Reference:
         - https://github.com/kahypar/kahypar/blob/master/python/module.cpp
-        - https://github.com/CQCL/pytket-dqc/blob/main/src/pytket_dqc/circuits/hypergraph.py#L474
         
         :return: _description_
         :rtype: _type_

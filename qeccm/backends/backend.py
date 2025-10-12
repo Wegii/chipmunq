@@ -127,6 +127,14 @@ class GenericMonolythicalBackend(BackendV2):
 class GenericChipletBackend(BackendV2):
     """ Simple chiplet backend
 
+    Things to add:
+     - Check out how to modify the backend with target that the qiskit compiler knows all potential constraints
+     - More transpiler info: https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.transpiler.Target
+
+    Additions
+     - TODO: Add inter-qpu connections and different constraints to backend
+     - TODO: Add list or something to get the qubits that connect to other qpus
+
     Args:
         BackendV2 (_type_): _description_
     """
@@ -148,9 +156,13 @@ class GenericChipletBackend(BackendV2):
         # TODO:  Add a) Linear, (b) Ring, (c) Grid, and (d) Star.
         self.typology = 'grid'
 
+        # Dictionary mapping chiplet index to list of nodes on chiplet 
+        self.chiplet_to_nodes = {}
+
     def _single_graph(self) -> rx.PyGraph:
 
-        # For a nice layout have a look at: https://github.com/munich-quantum-toolkit/qecc/blob/ls-compilation/scripts/co3/layouts.py
+        # For a nice layout have a look at:
+        #   https://github.com/munich-quantum-toolkit/qecc/blob/ls-compilation/scripts/co3/layouts.py
         # There, the layout has fixed coordinates.
 
         # Generate simple grid graph with edge to nearest neighbour
@@ -167,13 +179,15 @@ class GenericChipletBackend(BackendV2):
     def build_backend(self) -> None:
         # Construct sub-graphs based on number of chiplets specified
         G_partitioned = None
-        for c in range(self.c):
+        for i, c in enumerate(range(self.c)):
             g = self._single_graph()
 
             if G_partitioned == None:
                 G_partitioned = g
             else:
                 G_partitioned = rx.union(G_partitioned, g, merge_nodes=False, merge_edges=False)
+
+            self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m ))
 
         self.G = G_partitioned
 
@@ -192,6 +206,9 @@ class GenericChipletBackend(BackendV2):
         self.G.add_edges_from([(cb_idx2, ct_idx3, LABEL_INTER_CHIP)])     
         self.G.add_edges_from([(cl_idx3, cr_idx, LABEL_INTER_CHIP)])        
 
+    def get_chiplet_at(self, index: int):
+        # Return nodes associated with specified chiplet
+        return self.chiplet_to_nodes[index]
 
     def edge_attr_fn(self, edge):
         attr_dict = {
@@ -223,6 +240,41 @@ class GenericChipletBackend(BackendV2):
     def visualize_coupling_map(self):
         graphviz_draw(self.G, method="neato", edge_attr_fn=self.edge_attr_fn, node_attr_fn=self.node_attr_fn,
                       filename=f"data/backends/chiplet_{self.c}_{self.n}_{self.m}.png")
+
+    def mapped_node_attr_fn(self, node):
+        attr_dict = {
+            "style": "filled",
+            "shape": "circle",
+            #"label": str(node),
+            "width": ".5",
+            "height": ".5",
+            "rank": "same"
+        }
+
+        # Change color of node if mapped
+        if str(node) == "u":
+            attr_dict["fontcolor"] = "white"
+            attr_dict["fill_color"] = "darkcyan"
+            attr_dict["color"] = "darkcyan"
+        else:
+            attr_dict["fontcolor"] = "black"
+            attr_dict["fill_color"] = "white"
+        
+        # TODO: add label showing which qubit is placed on which node on the backend
+
+        return attr_dict
+
+    def visualize_mapping(self, mapping, filename):
+        
+        # Iterate over chiplets
+        for chiplet_key in mapping:
+            # Iterate over each node in mapping and mark as utilized
+            chiplet_mapping = mapping[chiplet_key]
+            for node_mapping_kay in chiplet_mapping:
+                self.G[chiplet_mapping[node_mapping_kay]] = "u"
+
+        graphviz_draw(self.G, method="neato", edge_attr_fn=self.edge_attr_fn, node_attr_fn=self.mapped_node_attr_fn,
+                filename=filename)
         
 
     @property

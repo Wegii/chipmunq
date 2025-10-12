@@ -29,9 +29,10 @@ def test_surface_memory_circuit_to_hypergraph_partition_calculation():
 
     # Partition
     mar = PartitionedMapRoute(hgc)
+
+    # TODO: this needs to be imlpemented
     k = mar.kahypar_partitioner.calculate_partitions()
 
-    
 
 def test_surface_memory_circuit_to_hypergraph_partitioning():
     """Test partitioning of hypergraph"""
@@ -52,7 +53,9 @@ def test_surface_memory_circuit_to_hypergraph_partitioning():
     mar = PartitionedMapRoute(hgc)
     # Set number of partitions
     k = 2
-    mar.perform_mapping(kp=k)
+    # TODO: add correct backend
+    backend = None
+    mar.perform_mapping(backend, kp=k)
 
     # Draw partitioned graph
     mar.partitioned_hgc.draw_phg(filename="data/circuits/surface_memory_phg.png")

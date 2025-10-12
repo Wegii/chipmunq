@@ -34,21 +34,19 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # Initialize kahypar
         self.khp_context = kahypar.Context()
         # TODO: change objective
-        self.khp_context.loadINIconfiguration("qeccm/circuit/kahypar_config.ini")
+        self.khp_context.loadINIconfiguration("qeccm/src/kahypar_config.ini")
 
     def run(self):
         try:
             assert self.k > 0
         except AssertionError:
-            logging.warning(f"Number of partitions not set. Setting to 10")
-            # TODO: Fix the default setting to 10
-            self.k = 10
+            logging.warning(f"Number of partitions not set. Calculating optimal parameter.")
 
-        # Usage from 
-        # https://github.com/CQCL/pytket-dqc/blob/main/src/pytket_dqc/allocators/hypergraph_partitioning.py#L149
-        
+            # TODO: Calculate from backend
+            self.k = self.calculate_partitions()
+
         # Size of each partition
-        # TODO: Calculate from backend
+        # TODO: this needs to be calculated from the backend
         partition_sizes = [15, 15]
 
         index_vector, edge_vector = self.hypergraph.hg_to_kahypar()
@@ -82,16 +80,19 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         return PartitionedHyperGraph(kahypar_hg)
 
+    def calculate_partitions(self, backend: GenericChipletBackend) -> int:
+
+        # TODO: this needs to be imlpemented
+        # Calculate the optimal partitions given circuit size and available backend (number of e. g. chiplets, to which
+        # the circuit is partitioned and distributed)
+
+        # self.hypergraph
+        # backend
+        pass
 
     def cost_analysis(self):
         """Calculate statistics of partitioned graph
         """
 
         # Output metrics
-        pass
-
-    def calculate_partitions(self, backend: GenericChipletBackend) -> int:
-
-        # self.hypergraph
-        # backend
         pass

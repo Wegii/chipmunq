@@ -1,7 +1,11 @@
 import abc
-from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
-from qeccm.circuit.partitioners import KaHyParPartitioning
+
 import qiskit
+import qiskit.dagcircuit
+from qiskit.providers import BackendV2
+
+from qeccm.src.partitioners import KaHyParPartitioning
+from qeccm.src.mapper import CongestionMapper, RandomMapper
 
 
 class GenericMapRoute(abc.ABC):
@@ -39,13 +43,16 @@ class PartitionedMapRoute(GenericMapRoute):
     # Only certain qubits are directly connected to the other chiplets
     # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
-    def __init__(self, hgc):
+    def __init__(self, hgc: qiskit.dagcircuit):
         self.hgc = hgc
         self.partitioned_hgc = None
 
-        self.kahypar_partitioner = KaHyParPartitioning(hgc)
+        self.mapping = None
 
-    def perform_mapping(self, kp: int = None) -> None:
+        self.kahypar_partitioner = KaHyParPartitioning(hgc)
+        self.mapper = RandomMapper()
+
+    def perform_mapping(self, backend: BackendV2, kp: int = None) -> None:
 
         # The hypergraph circuit has multiple edges, since multigraph=True
         # Remove these duplicates, since these are not needed in the partitioning
@@ -59,6 +66,9 @@ class PartitionedMapRoute(GenericMapRoute):
 
         # Partitioned mapping
         self.partitioned_hgc = self.kahypar_partitioner.run()
+
+        # Perform mapping
+        self.mapping = self.mapper.perform_mapping(backend, self.partitioned_hgc)
 
 
     def perform_routing(self):
