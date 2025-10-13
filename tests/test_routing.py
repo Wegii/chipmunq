@@ -38,7 +38,6 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
     mar.perform_mapping(chiplet_backend, kp=k)
     
     # Perform routing
-    mar.perform_mapping(chiplet_backend, kp=k)    
     
     # TODO: visualize routing
     # TODO: call draw method on circuit

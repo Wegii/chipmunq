@@ -24,8 +24,6 @@ class BasicSwapRouter(GenericRouter):
     def __init__(self, coupling_map):
         super().__init__(coupling_map)
 
-
-
     def run(self, dag):
         return self._local_routing(dag)
 

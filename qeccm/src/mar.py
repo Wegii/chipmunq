@@ -1,10 +1,16 @@
 import abc
 
+# Qiskit transpiler
 import qiskit
 import qiskit.dagcircuit
 from qiskit.providers import BackendV2
+from qiskit.transpiler import PassManager, StagedPassManager
+from qiskit.transpiler.preset_passmanagers.plugin import PassManagerStagePlugin
+from qiskit.transpiler.passmanager_config import PassManagerConfig
+from qiskit.transpiler.passes import Unroll3qOrMore
 
 from qeccm.src.partitioners import KaHyParPartitioning
+from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 from qeccm.src.mapper import CongestionMapper, RandomMapper
 from qeccm.src.router import BasicSwapRouter
 
@@ -38,44 +44,66 @@ class BasicMapRoute(GenericMapRoute):
         pass
 
 
-class PartitionedMapRoute(GenericMapRoute):
+#class PartitionedMapRoute(GenericMapRoute):
+class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
     # Not all qubits have the same connectivity
     # Only certain qubits are directly connected to the other chiplets
     # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
-    def __init__(self, hgc: qiskit.dagcircuit, coupling_map=None):
-        self.hgc = hgc
+    def pass_manager(self, pass_manager_config: PassManagerConfig, optimization_level: int | None = None
+                     ) -> StagedPassManager:
+        # TODO: generate stagedpassmanager with all stages
 
-        # Partitioning
-        self.kahypar_partitioner = KaHyParPartitioning(hgc)
-        self.partitioned_hgc = None
-        # Mapping
-        self.mapper = RandomMapper()
-        self.mapping = None
-        # Routing
-        self.router = BasicSwapRouter(coupling_map)
+        init_pass = self._generate_initial_pass()
+        layout_pass = self._generate_layout_pass(pass_manager_config)
+        routing_pass = self._generate_routing_pass(pass_manager_config)
 
-    def perform_mapping(self, backend: BackendV2, kp: int = None) -> None:
+        staged_pm = StagedPassManager(stages=["init", "layout", "routing"], 
+                                      init=init_pass, layout=layout_pass, routing=routing_pass)
+
+        return staged_pm
+
+    def _generate_initial_pass(self) -> PassManager:
+        # The output of the init stage is an abstract circuit that contains only one- and two-qubit operations.
+
+        # Construct hypergraph from circuit
+        hgc_op = HypergraphCircuit()
+
+        # Convert circuit to single- and two-qubit gates only
+        conversion_op = Unroll3qOrMore()
+
+        init_pm = PassManager([conversion_op, hgc_op])
+        return init_pm
+
+    #def _generate_layout_pass(self, backend: BackendV2, kp: int = None) -> PassManager:
+    def _generate_layout_pass(self, pass_manager_config: PassManagerConfig = None) -> PassManager:
+        # Consists of analysis and transformation passes
 
         # The hypergraph circuit has multiple edges, since multigraph=True
         # Remove these duplicates, since these are not needed in the partitioning
         # In the local mapping these can be again quite interesting
 
-        if kp is None:
-            # Calculate number of partitions based on circuit and backend
-            self.kahypar_partitioner.k = self.kahypar_partitioner.calculate_partitions()
-        else:
-            self.kahypar_partitioner.k = kp
+        kp = 2
+        #if kp is None:
+        #    # Calculate number of partitions based on circuit and backend
+        #    self.kahypar_partitioner.k = self.kahypar_partitioner.calculate_partitions()
+        #else:
+        #    self.kahypar_partitioner.k = kp
 
-        # Partitioned mapping
-        self.partitioned_hgc = self.kahypar_partitioner.run()
+        # KaHyPar partitioning
+        partition_op = KaHyParPartitioning(kp=kp)
 
-        # Perform mapping
-        self.mapping = self.mapper.run(backend, self.partitioned_hgc)
+        # TODO: Mapping
+        #mapping_op = RandomMapper(pass_manager_config.coupling_map)
+        mapping_op = RandomMapper(coupling_map=pass_manager_config)
 
+        # Combine partitioning and mapping into a single pass
+        layout_pm = PassManager([partition_op, mapping_op])
+        return layout_pm
 
-    def perform_routing(self):
+    def _generate_routing_pass(self):
+        # Consists of transformation passes
 
         # SABRE
         pass

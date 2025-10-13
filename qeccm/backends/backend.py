@@ -134,6 +134,7 @@ class GenericChipletBackend(BackendV2):
     Additions
      - TODO: Add inter-qpu connections and different constraints to backend
      - TODO: Add list or something to get the qubits that connect to other qpus
+     - TODO: Check this link out https://quantum.cloud.ibm.com/docs/en/guides/represent-quantum-computers
 
     Args:
         BackendV2 (_type_): _description_
@@ -274,6 +275,10 @@ class GenericChipletBackend(BackendV2):
 
     def visualize_mapping(self, mapping, filename):
         
+        # TODO: Improve the visualization
+        # - A nice way of visualizing the mapping is shown here: https://quantum.cloud.ibm.com/docs/en/guides/represent-quantum-computers
+        # - Potentially use plot_circuit_layout for the mapping visualization
+
         # Iterate over chiplets
         for chiplet_key in mapping:
             # Iterate over each node in mapping and mark as utilized

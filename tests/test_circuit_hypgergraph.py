@@ -8,6 +8,8 @@ from experiments.circuit_generator import QECMemory
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 # Qiskit
 from qiskit.converters import circuit_to_dag
+# Custom transpiler plugin
+from qeccm.src.mar import PartitionedMapRoutePlugin
 
 
 def test_surface_memory_circuit_to_hypergraph():
@@ -17,13 +19,11 @@ def test_surface_memory_circuit_to_hypergraph():
     # Generate surface code memory circuit
     circuit_generator = QECMemory(num_qubits)
     surface_memory_circuit = circuit_generator.generate_code_memory('surface')
-
-    # Convert circuit to DAG circuit. In the qiskit transpilation passes, 
-    surface_memory_circuit_dag = circuit_to_dag(surface_memory_circuit)
+    
+    mar_pmsp = PartitionedMapRoutePlugin()
     # Construct hypergraph from circuit
-    hgc = HypergraphCircuit(surface_memory_circuit_dag)
-    # Draw hypergraph
-    hgc.draw_hg("data/circuits/surface_memory_hg.png")
+    init_pm = mar_pmsp._generate_initial_pass()
+    _ = init_pm.run(surface_memory_circuit)
     
 
 if __name__ == "__main__":

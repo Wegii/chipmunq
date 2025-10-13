@@ -1,7 +1,6 @@
 # Circuit verification
 from qeccm.circuit.circuit_verification import check_valid_1q_2q_gates
 from qeccm.circuit.circuit_statistics import *
-
 # Hypergraph
 import rustworkx as rx
 from rustworkx.visualization import graphviz_draw
@@ -9,11 +8,9 @@ import kahypar
 # Visualization
 import matplotlib.pyplot as plt
 import hypernetx as hnx
-
-# Qiskit DAG
-import qiskit
+# Qiskit Transpiler
 from qiskit.dagcircuit import DAGCircuit
-
+from qiskit.transpiler.basepasses import AnalysisPass
 # Hashmap
 from collections import defaultdict
 
@@ -90,7 +87,7 @@ class HyperGraph:
         return self._hg.num_nodes()
 
 
-class HypergraphCircuit():
+class HypergraphCircuit(AnalysisPass):
     """Quantum circuit represented as hypergraph.
 
     TODO: Description
@@ -104,32 +101,37 @@ class HypergraphCircuit():
     `arXiv:2305.14148 <https://arxiv.org/abs/2305.14148>`
     """
     
-    def __init__(self, circuit: DAGCircuit):
+    def __init__(self):
+        """Hypergraph initializer """
 
-        # Quantum circuit
-        self.circuit = circuit
+        super().__init__()
 
-        # Use multigraph option for e. g. statistics. For partitioning, duplicate edges can be removed
-        self.hgc = HyperGraph(multigraph = True)
-
+    def run(self, dag: DAGCircuit) -> None:
         # Circuit to hypergraph
-        self._qc_to_hypergraph()
+        self._qc_to_hypergraph(dag)
 
-    def _qc_to_hypergraph(self) -> None:
+        # TODO: Translate hypergraph to Kahypar. For now this is left out, since the mapper calls this functions.
+        #       Potentially call this directly here, such that the mapper only needs to access the property the
+        self.hg_to_kahypar()
+
+
+    def _qc_to_hypergraph(self, dag: DAGCircuit) -> None:
         """ Create hypergraph given circuit as DAG.
 
         It is possible to e.g. group gates together (these will then become hyperedges). For now, do not consider such
         grouping mechanism.
         """
+        # Use multigraph option for e. g. statistics. For partitioning, duplicate edges can be removed
+        hgc = HyperGraph(multigraph = True)
 
         # Check if circuit consists of 1q and 2q gates only
-        if check_valid_1q_2q_gates(self.circuit):
+        if check_valid_1q_2q_gates(dag):
             raise Exception("Circuit contains >2q gates!")
 
         control_map = defaultdict(list)
         # Serial iteration over DAG using serial_layers. It is also possible to group all gates together (theoretical
         # possible to run in parallel) using multigraph_layers.
-        for layer in self.circuit.serial_layers():
+        for layer in dag.serial_layers():
             subdag = layer["graph"]
 
             # Iterate over two-qubit gates
@@ -138,7 +140,12 @@ class HypergraphCircuit():
                 control_map[qc._index].append(qt._index)
 
         for control, targets in control_map.items():
-            self.hgc.add_hyperedge(control, targets)
+            hgc.add_hyperedge(control, targets)
+
+        self.property_set['hyper_dag'] = hgc
+
+        # TODO: modify the drawing
+        self.draw_hg("data/circuits/surface_memory_hg.png")
 
     def hg_to_kahypar(self):
         """ Translate hypergraph to kahypar format
@@ -154,17 +161,19 @@ class HypergraphCircuit():
         :rtype: _type_
         """
         
+        hgc = self.property_set['hyper_dag']
+
         # Construct edge_vector and index_vector
         
         edge_vector = []
         idx_vector = []
         pos = 0
         # Iterate over all vertices
-        for vertice in self.hgc.node_idx:
-            root_node = self.hgc.node_idx[vertice]
+        for vertice in hgc.node_idx:
+            root_node = hgc.node_idx[vertice]
 
             # Get all edges going out from this vertice
-            out_edges = self.hgc._hg.out_edges(root_node)
+            out_edges = hgc._hg.out_edges(root_node)
             out_edges_target = [n[1] for n in out_edges]
             # Need to be in ascending order
             out_edges_target.sort()
@@ -175,20 +184,26 @@ class HypergraphCircuit():
 
             #print(f"{root_node}: {out_edges_target}")
 
+        # Set property for later usage
+        self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
+
+        # TODO: Remove the return statement and only use the property set from above
         return idx_vector, edge_vector
 
     def multigraph_to_singular(self):
         # Remove all duplicate edges added due to multigraph setting
 
+        hgc = self.property_set['hyper_dag']
+
         simple_g = rx.PyGraph(multigraph=False)
 
         # Copy nodes
-        for node in self.hgc.node_indices():
-            simple_g.add_node(self.hgc[node])
+        for node in hgc.node_indices():
+            simple_g.add_node(hgc[node])
 
         # Copy edges (only one per unique pair)
         added_pairs = set()
-        for u, v, data in self.hgc.edge_list():
+        for u, v, data in hgc.edge_list():
             pair = tuple(sorted((u, v)))
             if pair not in added_pairs:
                 simple_g.add_edge(u, v, data)
@@ -206,10 +221,12 @@ class HypergraphCircuit():
         calculate_gates()
 
     def get_num_edges(self):
-        return self.hgc.get_num_edges()
+        hgc = self.property_set['hyper_dag']
+        return hgc.get_num_edges()
 
     def get_num_vertices(self):
-        return self.hgc.get_num_vertices()
+        hgc = self.property_set['hyper_dag']
+        return hgc.get_num_vertices()
 
     def draw_hg(self, filename=""):
         """Draw hypergraph
@@ -232,4 +249,5 @@ class HypergraphCircuit():
             }
             return attr_dict
         
-        graphviz_draw(self.hgc._hg, filename=filename, node_attr_fn=node_attr_fn)
+        hgc = self.property_set['hyper_dag']
+        graphviz_draw(hgc._hg, filename=filename, node_attr_fn=node_attr_fn)

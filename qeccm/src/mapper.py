@@ -1,17 +1,21 @@
 import abc
 
 from qiskit.providers import BackendV2
+from qiskit.dagcircuit import DAGCircuit
 from qeccm.circuit.hypergraph_circuit import PartitionedHyperGraph
-from qiskit.transpiler.basepasses import AnalysisPass
+from qiskit.transpiler.basepasses import TransformationPass
 
 
-class GenericMapper(AnalysisPass):
+class GenericMapper(TransformationPass):
 
     def __init__(self):
+        """ GenericMapper initializer """ 
+        super().__init__()
+
         # Backend for mapping
-        self.backend = None
+        #self.backend = None
         # Dictionary with mapping of nodes
-        self.mapping = {}
+        #self.mapping = {}
 
     def perform_mapping(self):
         raise NotImplementedError
@@ -19,7 +23,8 @@ class GenericMapper(AnalysisPass):
     def visualize_mapping(self, filename) -> None:
         """Visualize mapping on backend"""
 
-        self.backend.visualize_mapping(self.mapping, filename)
+        #self.backend.visualize_mapping(self.mapping, filename)        
+        self.coupling_map.visualize_mapping(self.property_set["block_node_map"], filename)
     
 
 class RandomMapper(GenericMapper):
@@ -33,20 +38,26 @@ class RandomMapper(GenericMapper):
     - Since most algorithms are heuristics, this can be used as some sort of baseline for comparison
     """
 
-    def __init__(self):
+    def __init__(self, coupling_map):
+        """ RandomMapper initializer """        
+
         super().__init__()
 
+        # Coupling map to map the dag to
+        self.coupling_map = coupling_map
+
     def _get_node_in_backend(self, block_idx: int) -> list:
-        return self.backend.get_chiplet_at(block_idx)
+        #return self.backend.get_chiplet_at(block_idx)
+        return self.coupling_map.get_chiplet_at(block_idx)
 
-    def run(self, backend: BackendV2, partitioned_hgc: PartitionedHyperGraph) -> dict:
-        # TODO: fix the input and output parameters
-
-        # Set backend in order to track used backend after mapping
-        self.backend = backend
+    #def run(self, backend: BackendV2, partitioned_hgc: PartitionedHyperGraph) -> dict:
+    #def run(self, dag: DAGCircuit, partitioned_hgc: PartitionedHyperGraph) -> dict:
+    def run(self, dag: DAGCircuit) -> None:
 
         # Construct dictionary with block as key and value as (random) mapping from node to backend node 
         block_node_map = {}
+
+        partitioned_hgc = self.property_set["partitioned_hyper_dag"]
 
         # TODO: parallelization over distributed blocks
         for block in partitioned_hgc._btn.items():
@@ -61,13 +72,23 @@ class RandomMapper(GenericMapper):
 
             block_node_map[block_idx] = node_map
 
-        self.mapping = block_node_map
+        # TODO: technically this should not be done, since we are in a transformation pass
+        self.property_set["block_node_map"] = block_node_map
 
+        # TODO: draw mapping
+        self.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
+
+        # Perform mapping on dag
+        # TODO: iterate over dag
+        # TODO: each qubit gets it's mapped value given the block_node_map
+
+        #for i in dag:
+        #    pass
         # TODO: perform mapping on DAG
-        # TODO: this should then be returned DAGCircuit: A mapped DAG.
-        # TODO: set the block_node_map as self.property_set[SOME_NAME] = block_node_map
 
-        return block_node_map
+
+
+        return dag
 
 
 class CongestionMapper(GenericMapper):

@@ -1,5 +1,8 @@
 import logging
 
+# Qiskit transpiler
+from qiskit.transpiler.basepasses import AnalysisPass
+
 # Partitioning
 import multiprocessing
 import mtkahypar as mtkahypar
@@ -8,9 +11,9 @@ from qeccm.circuit.hypergraph_circuit import HypergraphCircuit, PartitionedHyper
 from qeccm.backends.backend import GenericChipletBackend
 
 
-class GenericHypergraphPartitioning():
+class GenericHypergraphPartitioning(AnalysisPass):
     def __init__(self):
-        pass
+        super().__init__()
 
     def run(self, circuit, backend) -> float:
         # TODO: function that calculates (given a backend and circuit) into how many cuts it is necessary to partition the circuit
@@ -24,11 +27,14 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
     See implementation details in `<https://kahypar.org/>`_ `<https://github.com/kahypar/mt-kahypar>`_
     """
 
-    def __init__(self, hgc: HypergraphCircuit):
+
+    def __init__(self, kp: int):
+        """KaHyPar partitioning initializer"""
         super().__init__()
 
-        self.hypergraph = hgc
-        self.k = -1
+        
+        #self.hypergraph = hgc
+        self.k = kp
         self.partition_id = None
 
         # Initialize kahypar
@@ -36,21 +42,25 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # TODO: change objective
         self.khp_context.loadINIconfiguration("qeccm/src/kahypar_config.ini")
 
-    def run(self):
+    def run(self, dag):
         try:
             assert self.k > 0
         except AssertionError:
             logging.warning(f"Number of partitions not set. Calculating optimal parameter.")
 
-            # TODO: Calculate from backend
+            # TODO: Calculate from coupling_map
             self.k = self.calculate_partitions()
 
         # Size of each partition
         # TODO: this needs to be calculated from the backend
         partition_sizes = [15, 15]
 
-        index_vector, edge_vector = self.hypergraph.hg_to_kahypar()
-        num_vertices = self.hypergraph.get_num_vertices() 
+        hgc = self.property_set['hyper_dag']
+        print(hgc)
+        #print(self.property_set)
+
+        (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar'] #self.hypergraph.hg_to_kahypar()
+        num_vertices = hgc.get_num_vertices() 
         num_hyperedges = len(index_vector)-1
 
         # For now, all hyperedges are assumed to have the same weight
@@ -78,7 +88,12 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # Partition hypergraph
         kahypar.partition(kahypar_hg, self.khp_context)
 
-        return PartitionedHyperGraph(kahypar_hg)
+        self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(kahypar_hg)
+
+        # TODO: drawing
+        self.property_set["partitioned_hyper_dag"].draw_phg(filename="data/circuits/surface_memory_phg.png")
+
+        return dag
 
     def calculate_partitions(self, backend: GenericChipletBackend) -> int:
 
