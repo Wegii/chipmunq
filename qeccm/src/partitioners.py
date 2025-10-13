@@ -56,7 +56,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         partition_sizes = [15, 15]
 
         hgc = self.property_set['hyper_dag']
-        print(hgc)
+        #print(hgc)
         #print(self.property_set)
 
         (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar'] #self.hypergraph.hg_to_kahypar()

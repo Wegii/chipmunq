@@ -44,7 +44,8 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
 
     staged_pm = StagedPassManager(stages=["init", "layout"], init=init_pm, layout=partitioning_pm)
     a = staged_pm.run(surface_memory_circuit)
-    print(a)
+    #print(a)
+    print(staged_pm.property_set["layout"])
 
 
 if __name__ == "__main__":

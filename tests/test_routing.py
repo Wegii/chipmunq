@@ -2,17 +2,19 @@ import sys
 import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
+# Circuits
 from experiments.circuit_generator import QECMemory
-from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
-from qeccm.src.mar import PartitionedMapRoute
+# Backend
 from qeccm.backends.backend import GenericChipletBackend
-# Qiskit
-from qiskit.converters import circuit_to_dag
-
+from qiskit.visualization import plot_gate_map
+# Qiskit Transpiler
+from qiskit.transpiler import StagedPassManager
+# Custom transpiler plugin
+from qeccm.src.mar import PartitionedMapRoutePlugin
 
 
 def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
-    """Test mapping of hypergraph"""
+    """Test routing of hypergraph"""
 
     # Minimum number of qubits for distance 3 surface code
     num_qubits = 26 
@@ -21,27 +23,34 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
     circuit_generator = QECMemory(num_qubits)
     surface_memory_circuit = circuit_generator.generate_code_memory('surface')
 
-    # Convert circuit to DAG circuit. In the qiskit transpilation passes, 
-    surface_memory_circuit_dag = circuit_to_dag(surface_memory_circuit)
-    # Construct hypergraph from circuit
-    hgc = HypergraphCircuit(surface_memory_circuit_dag)
-
     # Initialize backend to map to
     chiplet_backend = GenericChipletBackend((2, 5, 5), 1)
-    chiplet_backend.build_backend()
-
-    # Partition
-    mar = PartitionedMapRoute(hgc)
-    # Set number of partitions
-    k = 2
-    # Perform mapping
-    mar.perform_mapping(chiplet_backend, kp=k)
     
+    target = chiplet_backend.target
+    coupling_map_backend = target.build_coupling_map()
+    #print(coupling_map_backend)
+
+    plot_gate_map(
+        chiplet_backend,
+        plot_directed=False,
+        filename = "data/backends/new_chiplet.png"
+    )
+    
+    mar_pmsp = PartitionedMapRoutePlugin()
+    # Construct hypergraph from circui[t
+    init_pm = mar_pmsp._generate_initial_pass()
+    # Perform partition and mapping
+    partitioning_pm = mar_pmsp._generate_layout_pass(chiplet_backend)
     # Perform routing
-    
-    # TODO: visualize routing
-    # TODO: call draw method on circuit
+    routing_pm = mar_pmsp._generate_routing_pass(chiplet_backend)
 
+    staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=partitioning_pm,
+                                  routing=routing_pm)
+    a = staged_pm.run(surface_memory_circuit)
+    print(a)
+
+    #     mar.mapper.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
+    
 
 if __name__ == "__main__":
     test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing()

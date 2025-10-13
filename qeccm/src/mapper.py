@@ -96,14 +96,17 @@ class RandomMapper(GenericMapper):
 
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
+        #regs = [*dag.qubits, *[q for reg in dag.qregs.values() for q in reg]]
+
         hgc = self.property_set['hyper_dag']
         for reg in regs:
             if isinstance(reg, QuantumRegister):
                 layout.add_register(reg)
-                print(reg)
+                #print(reg)
             else:
                 # Map qubit id to graph id (since the partitioning works on the graph ids)
                 qubit_to_node = hgc.node_idx.get(reg._index)
+                #print(qubit_to_node)
                 if qubit_to_node is None:
                     # virtual qubit is not used, so simply use first free qubit
                     p_b = not_mapped_qubits.pop(0)
@@ -119,7 +122,7 @@ class RandomMapper(GenericMapper):
 
         # Virtual to physical qubit mapping
         self.property_set["layout"] = layout
-        
+
 
 class CongestionMapper(GenericMapper):
     """TODO: Short Description
