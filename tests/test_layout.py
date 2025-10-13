@@ -6,6 +6,7 @@ sys.path.append(os.path.join(os.getcwd(), "."))
 from experiments.circuit_generator import QECMemory
 # Backend
 from qeccm.backends.backend import GenericChipletBackend
+from qiskit.visualization import plot_gate_map
 # Qiskit Transpiler
 from qiskit.transpiler import StagedPassManager
 # Custom transpiler plugin
@@ -24,22 +25,27 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
 
     # Initialize backend to map to
     chiplet_backend = GenericChipletBackend((2, 5, 5), 1)
-    chiplet_backend.build_backend()
+    
+    target = chiplet_backend.target
+    coupling_map_backend = target.build_coupling_map()
+    print(coupling_map_backend)
+
+    plot_gate_map(
+        chiplet_backend,
+        plot_directed=False,
+        filename = "data/backends/new_chiplet.png"
+    )
     
     mar_pmsp = PartitionedMapRoutePlugin()
     # Construct hypergraph from circuit
     init_pm = mar_pmsp._generate_initial_pass()
-
     # Perform partition and mapping
     partitioning_pm = mar_pmsp._generate_layout_pass(chiplet_backend)
 
     staged_pm = StagedPassManager(stages=["init", "layout"], init=init_pm, layout=partitioning_pm)
-    _ = staged_pm.run(surface_memory_circuit)
-
-    #     mar.mapper.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
+    a = staged_pm.run(surface_memory_circuit)
+    print(a)
 
 
 if __name__ == "__main__":
     test_surface_memory_circuit_to_hypergraph_partitioning_mapping()
-
-    # test_surface_memory_circuit_to_hypergraph_partition_calculation()

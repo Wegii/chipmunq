@@ -10,6 +10,12 @@ import matplotlib.pyplot as plt
 
 # Qiskit
 from qiskit.providers import BackendV2, Options
+from qiskit.transpiler import CouplingMap
+from qiskit.transpiler import Target, InstructionProperties
+from qiskit.circuit.library import XGate, SXGate, RZGate, CZGate, ECRGate
+from qiskit.circuit import Measure, Delay, Parameter, Reset
+from qiskit import QuantumCircuit, transpile
+from qiskit.visualization import plot_gate_map
 
 # Numerics
 import numpy as np
@@ -56,7 +62,6 @@ def get_edge_coordinates(n, m, offset=0) -> tuple:
 
 # TODO: add class or function for constructing different connectivity graphs (grid, ring, heavyhex) 
 
-
 class GenericMonolythicalBackend(BackendV2):
     """ Simple monolythical backend
 
@@ -65,6 +70,7 @@ class GenericMonolythicalBackend(BackendV2):
     """
 
     def __init__(self, size):
+        
         super().__init__(name="GenericMonolythical", backend_version=2)
         self.n, self.m  = size
 
@@ -136,12 +142,26 @@ class GenericChipletBackend(BackendV2):
      - TODO: Add list or something to get the qubits that connect to other qpus
      - TODO: Check this link out https://quantum.cloud.ibm.com/docs/en/guides/represent-quantum-computers
 
+    TODO: check out implementation for chiplets
+    Adapted from https://quantum.cloud.ibm.com/docs/en/guides/custom-backend
+    TODO: they also have a fake Kookaburra backend
+
+
+
     Args:
         BackendV2 (_type_): _description_
     """
 
     def __init__(self, size, n_inter) -> None:
-        super().__init__(name="GenericChiplet", backend_version=2)
+        """Instantiate new multi-chip backend.
+
+        :param size: _description_
+        :type size: _type_
+        :param n_inter: _description_
+        :type n_inter: _type_
+        """
+        
+        super().__init__(name="GenericChiplet")
     
         # Number of chiplets, row, column
         self.c, self.n, self.m  = size
@@ -160,6 +180,82 @@ class GenericChipletBackend(BackendV2):
         # Dictionary mapping chiplet index to list of nodes on chiplet 
         self.chiplet_to_nodes = {}
 
+        num_qubits = self.c * self.n*self.m
+        self._target = Target(
+            "Fake multi-chip backend", num_qubits=num_qubits
+        )
+
+        # RNG for gate errors
+        rng = np.random.default_rng(seed=42)
+
+
+
+        # Construct local chip and gates
+        g = self._single_graph()
+        G_partitioned = None
+        cz_props = {}
+        for i, c in enumerate(range(self.c)):
+            # Construct backend as graph
+            if G_partitioned == None:
+                G_partitioned = g
+            else:
+                G_partitioned = rx.union(G_partitioned, g, merge_nodes=False, merge_edges=False)
+
+            self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m ))
+
+            # Construct gate constraints. Add local two-qubit gates (CZ)
+            for root_edge in g.edge_list():
+                offset = i * len(g)
+                edge = (root_edge[0] + offset, root_edge[1] + offset)
+                cz_props[edge] = InstructionProperties(
+                    error=rng.uniform(7e-4, 5e-3),
+                    duration=rng.uniform(1e-8, 9e-7),
+                )
+
+        self.G = G_partitioned
+        self._target.add_instruction(CZGate(), cz_props)
+
+
+
+
+        # TODO: Calculate number of rows and columns for structuring the subgraphs
+
+
+        # Construct inter-chip gates
+
+
+        if self.c == 4:
+            cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
+            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
+            cb_idx2, ct_idx2, cr_idx2, cl_idx2 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*2)
+            cb_idx3, ct_idx3, cr_idx3, cl_idx3 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*3)
+
+            # Connect graphs together
+            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
+            self.G.add_edges_from([(cr_idx1, cl_idx2, LABEL_INTER_CHIP)])
+            self.G.add_edges_from([(cb_idx2, ct_idx3, LABEL_INTER_CHIP)])     
+            self.G.add_edges_from([(cl_idx3, cr_idx, LABEL_INTER_CHIP)])     
+        else:
+            # Construct backend as graph
+            cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
+            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
+
+            # Connect graphs together
+            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
+
+            # Construct gate constraints. Add inter-chip two-qubit gates (CX)
+            cx_props = {}
+            edge = (
+                ct_idx,
+                cb_idx1,
+            )
+            cx_props[edge] = InstructionProperties(
+                error=rng.uniform(7e-4, 5e-3),
+                duration=rng.uniform(1e-8, 9e-7),
+            )
+            self._target.add_instruction(ECRGate(), cx_props)
+
+
     def _single_graph(self) -> rx.PyGraph:
 
         # For a nice layout have a look at:
@@ -176,44 +272,6 @@ class GenericChipletBackend(BackendV2):
             G.update_edge_by_index(edge_index, LABEL_ON_CHIP)
 
         return G
-
-    def build_backend(self) -> None:
-        # Construct sub-graphs based on number of chiplets specified
-        G_partitioned = None
-        for i, c in enumerate(range(self.c)):
-            g = self._single_graph()
-
-            if G_partitioned == None:
-                G_partitioned = g
-            else:
-                G_partitioned = rx.union(G_partitioned, g, merge_nodes=False, merge_edges=False)
-
-            self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m ))
-
-        self.G = G_partitioned
-
-        # TODO: Calculate number of rows and columns for structuring the subgraphs
-
-
-        # Connect edges from center
-        if self.c == 4:
-            cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
-            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
-            cb_idx2, ct_idx2, cr_idx2, cl_idx2 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*2)
-            cb_idx3, ct_idx3, cr_idx3, cl_idx3 = get_edge_coordinates(self.n, self.m, (self.n*self.m)*3)
-
-            # Connect graphs together
-            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
-            self.G.add_edges_from([(cr_idx1, cl_idx2, LABEL_INTER_CHIP)])
-            self.G.add_edges_from([(cb_idx2, ct_idx3, LABEL_INTER_CHIP)])     
-            self.G.add_edges_from([(cl_idx3, cr_idx, LABEL_INTER_CHIP)])     
-        else:
-            cb_idx, ct_idx, cr_idx, cl_idx = get_edge_coordinates(self.n, self.m, 0)
-            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = get_edge_coordinates(self.n, self.m, self.n*self.m)
-
-            # Connect graphs together
-            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
-
 
     def get_chiplet_at(self, index: int):
         # Return nodes associated with specified chiplet

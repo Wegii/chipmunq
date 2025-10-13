@@ -7,8 +7,10 @@ from qiskit.providers import BackendV2
 from qiskit.transpiler import PassManager, StagedPassManager
 from qiskit.transpiler.preset_passmanagers.plugin import PassManagerStagePlugin
 from qiskit.transpiler.passmanager_config import PassManagerConfig
-from qiskit.transpiler.passes import Unroll3qOrMore
-
+from qiskit.transpiler.passes import Unroll3qOrMore, ApplyLayout
+from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaAllocation
+from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAncilla
+# Custom passes
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 from qeccm.src.mapper import CongestionMapper, RandomMapper
@@ -96,10 +98,18 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
         # TODO: Mapping
         #mapping_op = RandomMapper(pass_manager_config.coupling_map)
-        mapping_op = RandomMapper(coupling_map=pass_manager_config)
+        mapping_op = RandomMapper(pass_manager_config)
+
+        # Qiskit specific
+        # Extend the layout with ancillas and idling qubits
+        extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), EnlargeWithAncilla()]
+
+        # TODO: use the apply layout method from qiskit, which performs the mapping on the dag
+        apply_mapping_op = ApplyLayout()
 
         # Combine partitioning and mapping into a single pass
-        layout_pm = PassManager([partition_op, mapping_op])
+        layout_pm = PassManager([partition_op, mapping_op, ] + extension_op + [apply_mapping_op])
+        
         return layout_pm
 
     def _generate_routing_pass(self):
