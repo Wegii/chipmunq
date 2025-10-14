@@ -2,6 +2,9 @@
 Mapping QECC to distributed systems
 
 
+## Tasks
+- Improve visualization
+- Add circuit construction for experiments
 
 
 ## Implementation
@@ -43,14 +46,22 @@ Mapping QECC to distributed systems
 # Installation
 
 ## Dependencies
+The mapping-and-routing is implemented for seamless integration into the transpilation pipeline of qiskit
 
-Qiskit
-mtkahypar
+- qiskit
 
 
-Install KaHyPar
-- See[KaHyPar](https://github.com/kahypar/kahypar)
-- mtkahypar
-- See [Kaminpar](https://github.com/KaHIP/KaMinPar)
+### Constructing circuits and experiments
+For running the experiments the following additional libraries are necessary:
 
-## Build from source
+- [eccentric_bench](https://github.com/aswierkowska/eccentric_bench/): Follow installation instructions in repo
+- [TQEC](https://github.com/tqec/tqec): `pip install git+https://github.com/tqec/tqec.git`
+- [PyZX](https://github.com/zxcalc/pyzx): `pip install pyzx`
+- [Topologiq](https://github.com/jbolns/topologiq): `pip install git+https://github.com/jbolns/topologiq.git`
+
+
+### Mapping
+
+- [KaHyPar](https://github.com/kahypar/kahypar)
+- hypernetx (only for visualizing)
+- Potential replacement for KaHyPar: [Kaminpar](https://github.com/KaHIP/KaMinPar)
