@@ -141,6 +141,8 @@ class GenericChipletBackend(BackendV2):
      - TODO: Add inter-qpu connections and different constraints to backend
      - TODO: Add list or something to get the qubits that connect to other qpus
      - TODO: Check this link out https://quantum.cloud.ibm.com/docs/en/guides/represent-quantum-computers
+     - TODO: Move to GenericBackendV2: https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.providers.fake_provider.GenericBackendV2
+     - TODO: Check https://quantum.cloud.ibm.com/docs/en/migration-guides/qiskit-2.0
 
     TODO: check out implementation for chiplets
     Adapted from https://quantum.cloud.ibm.com/docs/en/guides/custom-backend
@@ -305,6 +307,7 @@ class GenericChipletBackend(BackendV2):
         return attr_dict
 
     def visualize_coupling_map(self):
+        # TODO: nice visualization slide 11 at: https://docs.google.com/presentation/d/1jfFkAl5iXKAwr9SH0FCukEQ7G2c2gMhMVwMitzbRDyw/edit?resourcekey=0-BUIhaZ_kk5O8OYA7fJUN8A&slide=id.g2b15005381b_0_120#slide=id.g2b15005381b_0_120
         graphviz_draw(self.G, method="neato", edge_attr_fn=self.edge_attr_fn, node_attr_fn=self.node_attr_fn,
                       filename=f"data/backends/chiplet_{self.c}_{self.n}_{self.m}.png")
 
