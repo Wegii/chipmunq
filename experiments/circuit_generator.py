@@ -9,7 +9,7 @@ import numpy as np
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 # TODO: fix this, since this is no longer running
-#from codes import get_code, get_max_d
+from codes import get_code, get_max_d
 
 # QECCircuit
 import random

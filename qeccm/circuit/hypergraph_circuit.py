@@ -21,8 +21,9 @@ class PartitionedHyperGraph:
     Visualization of hypergraph given kahypar partitioning using hypernetx. Translates partitioning format to dict
     structure to then construct a hypergraph 
 
-    TODO: Potentially also use the hypergraph from hypernetx as hypergraph object, instead of using the rustworkx
-    pygraph. 
+    Tasks:
+        - TODO: Potentially also use the hypergraph from hypernetx as hypergraph object, instead of using the rustworkx
+                pygraph. 
     """
 
     def __init__(self, partitioned_hgc: kahypar.Hypergraph):
@@ -218,7 +219,8 @@ class HypergraphCircuit(AnalysisPass):
         
         # calc num qubits
 
-        calculate_gates()
+        # calculate_gates()
+        pass
 
     def get_num_edges(self):
         hgc = self.property_set['hyper_dag']

@@ -8,7 +8,7 @@ import multiprocessing
 import mtkahypar as mtkahypar
 import kahypar as kahypar
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit, PartitionedHyperGraph
-from qeccm.backends.backend import GenericChipletBackend
+from qeccm.backends.BackendChipletV2 import BackendChipletV2
 
 
 class GenericHypergraphPartitioning(AnalysisPass):
@@ -95,7 +95,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         return dag
 
-    def calculate_partitions(self, backend: GenericChipletBackend) -> int:
+    def calculate_partitions(self, backend: BackendChipletV2) -> int:
 
         # TODO: this needs to be imlpemented
         # Calculate the optimal partitions given circuit size and available backend (number of e. g. chiplets, to which
