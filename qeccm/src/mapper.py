@@ -26,8 +26,9 @@ class GenericMapper(AnalysisPass):
     def visualize_mapping(self, filename) -> None:
         """Visualize mapping on backend"""
 
-        #self.backend.visualize_mapping(self.mapping, filename)        
-        self.backend.visualize_mapping(self.property_set["block_node_map"], filename)
+        #self.backend.visualize_mapping(self.mapping, filename)   
+        # TODO: this needs to be replaced by plot_circuit_layout from backend_utils     
+        #self.backend.visualize_mapping(self.property_set["block_node_map"], filename)
     
 
 class RandomMapper(GenericMapper):

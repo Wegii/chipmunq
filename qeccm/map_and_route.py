@@ -13,6 +13,9 @@ class PartitionedMapRoutePass(TransformationPass):
 
     The `PartitionedMapRoutePass` pass acts both as a layout stage and a routing stage.
 
+    Tasks:
+        - TODO: Find out how to implement this the best way. Probably rewrite the mar class. This class then returns the
+                multiple stages
     
     References:
     https://quantum.cloud.ibm.com/docs/en/guides/create-transpiler-plugin

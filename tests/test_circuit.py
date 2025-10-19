@@ -37,7 +37,7 @@ def test_logical_circuit_generation():
     #print(cir)
     print(dict(circ.count_ops()))
     print("Number of qubits:", circ.num_qubits)
-    circ.draw(output="mpl", fold=-1, filename="data/circuits/QECCircuit/test.png")
+    #circ.draw(output="mpl", fold=-1, filename="data/circuits/QECCircuit/test.png")
     #circ.draw(output="mpl", filename="data/circuits/QECCircuit/test.png")
 
 

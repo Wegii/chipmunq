@@ -3,20 +3,13 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
-
-#
-from qiskit.visualization import plot_gate_map
+from qeccm.backends.backend_utils import plot_gate_map
 
 
 def test_chiplet_backend():
 
-    chiplet_backend = BackendChipletV2((2, 5, 5), 1)
-
-    plot_gate_map(
-        chiplet_backend,
-        plot_directed=False,
-        filename = "data/backends/new_chiplet.png"
-    )
+    chiplet_backend = BackendChipletV2((4, 6, 6), 1)
+    plot_gate_map(backend = chiplet_backend, filename = "data/backends/chiplet_testing.png")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ sys.path.append(os.path.join(os.getcwd(), "."))
 from experiments.circuit_generator import QECMemory
 # Backend
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
-from qiskit.visualization import plot_gate_map
+from qeccm.backends.backend_utils import plot_gate_map
 # Qiskit Transpiler
 from qiskit.transpiler import StagedPassManager
 # Custom transpiler plugin
@@ -26,13 +26,12 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
     # Initialize backend to map to
     chiplet_backend = BackendChipletV2((2, 5, 5), 1)
     
-    target = chiplet_backend.target
-    coupling_map_backend = target.build_coupling_map()
-    print(coupling_map_backend)
+    #target = chiplet_backend.target
+    #coupling_map_backend = target.build_coupling_map()
+    #print(coupling_map_backend)
 
     plot_gate_map(
         chiplet_backend,
-        plot_directed=False,
         filename = "data/backends/new_chiplet.png"
     )
     

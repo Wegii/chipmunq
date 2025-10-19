@@ -73,8 +73,22 @@ class BackendChipletV2(BackendV2):
         # TODO:  Add a) Linear, (b) Ring, (c) Grid, and (d) Star.
         self.typology = 'grid'
 
+        # TODO: Add different variants for connecting and placing chiplets
+        # Ideas: Line (connection to the right)
+        self.chiplet_typology = 'line'
+
+        # TODO: Type of remote gate connecting chiplets
+        self.remote_gate_type = "ecr"
+
+        # TODO: Type of connectivity
+        # nn: neares-neighbour
+        # torus: connectivity of 6
+        # Note: This can't necessarily be applied on all type of topologies.
+        self.connectivity = 'nn'
+
         # Dictionary mapping chiplet index to list of nodes on chiplet 
         self.chiplet_to_nodes = {}
+
 
         num_qubits = self.c * self.n*self.m
         self._target = Target(
@@ -84,19 +98,11 @@ class BackendChipletV2(BackendV2):
         # RNG for gate errors
         rng = np.random.default_rng(seed=42)
 
-
-
         # Construct local chip and gates
         g = self._single_graph()
-        G_partitioned = None
+        
         cz_props = {}
         for i, c in enumerate(range(self.c)):
-            # Construct backend as graph
-            if G_partitioned == None:
-                G_partitioned = g
-            else:
-                G_partitioned = rx.union(G_partitioned, g, merge_nodes=False, merge_edges=False)
-
             self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m ))
 
             # Construct gate constraints. Add local two-qubit gates (CZ)
@@ -108,7 +114,7 @@ class BackendChipletV2(BackendV2):
                     duration=rng.uniform(1e-8, 9e-7),
                 )
 
-        self.G = G_partitioned
+
         self._target.add_instruction(CZGate(), cz_props)
 
 
@@ -120,36 +126,28 @@ class BackendChipletV2(BackendV2):
         # Construct inter-chip gates
 
 
-        if self.c == 4:
-            cb_idx, ct_idx, cr_idx, cl_idx = self.get_edge_coordinates(self.n, self.m, 0)
-            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = self.get_edge_coordinates(self.n, self.m, self.n*self.m)
-            cb_idx2, ct_idx2, cr_idx2, cl_idx2 = self.get_edge_coordinates(self.n, self.m, (self.n*self.m)*2)
-            cb_idx3, ct_idx3, cr_idx3, cl_idx3 = self.get_edge_coordinates(self.n, self.m, (self.n*self.m)*3)
+        
+        # Construct gate constraints. Add inter-chip two-qubit gates (CX)
+        cx_props = {}
+        for i in range(1, self.c):
+            cb_idx, ct_idx, cr_idx, cl_idx = self.get_edge_coordinates(self.n, self.m, (i-1)*self.n*self.m)
+            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = self.get_edge_coordinates(self.n, self.m, i*self.n*self.m)
 
-            # Connect graphs together
-            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
-            self.G.add_edges_from([(cr_idx1, cl_idx2, LABEL_INTER_CHIP)])
-            self.G.add_edges_from([(cb_idx2, ct_idx3, LABEL_INTER_CHIP)])     
-            self.G.add_edges_from([(cl_idx3, cr_idx, LABEL_INTER_CHIP)])     
-        else:
-            # Construct backend as graph
-            cb_idx, ct_idx, cr_idx, cl_idx = self.get_edge_coordinates(self.n, self.m, 0)
-            cb_idx1, ct_idx1, cr_idx1, cl_idx1 = self.get_edge_coordinates(self.n, self.m, self.n*self.m)
-
-            # Connect graphs together
-            self.G.add_edges_from([(ct_idx, cb_idx1, LABEL_INTER_CHIP)])
-
-            # Construct gate constraints. Add inter-chip two-qubit gates (CX)
-            cx_props = {}
             edge = (
-                ct_idx,
-                cb_idx1,
+                cr_idx,
+                cl_idx1,
             )
             cx_props[edge] = InstructionProperties(
                 error=rng.uniform(7e-4, 5e-3),
                 duration=rng.uniform(1e-8, 9e-7),
             )
+
+        if self.remote_gate_type == "ecr":
             self._target.add_instruction(ECRGate(), cx_props)
+        else:
+            # TODO: add option to have other remote gates
+            self._target.add_instruction(ECRGate(), cx_props)
+
 
 
     def _single_graph(self) -> rx.PyGraph:
