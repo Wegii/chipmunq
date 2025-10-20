@@ -1,6 +1,7 @@
 import qiskit
 from qiskit.visualization import plot_gate_map
 from qeccm.backends import BackendChipletV2
+import numpy as np
 
 
 def plot_gate_map(backend: BackendChipletV2, filename: str = ""):
@@ -58,18 +59,38 @@ def generate_coordinates(backend):
     print(coordinates)
     print(len(coordinates))
     total_qubit_coordinates = []
-    if backend.c > 1:
-        if backend.chiplet_typology == 'line':
+    if backend.c1 > 1 or backend.c2 > 1:
+        if backend.chiplet_topology == 'line':
             for coordinate in coordinates:
                 total_qubit_coordinates.append(coordinate)
         
-            for i in range(1, backend.c):
+            for i in range(1, backend.c1):
                 # Concatenate chiplets
                 
                 for coordinate in coordinates:
                     total_qubit_coordinates.append(
                         (coordinate[0], coordinate[1] + i*backend.m)
                     )
+        elif backend.chiplet_topology == 'grid':
+            #for coordinate in coordinates:
+            #    total_qubit_coordinates.append(coordinate)
+        
+            x_c = backend.c1
+            y_c = backend.c2
+            
+            # Iterate over each row
+            for y in range(x_c):
+                # Iterate over each column
+                for x in range(y_c):
+                    #idx = (y*y_c + x) * self.n * self.m
+
+                    for coordinate in coordinates:
+                        total_qubit_coordinates.append(
+                            (coordinate[0]-y*backend.n, coordinate[1]+x*backend.m)
+                            
+                        )
+                        #pass
+            #total_qubit_coordinates = []
         
 
     else:

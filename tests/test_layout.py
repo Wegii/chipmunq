@@ -24,7 +24,8 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
     surface_memory_circuit = circuit_generator.generate_code_memory('surface')
 
     # Initialize backend to map to
-    chiplet_backend = BackendChipletV2((2, 5, 5), 1)
+    #chiplet_backend = BackendChipletV2((2, 5, 5), 1)
+    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 1)
     
     #target = chiplet_backend.target
     #coupling_map_backend = target.build_coupling_map()
