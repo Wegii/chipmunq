@@ -74,10 +74,8 @@ class RandomMapper(GenericMapper):
         #       this can easily become a huge bottleneck!
         # TODO: partition_to_qpu_mapping() -> Assign each partition a QPU, based on the interactions with the other
         #                                     partitions.
-        
 
-
-        # TODO: parallelization over distributed blocks
+        # TODO: Parallelization over distributed blocks
         for block in partitioned_hgc._btn.items():
             # Extract index from key
             block_idx = int(block[0][2:])
@@ -94,42 +92,18 @@ class RandomMapper(GenericMapper):
 
         self.property_set["block_node_map"] = block_node_map
 
-        # TODO: draw mapping
-        #self.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
-
-
-        # Generate layout for mapping
-        # Generate a list of physical qubits, to which there exists no virtual mapping
-        #not_mapped_qubits = []
-
-        # TODO: fix the range with minimum and maximum of backend
-        #for nmq in range(0, 100):
-        #    # Check if nmq is mapped with 
-        #    if not (nmq in full_node_map.values()):
-        #        # value is already mapped
-        #        not_mapped_qubits.append(nmq)
-
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
-        #print(regs)
-        #regs = [*dag.qubits, *[q for reg in dag.qregs.values() for q in reg]]
 
         hgc = self.property_set['hyper_dag']
         for reg in regs:
             if isinstance(reg, QuantumRegister):
                 layout.add_register(reg)
-                #print(reg)
             else:
                 # Map qubit id to graph id (since the partitioning works on the graph ids)
                 qubit_to_node = hgc.node_idx.get(reg._index)
 
-                #print(qubit_to_node)
-                #if qubit_to_node is None:
-                #    # virtual qubit is not used, so simply use first free qubit
-                #    p_b = not_mapped_qubits.pop(0)#
-
-                    #print(f"mapping qubit {reg._index} to {p_b}")
-                    #layout.add(reg, p_b)
+                # Add qubit mapping from partitioning
                 if qubit_to_node is not None:
                     # Virtual qubit is used and mapped. Get the mapping from the mapping list 
                     p_b = full_node_map[qubit_to_node]
@@ -148,7 +122,7 @@ class CongestionMapper(GenericMapper):
     - 1. Map qubits with high connectivities close together -> Reason for congestion part, as we generally have less qubits
          with connections to other modules
     - 2. Qubits that need a lot of communication with other modules, are placed on nodes that have the connection to the
-         other modules
+         other modules (in general on the border of the chiplet)
     - For the 1. idea, have a look at qiskit.transpiler.passes.DenseLayout, since this could be similar
 
     Issues and Problems:
