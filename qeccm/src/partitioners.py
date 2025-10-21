@@ -28,14 +28,12 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
     """
 
 
-    def __init__(self, kp: int):
+    def __init__(self, backend: BackendChipletV2, kp: int = None):
         """KaHyPar partitioning initializer"""
         super().__init__()
 
-        
-        #self.hypergraph = hgc
-        self.k = kp
-        self.partition_id = None
+        self.backend = backend
+        self.kp = kp
 
         # Initialize kahypar
         self.khp_context = kahypar.Context()
@@ -43,19 +41,16 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         self.khp_context.loadINIconfiguration("qeccm/src/kahypar_config.ini")
 
     def run(self, dag):
-        try:
-            assert self.k > 0
-        except AssertionError:
-            logging.warning(f"Number of partitions not set. Calculating optimal parameter.")
-
-            # TODO: Calculate from coupling_map
-            self.k = self.calculate_partitions()
+        
+        if self.kp == None:
+            self.kp = self.calculate_partitions()
 
         # TODO: Calculate into how many partitions the circuit should be split.
         #       This is based on a number of things:
         #           - Backend size of each QPU (are all QPUs the same size, and are all qubits working?)
         #           - For lattice surgery, detect the patch size and how many can be placed on the backend
         #           
+
 
         # Size of each partition (number of qubits it can hold)
         # TODO: this needs to be calculated from the backend!!!
@@ -75,7 +70,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # Potentially vertices with high connectivity should get higher weight to connect these together
         vertex_weights = [1 for i in range(0, num_vertices)]
 
-        self.khp_context.setK(self.k)
+        self.khp_context.setK(self.kp)
         self.khp_context.setCustomTargetBlockWeights(partition_sizes)
         self.khp_context.suppressOutput(True)
         self.khp_context.setSeed(42)
@@ -86,7 +81,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             num_hyperedges,
             index_vector,
             edge_vector,
-            self.k,
+            self.kp,
             hyperedge_weights,
             vertex_weights,
             )
@@ -107,7 +102,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         return dag
 
-    def calculate_partitions(self, backend: BackendChipletV2) -> int:
+    def calculate_partitions(self, backend: BackendChipletV2, dag) -> int:
 
         # TODO: this needs to be imlpemented
         # Calculate the optimal partitions given circuit size and available backend (number of e. g. chiplets, to which

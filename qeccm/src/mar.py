@@ -2,15 +2,13 @@ import abc
 
 # Qiskit transpiler
 import qiskit
-import qiskit.dagcircuit
-from qiskit.providers import BackendV2
 from qiskit.transpiler import PassManager, StagedPassManager, CouplingMap
 from qiskit.transpiler.preset_passmanagers.plugin import PassManagerStagePlugin
-from qiskit.transpiler.passmanager_config import PassManagerConfig
 from qiskit.transpiler.passes import Unroll3qOrMore, ApplyLayout, TrivialLayout
 from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaAllocation
 from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAncilla
 # Custom passes
+from qeccm.backends import BackendChipletV2
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 from qeccm.src.mapper import CongestionMapper, RandomMapper
@@ -53,13 +51,13 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
     # Only certain qubits are directly connected to the other chiplets
     # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
-    def pass_manager(self, pass_manager_config: PassManagerConfig, optimization_level: int | None = None
+    def pass_manager(self, backend: BackendChipletV2, optimization_level: int | None = None
                      ) -> StagedPassManager:
         # TODO: generate stagedpassmanager with all stages
 
         init_pass = self._generate_initial_pass()
-        layout_pass = self._generate_layout_pass(pass_manager_config)
-        routing_pass = self._generate_routing_pass(pass_manager_config)
+        layout_pass = self._generate_layout_pass(backend)
+        routing_pass = self._generate_routing_pass(backend)
 
         staged_pm = StagedPassManager(stages=["init", "layout", "routing"], 
                                       init=init_pass, layout=layout_pass, routing=routing_pass)
@@ -79,7 +77,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         return init_pm
 
     #def _generate_layout_pass(self, backend: BackendV2, kp: int = None) -> PassManager:
-    def _generate_layout_pass(self, pass_manager_config: PassManagerConfig = None) -> PassManager:
+    def _generate_layout_pass(self, backend: BackendChipletV2 = None) -> PassManager:
         # Consists of analysis and transformation passes
 
         # The hypergraph circuit has multiple edges, since multigraph=True
@@ -94,15 +92,15 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #    self.kahypar_partitioner.k = kp
 
         # KaHyPar partitioning pass
-        partition_op = KaHyParPartitioning(kp=kp)
+        partition_op = KaHyParPartitioning(backend, kp=kp)
 
         # Mapping pass
-        mapping_op = RandomMapper(pass_manager_config)
+        mapping_op = RandomMapper(backend)
         #mapping_op = TrivialLayout(pass_manager_config.coupling_map)
 
         # Extend the dag with ancillas and idling qubits
         #extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), EnlargeWithAncilla()]
-        extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), ]
+        extension_op = [FullAncillaAllocation(backend.coupling_map), ]
 
         # Map application pass, which performs the mapping on the dag
         apply_mapping_op = ApplyLayout()
@@ -118,7 +116,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
         return layout_pm
 
-    def _generate_routing_pass(self, pass_manager_config):
+    def _generate_routing_pass(self, backend):
         # Consists of transformation passes
 
         # Note: it is necessary to perform the mapping_op twice. After the first mapping, we are only working on a
@@ -128,18 +126,16 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # In order to *merge* the normal and ancilla qubit register, simply perform the mapping operation again. This
         # generates a single qubit register with the correct mapping and size
 
-        #routing_op = BasicSwapRouter(pass_manager_config)
-
         # SABRE
         #routing_op = qiskit.transpiler.passes.SabreSwap(
-        #    coupling_map=CouplingMap(pass_manager_config.coupling_map),
+        #    coupling_map=CouplingMap(backend.coupling_map),
         #    heuristic='decay',
         #    seed=42
         #    )
-        #routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(pass_manager_config.coupling_map))
+        #routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
         
         # Custom implementation
-        routing_op = BasicSwapRouter(pass_manager_config)
+        routing_op = BasicSwapRouter(backend)
 
         router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
         
