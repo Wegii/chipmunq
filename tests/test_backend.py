@@ -8,7 +8,7 @@ from qeccm.backends.backend_utils import plot_gate_map
 
 def test_chiplet_backend():
 
-    chiplet_backend = BackendChipletV2((2, 2, 6, 6), 1)
+    chiplet_backend = BackendChipletV2((2, 2, 4, 6), 3)
     plot_gate_map(backend = chiplet_backend, filename = "data/backends/chiplet_testing.png")
 
 

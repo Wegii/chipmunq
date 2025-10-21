@@ -38,7 +38,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
     surface_memory_circuit = circuit_generator.generate_code_memory('surface')
 
     # Initialize backend to map to
-    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 1)
+    chiplet_backend = BackendChipletV2((2, 2, 3, 3), 3)
 
     #plot_gate_map(
     #    chiplet_backend,

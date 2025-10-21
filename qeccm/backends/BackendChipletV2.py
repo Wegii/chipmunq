@@ -241,31 +241,37 @@ class BackendChipletV2(BackendV2):
                     # Get the edges for the current node
                     cb_idx, ct_idx, cr_idx, cl_idx = self.get_edge_coordinates(self.n, self.m, idx)
 
+                    # Calculate offset_indices for multiple connections between chiplets
+                    nu = int(np.ceil((self.n_inter)/2))
+                    nl = int(np.floor((self.n_inter)/2))
+                    offset_indices = list(range(-nl, nu))
+
                     # Connect to right
                     if x < y_c - 1:
                         right_idx = idx + self.n*self.m 
                         cb_r, ct_r, cr_r, cl_r = self.get_edge_coordinates(self.n, self.m, right_idx)
 
-                        edge = (cr_idx, cl_r)
-                        print(edge)
-                        print("right")
-                        cx_props[edge] = InstructionProperties(
-                            error=rng.uniform(7e-4, 5e-3),
-                            duration=rng.uniform(1e-8, 9e-7),
-                        )
+                        for oi in offset_indices:
+                            edge = (cr_idx + (oi*self.m), cl_r + (oi*self.m))
+                            #print(edge)
+                            #print("right")
+                            cx_props[edge] = InstructionProperties(
+                                error=rng.uniform(7e-4, 5e-3),
+                                duration=rng.uniform(1e-8, 9e-7),
+                            )
+
 
                     # Connect to bottom
                     if y < x_c - 1:
                         bottom_idx = idx + y_c*self.n*self.m
                         cb_b, ct_b, cr_b, cl_b = self.get_edge_coordinates(self.n, self.m, bottom_idx)
 
-                        edge = (cb_idx, ct_b)
-                        print(edge)
-                        print("bottom")
-                        cx_props[edge] = InstructionProperties(
-                            error=rng.uniform(7e-4, 5e-3),
-                            duration=rng.uniform(1e-8, 9e-7),
-                        )
+                        for oi in offset_indices:
+                            edge = (cb_idx + oi, ct_b + oi)
+                            cx_props[edge] = InstructionProperties(
+                                error=rng.uniform(7e-4, 5e-3),
+                                duration=rng.uniform(1e-8, 9e-7),
+                            )
 
 
         if self.remote_gate_type == "ecr":
@@ -291,6 +297,16 @@ class BackendChipletV2(BackendV2):
         cl_idx = (np.floor(n/2) * m).astype(int)
 
         return cb_idx + offset, ct_idx + offset, cr_idx + offset, cl_idx + offset
+
+    def get_chip_size(self) -> int:
+        """Return size of the biggest chip.
+
+        Note: At the moment, all chips have the same size.
+
+        :return: Size of a single chip
+        :rtype: int
+        """
+        return self.m * self.n
 
     @property
     def target(self):
