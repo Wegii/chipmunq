@@ -51,8 +51,14 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             # TODO: Calculate from coupling_map
             self.k = self.calculate_partitions()
 
-        # Size of each partition
-        # TODO: this needs to be calculated from the backend
+        # TODO: Calculate into how many partitions the circuit should be split.
+        #       This is based on a number of things:
+        #           - Backend size of each QPU (are all QPUs the same size, and are all qubits working?)
+        #           - For lattice surgery, detect the patch size and how many can be placed on the backend
+        #           
+
+        # Size of each partition (number of qubits it can hold)
+        # TODO: this needs to be calculated from the backend!!!
         partition_sizes = [15, 15]
 
         hgc = self.property_set['hyper_dag']
@@ -91,7 +97,13 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(kahypar_hg)
 
         # TODO: drawing
-        self.property_set["partitioned_hyper_dag"].draw_phg(filename="data/circuits/surface_memory_phg.png")
+        #self.property_set["partitioned_hyper_dag"].draw_phg(filename="data/circuits/surface_memory_phg.png")
+
+
+        # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without any
+        #       edges intersecting each other. If there are intersecting edges, this is a big problem for the routing, 
+        #       since these connections need to be routed through a whole other qpu.
+        #       Goal: We do not want any intersection of edges of the partitioned graph
 
         return dag
 

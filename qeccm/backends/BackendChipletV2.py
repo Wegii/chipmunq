@@ -97,7 +97,11 @@ class BackendChipletV2(BackendV2):
 
         # Construct target
         # TODO: Better comment why!
-        self._target = Target("Fake chiplet backend", num_qubits=self.c1*self.c2 * self.n * self.m)
+        if self.chiplet_topology == "line":
+            self.num_qubits_total = self.c1* self.n * self.m
+        else:
+            self.num_qubits_total = self.c1*self.c2 * self.n * self.m
+        self._target = Target("Fake chiplet backend", num_qubits=self.num_qubits_total)
 
         # Construct local chip and gates (single- and two-qubit gates)
         self.G, self._target = self._generate_chiplet()
@@ -145,7 +149,7 @@ class BackendChipletV2(BackendV2):
         elif self.typology == "line":
             raise NotImplemented
 
-        num_qubits = self.c1*self.c2 * self.n*self.m
+
         # Single-qubit gates
         # Generate instruction properties for single qubit gates and a measurement, delay,
         #  and reset operation to every qubit in the backend.
@@ -157,7 +161,7 @@ class BackendChipletV2(BackendV2):
         delay_props = {}
  
         # Add single-qubit gates. Globally use virtual rz, x, sx, and measure
-        for i in range(num_qubits):
+        for i in range(self.num_qubits_total):
             qarg = (i,)
             rz_props[qarg] = InstructionProperties(error=0.0, duration=0.0)
             x_props[qarg] = InstructionProperties(
@@ -276,76 +280,6 @@ class BackendChipletV2(BackendV2):
         # Return nodes associated with specified chiplet
         return self.chiplet_to_nodes[index]
 
-    def edge_attr_fn(self, edge):
-        attr_dict = {
-            #"label": edge,
-            "color": "black",
-            "penwidth": str(3),
-        }
-
-        if edge == LABEL_INTER_CHIP:
-            attr_dict['color'] = 'red'
-        
-        return attr_dict
-    
-    def node_attr_fn(self, node):
-        attr_dict = {
-            "fontcolor": "white",
-            "color": "darkcyan", 
-            "fill_color": "darkcyan",
-            "style": "filled",
-            "shape": "circle",
-            #"label": str(node),
-            "width": ".5",
-            "height": ".5",
-            "rank": "same"
-        }
-        
-        return attr_dict
-
-    def visualize_coupling_map(self):
-        # TODO: nice visualization slide 11 at: https://docs.google.com/presentation/d/1jfFkAl5iXKAwr9SH0FCukEQ7G2c2gMhMVwMitzbRDyw/edit?resourcekey=0-BUIhaZ_kk5O8OYA7fJUN8A&slide=id.g2b15005381b_0_120#slide=id.g2b15005381b_0_120
-        graphviz_draw(self.G, method="neato", edge_attr_fn=self.edge_attr_fn, node_attr_fn=self.node_attr_fn,
-                      filename=f"data/backends/chiplet_{self.c1}_{self.c2}_{self.n}_{self.m}.png")
-
-    def mapped_node_attr_fn(self, node):
-        attr_dict = {
-            "style": "filled",
-            "shape": "circle",
-            #"label": str(node),
-            "width": ".5",
-            "height": ".5",
-            "rank": "same"
-        }
-
-        # Change color of node if mapped
-        if str(node) == "u":
-            attr_dict["fontcolor"] = "white"
-            attr_dict["fill_color"] = "darkcyan"
-            attr_dict["color"] = "darkcyan"
-        else:
-            attr_dict["fontcolor"] = "black"
-            attr_dict["fill_color"] = "white"
-        
-        # TODO: add label showing which qubit is placed on which node on the backend
-
-        return attr_dict
-
-    def visualize_mapping(self, mapping, filename):
-        
-        # TODO: Improve the visualization
-        # - A nice way of visualizing the mapping is shown here: https://quantum.cloud.ibm.com/docs/en/guides/represent-quantum-computers
-        # - Potentially use plot_circuit_layout for the mapping visualization
-
-        # Iterate over chiplets
-        for chiplet_key in mapping:
-            # Iterate over each node in mapping and mark as utilized
-            chiplet_mapping = mapping[chiplet_key]
-            for node_mapping_kay in chiplet_mapping:
-                self.G[chiplet_mapping[node_mapping_kay]] = "u"
-
-        graphviz_draw(self.G, method="neato", edge_attr_fn=self.edge_attr_fn, node_attr_fn=self.mapped_node_attr_fn,
-                filename=filename)
         
     def get_edge_coordinates(self, n, m, offset=0) -> tuple:
         cb_idx = (np.floor(m/2)).astype(int)

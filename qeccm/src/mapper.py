@@ -63,6 +63,20 @@ class RandomMapper(GenericMapper):
 
         partitioned_hgc = self.property_set["partitioned_hyper_dag"]
 
+        # Big Issue: However, partitioning assumes full qubit connectivity inside and across the quantum processors to
+        #            reduce the problem to a graph partitioning problem. on a higher level, this constrained is already
+        #            known to a high level compiler (e. g. for lattice surgery). Thus, we should generally not get a 
+        #            circuit that has to communicate with another node, to which no direct connection is.
+        #            Note: This is not entirely true, since the ancilla qubits used in lattice surgery could become an
+        #                  issue, if it is not possible to map these also to the same node!
+
+        # TODO: On which QPU does a partition need to be placed? The QPUs do not have connections to all other QPUs, so
+        #       this can easily become a huge bottleneck!
+        # TODO: partition_to_qpu_mapping() -> Assign each partition a QPU, based on the interactions with the other
+        #                                     partitions.
+        
+
+
         # TODO: parallelization over distributed blocks
         for block in partitioned_hgc._btn.items():
             # Extract index from key
@@ -81,22 +95,23 @@ class RandomMapper(GenericMapper):
         self.property_set["block_node_map"] = block_node_map
 
         # TODO: draw mapping
-        self.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
+        #self.visualize_mapping(filename = "data/backends/surface_memory_mapped_backend.png")
 
 
         # Generate layout for mapping
         # Generate a list of physical qubits, to which there exists no virtual mapping
-        not_mapped_qubits = []
-        
+        #not_mapped_qubits = []
+
         # TODO: fix the range with minimum and maximum of backend
-        for nmq in range(0, 100):
-            # Check if nmq is mapped with 
-            if not (nmq in full_node_map.values()):
-                # value is already mapped
-                not_mapped_qubits.append(nmq)
+        #for nmq in range(0, 100):
+        #    # Check if nmq is mapped with 
+        #    if not (nmq in full_node_map.values()):
+        #        # value is already mapped
+        #        not_mapped_qubits.append(nmq)
 
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
+        #print(regs)
         #regs = [*dag.qubits, *[q for reg in dag.qregs.values() for q in reg]]
 
         hgc = self.property_set['hyper_dag']
@@ -107,14 +122,15 @@ class RandomMapper(GenericMapper):
             else:
                 # Map qubit id to graph id (since the partitioning works on the graph ids)
                 qubit_to_node = hgc.node_idx.get(reg._index)
+
                 #print(qubit_to_node)
-                if qubit_to_node is None:
-                    # virtual qubit is not used, so simply use first free qubit
-                    p_b = not_mapped_qubits.pop(0)
+                #if qubit_to_node is None:
+                #    # virtual qubit is not used, so simply use first free qubit
+                #    p_b = not_mapped_qubits.pop(0)#
 
                     #print(f"mapping qubit {reg._index} to {p_b}")
-                    layout.add(reg, p_b)
-                else:
+                    #layout.add(reg, p_b)
+                if qubit_to_node is not None:
                     # Virtual qubit is used and mapped. Get the mapping from the mapping list 
                     p_b = full_node_map[qubit_to_node]
                     
@@ -144,4 +160,18 @@ class CongestionMapper(GenericMapper):
 
 
     def perform_mapping(self):
+
+        pass
+
+
+class SABREMapper(GenericMapper):
+    def __init__(self):
+        super().__init__()
+
+    def perform_mapping(self):
+        # Iterate over all partitions
+        # Perform SABRE (simply remove the remote gates) to get an initial layout
+
+        # The routing for the local chips should be more or less optimal now. The routing pass will then have to do the
+        # actual local routing (SABRE again) and the remote routing as BASIC SWAP
         pass

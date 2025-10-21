@@ -46,47 +46,54 @@ class BasicSwapRouter(GenericRouter):
         :rtype: _type_
         """
 
-        new_dag = dag.copy_empty_like()
         current_layout = self.property_set["layout"]
-        canonical_register = dag.qregs["q"]
+        #new_dag = dag.copy_empty_like()
+        new_dag = DAGCircuit()
+        for qreg in dag.qregs.values():
+            new_dag.add_qreg(qreg)
+        for creg in dag.cregs.values():
+            new_dag.add_creg(creg)
+        
 
-        # Implementation from: https://github.com/Qiskit/qiskit/blob/main/qiskit/transpiler/passes/routing/basic_swap.py
-        for layer in dag.serial_layers():
-            subdag = layer["graph"]
+        for node in dag.topological_op_nodes():
+                if len(node.qargs) == 2:
+                    q0, q1 = [dag.qubits.index(q) for q in node.qargs]
+                    
+                    # Check distance in coupling map
+                    if not self.coupling_map.distance(q0, q1) == 1:
+                        # Find shortest path connecting both qubits
+                        path = self.coupling_map.shortest_undirected_path(q0, q1)
+                     
+                        # Insert swaps along path except last edge
+                        for i in range(len(path) - 2):
+                            swap = SwapGate()
+                            new_dag.apply_operation_back(
+                                swap,
+                                qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            )
+                        
+                        # Apply original gate
+                        new_dag.apply_operation_back(node.op, qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]])
 
-            for gate in subdag.two_qubit_ops():
-                physical_q0 = current_layout[gate.qargs[0]]
-                physical_q1 = current_layout[gate.qargs[1]]
-
-                if self.coupling_map.distance(physical_q0, physical_q1) != 1:
-                    # Insert a new layer with the SWAP(s).
-                    swap_layer = DAGCircuit()
-                    swap_layer.add_qreg(canonical_register)
-
-                    path = self.coupling_map.shortest_undirected_path(physical_q0, physical_q1)
-                    for swap in range(len(path) - 2):
-                        connected_wire_1 = path[swap]
-                        connected_wire_2 = path[swap + 1]
-
-                        qubit_1 = current_layout[connected_wire_1]
-                        qubit_2 = current_layout[connected_wire_2]
-
-                        # create the swap operation
-                        swap_layer.apply_operation_back(
-                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
-                        )
-
-                    # layer insertion
-                    order = current_layout.reorder_bits(new_dag.qubits)
-                    new_dag.compose(swap_layer, qubits=order)
-
-                    # update current_layout
-                    # TODO: is this necessary??
-                    for swap in range(len(path) - 2):
-                        current_layout.swap(path[swap], path[swap + 1])
-
-            order = current_layout.reorder_bits(new_dag.qubits)
-            new_dag.compose(subdag, qubits=order)
+                        # SWAP backwards
+                        for i in reversed(range(len(path) - 2)):
+                            swap = SwapGate()
+                            new_dag.apply_operation_back(
+                                swap,
+                                qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            )
+                        
+                    else:
+                        # Local two-qubit gates
+                        new_dag.apply_operation_back(node.op, qargs=node.qargs)
+                        
+                else:
+                    # Single-qubit gates
+                    new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
+                    
+        #from qiskit.visualization import dag_drawer
+        #dag_drawer(dag, filename="data/backends/mapping/dag.png")
+        #dag_drawer(new_dag, filename="data/backends/mapping/routed_dag.png")
 
         # This pass must set the following property: self.property_set["final_layout"]
         self.property_set["final_layout"] = current_layout

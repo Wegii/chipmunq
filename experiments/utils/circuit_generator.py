@@ -31,7 +31,7 @@ from tqec.computation.cube import CubeKind, Port, YHalfCube
 from tqec.computation.pipe import PipeKind
 from tqec.utils.position import FloatPosition3D, Position3D
 from tqec.utils.scale import round_or_fail
-from experiments.circuit_utils import stim_to_qiskit
+from experiments.utils.circuit_utils import stim_to_qiskit
 
 # Plotting
 import matplotlib.pyplot as plt

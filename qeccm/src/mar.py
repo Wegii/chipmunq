@@ -4,7 +4,7 @@ import abc
 import qiskit
 import qiskit.dagcircuit
 from qiskit.providers import BackendV2
-from qiskit.transpiler import PassManager, StagedPassManager
+from qiskit.transpiler import PassManager, StagedPassManager, CouplingMap
 from qiskit.transpiler.preset_passmanagers.plugin import PassManagerStagePlugin
 from qiskit.transpiler.passmanager_config import PassManagerConfig
 from qiskit.transpiler.passes import Unroll3qOrMore, ApplyLayout, TrivialLayout
@@ -101,27 +101,46 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #mapping_op = TrivialLayout(pass_manager_config.coupling_map)
 
         # Extend the dag with ancillas and idling qubits
-        extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), EnlargeWithAncilla()]
+        #extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), EnlargeWithAncilla()]
+        extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), ]
 
         # Map application pass, which performs the mapping on the dag
         apply_mapping_op = ApplyLayout()
 
         # Combine partitioning and mapping into a single pass
-        # Note: it is necessary to perform the mapping_op twice. After the first mapping, we are only working on a
-        # circuit of (potentially) size smaller than the backend. By calling the extension_op, ancilla qubits are 
-        # initialized and added to the DAG. These ancilla qubits are added in an additional qubit register. This is a
-        # problem, since this is not expected by the routing pass; thus, it fails!
-        # In order to *merge* the normal and ancilla qubit register, simply perform the mapping operation again. This
-        # generates a single qubit register with the correct mapping and size
-        layout_pm = PassManager([partition_op, mapping_op ] + extension_op + 
-                                [apply_mapping_op] + [mapping_op, apply_mapping_op])
+        
+        #layout_pm = PassManager([partition_op, mapping_op ] + extension_op + 
+        #                        [apply_mapping_op] + [mapping_op, apply_mapping_op])
+        #layout_pm = PassManager([partition_op, mapping_op ] + extension_op + 
+        #                        [apply_mapping_op] )
+        
+        layout_pm = PassManager([partition_op, mapping_op ] + extension_op)
 
         return layout_pm
 
     def _generate_routing_pass(self, pass_manager_config):
         # Consists of transformation passes
 
+        # Note: it is necessary to perform the mapping_op twice. After the first mapping, we are only working on a
+        # circuit of (potentially) size smaller than the backend. By calling the extension_op, ancilla qubits are 
+        # initialized and added to the DAG. These ancilla qubits are added in an additional qubit register. This is a
+        # problem, since this is not expected by the routing pass; thus, it fails!
+        # In order to *merge* the normal and ancilla qubit register, simply perform the mapping operation again. This
+        # generates a single qubit register with the correct mapping and size
+
+        #routing_op = BasicSwapRouter(pass_manager_config)
+
+        # SABRE
+        #routing_op = qiskit.transpiler.passes.SabreSwap(
+        #    coupling_map=CouplingMap(pass_manager_config.coupling_map),
+        #    heuristic='decay',
+        #    seed=42
+        #    )
+        #routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(pass_manager_config.coupling_map))
+        
+        # Custom implementation
         routing_op = BasicSwapRouter(pass_manager_config)
-        router_pm = PassManager([routing_op])
+
+        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
         
         return router_pm

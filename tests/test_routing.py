@@ -3,10 +3,10 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # Circuits
-from experiments.circuit_generator import QECMemory
+from experiments.utils.circuit_generator import QECMemory
 # Backend
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
-from qiskit.visualization import plot_gate_map
+from qeccm.backends.backend_utils import plot_circuit_layout_utilization, plot_circuit_layout
 # Qiskit Transpiler
 from qiskit.transpiler import StagedPassManager
 # Custom transpiler plugin
@@ -39,16 +39,12 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
 
     # Initialize backend to map to
     chiplet_backend = BackendChipletV2((2, 2, 5, 5), 1)
-    
-    target = chiplet_backend.target
-    coupling_map_backend = target.build_coupling_map()
-    #print(coupling_map_backend)
 
-    plot_gate_map(
-        chiplet_backend,
-        plot_directed=False,
-        filename = "data/backends/new_chiplet.png"
-    )
+    #plot_gate_map(
+    #    chiplet_backend,
+    #    plot_directed=False,
+     #   filename = "data/backends/new_chiplet.png"
+    #)
     
     mar_pmsp = PartitionedMapRoutePlugin()
     # Construct hypergraph from circui[t
@@ -60,8 +56,13 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
 
     staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=partitioning_pm,
                                   routing=routing_pm)
-    a = staged_pm.run(surface_memory_circuit)
-    print(a)
+    routed_circuit = staged_pm.run(surface_memory_circuit)
+    print(routed_circuit)
+
+    print(surface_memory_circuit.count_ops())
+    print(print(routed_circuit.count_ops()))
+    plot_circuit_layout(routed_circuit, chiplet_backend, "data/backends/mapping/routed_circuit_on_backend.png")
+    plot_circuit_layout_utilization(routed_circuit, chiplet_backend, "data/backends/mapping/routed_circuit_on_backend_utilization.png")
     
 
 if __name__ == "__main__":
