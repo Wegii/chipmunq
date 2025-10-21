@@ -26,19 +26,30 @@ class PartitionedHyperGraph:
                 pygraph. 
     """
 
-    def __init__(self, partitioned_hgc: kahypar.Hypergraph):
-        """Generate hypernetx hypergraph given a partitioned kahypar hypergraph
-
-        :param partitioned_hgc: Hypergraph after partitioning
-        :type partitioned_hgc: kahypar.Hypergraph
-        """
-
-        # Generate dictionary for each block as key containing all nodes
-        num_blocks = partitioned_hgc.numBlocks()
-        block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
+    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes = None):
         
-        for node in range(partitioned_hgc.numNodes()):
-            block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
+
+        #"""Generate hypernetx hypergraph given a partitioned kahypar hypergraph
+
+        #:param partitioned_hgc: Hypergraph after partitioning. If None, assume that only one block exists
+        #:type partitioned_hgc: kahypar.Hypergraph
+        #"""
+
+        if partitioned_hgc is not None:
+            # Generate dictionary for each block as key containing all nodes
+            num_blocks = partitioned_hgc.numBlocks()
+            block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
+            
+            # Assign each block all nodes
+            for node in range(partitioned_hgc.numNodes()):
+                block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
+        else:
+            # Generate dictionary with one block
+            block_to_nodes = {"b:" + str(0): []}
+            
+            # Assign all nodes to this block
+            for node in range(num_nodes):
+                block_to_nodes["b:" + str(0)].append(node)
 
         # Construct hypergraph from partitioned hypergraph
         self._phg = hnx.Hypergraph(block_to_nodes)

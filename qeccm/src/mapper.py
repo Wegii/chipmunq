@@ -76,6 +76,8 @@ class RandomMapper(GenericMapper):
         #                                     partitions.
 
         # TODO: Parallelization over distributed blocks
+
+        # Get blocks from partitioned hypergraph
         for block in partitioned_hgc._btn.items():
             # Extract index from key
             block_idx = int(block[0][2:])

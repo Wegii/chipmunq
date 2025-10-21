@@ -83,16 +83,9 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # The hypergraph circuit has multiple edges, since multigraph=True
         # Remove these duplicates, since these are not needed in the partitioning
         # In the local mapping these can be again quite interesting
-
-        kp = 2
-        #if kp is None:
-        #    # Calculate number of partitions based on circuit and backend
-        #    self.kahypar_partitioner.k = self.kahypar_partitioner.calculate_partitions()
-        #else:
-        #    self.kahypar_partitioner.k = kp
-
+        
         # KaHyPar partitioning pass
-        partition_op = KaHyParPartitioning(backend, kp=kp)
+        partition_op = KaHyParPartitioning(backend)
 
         # Mapping pass
         mapping_op = RandomMapper(backend)
