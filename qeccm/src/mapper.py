@@ -51,9 +51,6 @@ class RandomMapper(GenericMapper):
         self.coupling_map = backend.coupling_map
         self.backend = backend
 
-    def _get_node_in_backend(self, block_idx: int) -> list:
-        #return self.backend.get_chiplet_at(block_idx)
-        return self.backend.get_chiplet_at(block_idx)
 
     def run(self, dag: DAGCircuit) -> None:
 
@@ -70,13 +67,8 @@ class RandomMapper(GenericMapper):
         #            Note: This is not entirely true, since the ancilla qubits used in lattice surgery could become an
         #                  issue, if it is not possible to map these also to the same node!
 
-        # TODO: On which QPU does a partition need to be placed? The QPUs do not have connections to all other QPUs, so
-        #       this can easily become a huge bottleneck!
-        # TODO: partition_to_qpu_mapping() -> Assign each partition a QPU, based on the interactions with the other
-        #                                     partitions.
 
-        # TODO: Parallelization over distributed blocks
-
+        partition_to_qpu = self.property_set["partition_to_qpu"]
         # Get blocks from partitioned hypergraph
         for block in partitioned_hgc._btn.items():
             # Extract index from key
@@ -84,15 +76,22 @@ class RandomMapper(GenericMapper):
 
             # Iterate over nodes
             node_map = {}
-            nodes_in_backend = self._get_node_in_backend(block_idx)
+
+            # Get qubit nodes from chiplet to which this partition/block is mapped to
+            nodes_in_backend = self.backend.get_chiplet_at(partition_to_qpu[block_idx] + 1)
+
+            print(nodes_in_backend)
             for n, node in enumerate(block[1]):
-                node_map[node] = nodes_in_backend[n]
+                #node_map[node] = nodes_in_backend[n]
                 # Continuous dict
                 full_node_map[node] = nodes_in_backend[n]
-            # Each block is also hashed
-            block_node_map[block_idx] = node_map
 
-        self.property_set["block_node_map"] = block_node_map
+            # For bookkeeping story the mapping for each block
+            #block_node_map[block_idx] = node_map
+
+        #self.property_set["block_node_map"] = block_node_map
+
+        print(full_node_map)
 
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
@@ -103,7 +102,7 @@ class RandomMapper(GenericMapper):
                 layout.add_register(reg)
             else:
                 # Map qubit id to graph id (since the partitioning works on the graph ids)
-                qubit_to_node = hgc.node_idx.get(reg._index)
+                qubit_to_node = reg._index#hgc.node_idx.get(reg._index)
 
                 # Add qubit mapping from partitioning
                 if qubit_to_node is not None:

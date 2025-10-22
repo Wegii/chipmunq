@@ -22,6 +22,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
     # Generate surface code memory circuit
     circuit_generator = QECMemory(num_qubits)
     surface_memory_circuit = circuit_generator.generate_code_memory('surface')
+    print(surface_memory_circuit.count_ops())
 
     # Initialize backend to map to
     #chiplet_backend = BackendChipletV2((2, 5, 5), 1)
@@ -45,7 +46,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
     staged_pm = StagedPassManager(stages=["init", "layout"], init=init_pm, layout=partitioning_pm)
     mapped_circuit = staged_pm.run(surface_memory_circuit)
 
-    print(mapped_circuit)
+    #print(mapped_circuit)
 
     
     # print mapping

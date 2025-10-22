@@ -298,6 +298,20 @@ class BackendChipletV2(BackendV2):
 
         return cb_idx + offset, ct_idx + offset, cr_idx + offset, cl_idx + offset
 
+    def get_num_chips(self) -> int:
+        """Return number of chiplets depending on chiplet_topology
+
+        :return: Number of chiplets
+        :rtype: int
+        """
+
+        if self.chiplet_topology == "line":
+            return self.c1
+        elif self.chiplet_topology == "grid":
+            return self.c1 * self.c2
+        else:
+            return -1
+
     def get_chip_size(self) -> int:
         """Return size of the biggest chip.
 
