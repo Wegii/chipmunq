@@ -133,7 +133,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             )
 
         # Partition hypergraph
+        print("starting partitioning")
         kahypar.partition(kahypar_hg, self.khp_context)
+        print("partitioning found")
 
         return kahypar_hg
 
@@ -192,6 +194,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         num_qubits_chiplet = self.backend.get_chip_size()
         num_qubits_circuit = dag.num_qubits()
 
+        print("Calculate optimal k")
         # Perform partitioning, if circuit does not fit on on chiplet
         if num_qubits_chiplet < num_qubits_circuit:
             if self._calculate_partitions_method == "full":
@@ -249,9 +252,12 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                     if bipartite_community_detection == []:
                         break
 
-                print(bipartite_communities)
+                #print(bipartite_communities)
                 k = len(bipartite_communities)
 
+                # k can be of maximum size backend_num_chiplets
+                if k > self.backend.get_num_chips():
+                    k = self.backend.get_num_chips()
 
                 #core_numbers = nx.core_number(G_nx)
                 #print(core_numbers)
@@ -275,6 +281,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         else:
             k = 1
 
+        print("Optimal k found")
         # Set size of each partition as number of qubits on a chiplet
         partition_sizes = [num_qubits_chiplet for c in range(k)]
 
