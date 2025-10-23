@@ -77,6 +77,7 @@ class BackendChipletV2(BackendV2):
         # Different variants for connecting and placing chiplets:
         # - line: simple line (Peano Curve for placement)
         # - grid: simple grid structure
+        # - idea: https://patentimages.storage.googleapis.com/d7/d8/83/51fb5619877a47/US20250181953A1-20250605-D00004.png
         #self.chiplet_topology = "line"
         self.chiplet_topology = "grid"
 
@@ -189,6 +190,7 @@ class BackendChipletV2(BackendV2):
         cz_props = {}
         for i, c in enumerate(range(self.c1*self.c2)):
             self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m ))
+            #print(c)
 
             # Construct gate constraints. Add local two-qubit gates (CZ)
             for root_edge in G.edge_list():

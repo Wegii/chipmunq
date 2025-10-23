@@ -78,9 +78,12 @@ class RandomMapper(GenericMapper):
             node_map = {}
 
             # Get qubit nodes from chiplet to which this partition/block is mapped to
-            nodes_in_backend = self.backend.get_chiplet_at(partition_to_qpu[block_idx] + 1)
+            #print(partition_to_qpu[block_idx])
+            print(block_idx)
 
-            print(nodes_in_backend)
+            nodes_in_backend = self.backend.get_chiplet_at(partition_to_qpu[block_idx])
+
+            #print(nodes_in_backend)
             for n, node in enumerate(block[1]):
                 #node_map[node] = nodes_in_backend[n]
                 # Continuous dict

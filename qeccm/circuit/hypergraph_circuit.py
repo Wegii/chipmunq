@@ -1,6 +1,6 @@
 # Circuit verification
 from qeccm.circuit.circuit_verification import check_valid_1q_2q_gates
-from qeccm.circuit.circuit_statistics import *
+#from qecc_mapping.experiments.utils.circuit_statistics import *
 # Hypergraph
 import rustworkx as rx
 from rustworkx.visualization import graphviz_draw
@@ -119,13 +119,14 @@ class HypergraphCircuit(AnalysisPass):
         super().__init__()
 
     def run(self, dag: DAGCircuit) -> None:
+        print("Start circuit to hg transformation")
         # Circuit to hypergraph
         self._qc_to_hypergraph(dag)
 
+        print("Conversion finished")
         # TODO: Translate hypergraph to Kahypar. For now this is left out, since the mapper calls this functions.
         #       Potentially call this directly here, such that the mapper only needs to access the property the
         self.hg_to_kahypar()
-
 
     def _qc_to_hypergraph(self, dag: DAGCircuit) -> None:
         """ Create hypergraph given circuit as DAG.

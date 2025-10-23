@@ -8,8 +8,11 @@ import numpy as np
 # QECMemory
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
+#from glue.eccentric_bench.external.qiskit_qec
+
 # TODO: fix this, since this is no longer running
-from codes import get_code, get_max_d
+from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+#from glue.eccentric_bench.codes.utils import get_code, get_max_d
 
 # QECCircuit
 import random
@@ -36,6 +39,51 @@ from experiments.utils.circuit_utils import stim_to_qiskit
 # Plotting
 import matplotlib.pyplot as plt
 
+class GenericCircuit():
+    def __init__(self, nq: int):
+        self.num_qubits = nq
+
+    def generate_circuit(self, num_patches):
+        
+        # Generate GHZ circuit
+        ghz = QuantumCircuit(self.num_qubits)
+        # Apply H on qubit 0
+        ghz.h(0)
+        # Apply CNOT chain
+        for i in range(self.num_qubits - 1):
+            ghz.cx(i, i + 1)
+
+        # Apply H on qubit 0
+        ghz.h(0)
+        # Apply CNOT chain
+        for i in range(self.num_qubits - 1):
+            ghz.cx(i, i + 1)
+
+        # Apply H on qubit 0
+        ghz.h(0)
+        # Apply CNOT chain
+        for i in range(self.num_qubits - 1):
+            ghz.cx(i, i + 1)
+
+        # Apply H on qubit 0
+        ghz.h(0)
+        # Apply CNOT chain
+        for i in range(self.num_qubits - 1):
+            ghz.cx(i, i + 1)
+
+        # Create num_patches of the GHZ circuit
+        total_qubits = self.num_qubits * num_patches
+        patched_circuit = QuantumCircuit(total_qubits, name="Big_GHZ")
+
+        # Stitch GHZ patches together
+        for patch_index in range(num_patches):
+            offset = patch_index * self.num_qubits
+
+            # Append with correct qubit mapping
+            patched_circuit.append(ghz.to_instruction(),
+                    qargs=list(range(offset, offset + self.num_qubits)))
+
+        return patched_circuit
 
 class QECMemory():
     """QECC memory circuits
@@ -67,7 +115,7 @@ class QECMemory():
         self.gate_set
         return circuit
 
-    def _generate_code_from_eccentric_bench(self, codename: str) -> qiskit.QuantumCircuit:
+    def _generate_code_from_eccentric_bench(self, codename: str) -> StimCodeCircuit:
         """Generate QECC memory circuit using eccentric_bench library
 
         :param codename: Name of QEC code to generate
@@ -84,17 +132,23 @@ class QECMemory():
 
         # Generate code
         cycles = 1#d
-        return get_code(codename, d, cycles).qc
+        #return get_code(codename, d, cycles).qc
+        return get_code(codename, d, cycles)
     
     def _generate_distributed_code_from_eccentric_bench(self, codename: str) -> qiskit.QuantumCircuit:
         # Simply generate multiple patches of the same code, and concatenate the generated code circuits
 
+        qecc_mem = self._generate_code_from_eccentric_bench(codename)
+
         # Generate code
 
         # Stitch circuits together
+
+        # TODO: This is more complicated, since it is necessary to modify the detectors and logicals.
+
         pass
 
-    def generate_code_memory(self, codename: str) -> qiskit.QuantumCircuit:
+    def generate_code_memory(self, codename: str, patches: int = 0) -> qiskit.QuantumCircuit:
         """Generate QECC memory circuit
 
         Currently used as wrapper around the circuit generation function from eccentric_bench. Extend this function if
@@ -105,10 +159,9 @@ class QECMemory():
         :return: QECC memory circuit
         :rtype: qiskit.QuantumCircuit
         """
-        multi = False
 
-        if multi:
-            qecc_mem = self._generate_code_from_eccentric_bench(codename)
+        if patches > 0:
+            qecc_mem = self._generate_distributed_code_from_eccentric_bench(codename)
         else:
             qecc_mem = self._generate_code_from_eccentric_bench(codename)
 

@@ -91,7 +91,8 @@ def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV
         backend,
         qubit_color=qcolors,
         qubit_labels=qubit_labels,
-        line_color=lcolors,
+        #line_color=lcolors,
+        line_color=line_colors,
         qubit_coordinates=qubit_coordinates,
         filename = filename,
     )

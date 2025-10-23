@@ -15,7 +15,8 @@ def stim_to_qiskit(stim_circuit) -> QuantumCircuit:
         - not all stim gates can be represented by a qiskit QuantumCircuit. These gates are simply not used
     """
 
-    
+    # TODO: extract detectors and return them
+
     # Convert stim circuit to qiskit
     stim_code = StimCodeCircuit(stim_circuit = stim_circuit)
     
@@ -31,6 +32,8 @@ def qiskit_to_stim():
     References:
         - https://qiskit-community.github.io/qiskit-qec/stubs/qiskit_qec.utils.get_stim_circuits.html
     """
+
+    # TODO: See https://github.com/aswierkowska/eccentric_bench/blob/main/main.py how to add the detectors again
 
     pass
 
