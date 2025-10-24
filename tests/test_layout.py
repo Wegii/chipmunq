@@ -21,7 +21,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping():
 
     # Generate surface code memory circuit
     circuit_generator = QECMemory(num_qubits)
-    surface_memory_circuit = circuit_generator.generate_code_memory('surface')
+    surface_memory_circuit = (circuit_generator.generate_code_memory('surface')).qc
     print(surface_memory_circuit.count_ops())
 
     # Initialize backend to map to

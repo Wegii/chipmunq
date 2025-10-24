@@ -27,6 +27,7 @@ def test_routing():
     pass
 
 
+
 def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
     """Test routing of hypergraph"""
 
@@ -35,7 +36,7 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
 
     # Generate surface code memory circuit
     circuit_generator = QECMemory(num_qubits)
-    surface_memory_circuit = circuit_generator.generate_code_memory('surface')
+    surface_memory_circuit = (circuit_generator.generate_code_memory('surface')).qc
 
     # Initialize backend to map to
     chiplet_backend = BackendChipletV2((2, 2, 3, 3), 3)

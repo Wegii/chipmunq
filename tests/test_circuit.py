@@ -16,7 +16,7 @@ def test_surface_memory_circuit_generation():
 
     # Generate surface code memory circuit
     circuit_generator = QECMemory(num_qubits)
-    surface_memory_circuit = circuit_generator.generate_code_memory('surface')
+    surface_memory_circuit = (circuit_generator.generate_code_memory('surface')).qc
 
     # Draw circuit to file
     circuit_generator.draw_circuit(surface_memory_circuit, "data/circuits/surface_memory.png")

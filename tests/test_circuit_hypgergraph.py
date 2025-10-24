@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # Circuits
-from experiments.circuit_generator import QECMemory
+from experiments.utils.circuit_generator import QECMemory
 # Hypergraph
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 # Qiskit
@@ -18,7 +18,7 @@ def test_surface_memory_circuit_to_hypergraph():
 
     # Generate surface code memory circuit
     circuit_generator = QECMemory(num_qubits)
-    surface_memory_circuit = circuit_generator.generate_code_memory('surface')
+    surface_memory_circuit = (circuit_generator.generate_code_memory('surface')).qc
     
     mar_pmsp = PartitionedMapRoutePlugin()
     # Construct hypergraph from circuit

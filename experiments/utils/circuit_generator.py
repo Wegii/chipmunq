@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qe
 # TODO: fix this, since this is no longer running
 from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
 #from glue.eccentric_bench.codes.utils import get_code, get_max_d
+from codes.utils import get_code, get_max_d
 
 # QECCircuit
 import random
