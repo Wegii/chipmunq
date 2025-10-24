@@ -58,17 +58,11 @@ class RandomMapper(GenericMapper):
         block_node_map = {}
         full_node_map = {}
 
+        # KaHyPar partitioning as HyperNetX
         partitioned_hgc = self.property_set["partitioned_hyper_dag"]
-
-        # Big Issue: However, partitioning assumes full qubit connectivity inside and across the quantum processors to
-        #            reduce the problem to a graph partitioning problem. on a higher level, this constrained is already
-        #            known to a high level compiler (e. g. for lattice surgery). Thus, we should generally not get a 
-        #            circuit that has to communicate with another node, to which no direct connection is.
-        #            Note: This is not entirely true, since the ancilla qubits used in lattice surgery could become an
-        #                  issue, if it is not possible to map these also to the same node!
-
-
+        # Mapping from partition to QPU
         partition_to_qpu = self.property_set["partition_to_qpu"]
+
         # Get blocks from partitioned hypergraph
         for block in partitioned_hgc._btn.items():
             # Extract index from key
@@ -79,7 +73,7 @@ class RandomMapper(GenericMapper):
 
             # Get qubit nodes from chiplet to which this partition/block is mapped to
             #print(partition_to_qpu[block_idx])
-            print(block_idx)
+            #print(block_idx)
 
             nodes_in_backend = self.backend.get_chiplet_at(partition_to_qpu[block_idx])
 
@@ -94,7 +88,7 @@ class RandomMapper(GenericMapper):
 
         #self.property_set["block_node_map"] = block_node_map
 
-        print(full_node_map)
+        #print(full_node_map)
 
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())

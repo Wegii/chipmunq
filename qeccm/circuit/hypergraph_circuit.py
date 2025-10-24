@@ -119,14 +119,18 @@ class HypergraphCircuit(AnalysisPass):
         super().__init__()
 
     def run(self, dag: DAGCircuit) -> None:
-        print("Start circuit to hg transformation")
+        #print("Start circuit to hg transformation")
         # Circuit to hypergraph
-        self._qc_to_hypergraph(dag)
+        #self._qc_to_hypergraph(dag)
+        # Translate hypergraph to Kahypar. 
+        #self.hg_to_kahypar()
 
-        print("Conversion finished")
-        # TODO: Translate hypergraph to Kahypar. For now this is left out, since the mapper calls this functions.
-        #       Potentially call this directly here, such that the mapper only needs to access the property the
-        self.hg_to_kahypar()
+        # Fast conversion of dag to KaHyPar CSR format. Note: hyper_dag property is not available, since no real
+        # hypergraph is constructed.
+        self._dag_to_kahypar(dag)
+
+        # TODO: possibility to create hypergraph (for visualization only) from KaHyPar CSR format
+
 
     def _qc_to_hypergraph(self, dag: DAGCircuit) -> None:
         """ Create hypergraph given circuit as DAG.
@@ -202,6 +206,36 @@ class HypergraphCircuit(AnalysisPass):
 
         # TODO: Remove the return statement and only use the property set from above
         return idx_vector, edge_vector
+
+    def _dag_to_kahypar(self, dag: DAGCircuit) -> None:
+        """Fast conversion from dag to KaHyPar CSR format
+
+        :param dag: _description_
+        :type dag: DAGCircuit
+        """
+        edge_vector = []
+        num_qubits = len(dag.qubits)
+        connectivity = [set() for _ in range(num_qubits)]
+
+        # Build connectivity map from all 2-qubit gates
+        for node in dag.two_qubit_ops():
+            q_indices = [q._index for q in node.qargs]
+            q0, q1 = q_indices
+            connectivity[q0].add(q1)
+            connectivity[q1].add(q0)
+
+        # Build edge_vector list
+        idx_vector = []
+        pos = 0
+        edge_vector = []
+        for i, connected in enumerate(connectivity):
+            edge = sorted([i] + list(connected))
+
+            edge_vector.extend(edge)
+            idx_vector.append(pos)
+            pos += len(edge)
+
+        self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
 
     def multigraph_to_singular(self):
         # Remove all duplicate edges added due to multigraph setting

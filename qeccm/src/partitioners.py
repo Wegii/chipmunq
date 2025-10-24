@@ -38,8 +38,8 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         self.backend = backend
 
         # Method for calculating the number of partitions
-        #self._calculate_partitions_method = "full"
-        self._calculate_partitions_method = "patch-aware"
+        self._calculate_partitions_method = "full"
+        #self._calculate_partitions_method = "patch-aware"
 
         # Initialize KaHyPar
         self.khp_context = kahypar.Context()
@@ -68,6 +68,13 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             # Partition graph into calculated number of partitions
             kahypar_hg = self.perform_partitioning(partition_sizes)
 
+
+            # Big Issue: However, partitioning assumes full qubit connectivity inside and across the quantum processors to
+            #            reduce the problem to a graph partitioning problem. on a higher level, this constrained is already
+            #            known to a high level compiler (e. g. for lattice surgery). Thus, we should generally not get a 
+            #            circuit that has to communicate with another node, to which no direct connection is.
+            #            Note: This is not entirely true, since the ancilla qubits used in lattice surgery could become an
+            #                  issue, if it is not possible to map these also to the same node!
             # Calculate mapping of partition to QPU. This is necessary, since KaHyPar assumes an all-to-all chiplet 
             # topology. Depending on the backend chiplet_topology, we do not have and all-to-all connection.
             partition_to_qpu = self.partition_to_qpu_mapping(kahypar_hg)
@@ -81,11 +88,6 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             partition_to_qpu = None
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(num_nodes = num_vertices)
             self.property_set["partition_to_qpu"] = partition_to_qpu
-
-
-
-
-
 
         # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without any
         #       edges intersecting each other. If there are intersecting edges, this is a big problem for the routing, 
@@ -107,7 +109,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         # Translate vertices and edges from general hypergraph to KaHyPar specific format
         (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
-        num_vertices = hgc.get_num_vertices() 
+        num_vertices = len(index_vector)#hgc.get_num_vertices() 
         num_hyperedges = len(index_vector) - 1
 
         # For now, all hyperedges are assumed to have the same weight
@@ -258,24 +260,6 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                 # k can be of maximum size backend_num_chiplets
                 if k > self.backend.get_num_chips():
                     k = self.backend.get_num_chips()
-
-                #core_numbers = nx.core_number(G_nx)
-                #print(core_numbers)
-                #max_core = max(core_numbers.values())
-                #print(core_numbers.values())
-                #print(max_core)
-                #for k in range(1, max_core + 1):
-                #    subg = nx.k_core(G_nx, k)
-                #    print(f"{k}-core has {len(subg.nodes())} nodes")
-                    
-                # Community detection
-                #communities = community.louvain_communities(G_nx, resolution=0.2, seed=42)
-                #print("Detected communities:")
-                #for i, c in enumerate(communities):
-                #    print(f"  Community {i}: {c}")
-
-
-                # TODO: Visualzation, if we found the clusters
             else:
                 pass
         else:
