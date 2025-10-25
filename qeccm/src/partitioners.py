@@ -62,8 +62,6 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # Calculate number of partitions
         self.kp, partition_sizes = self.calculate_number_partitions(dag, hgc)
 
-
-        
         if self.kp > 1:
             # Partition graph into calculated number of partitions
             kahypar_hg = self.perform_partitioning(partition_sizes)
@@ -84,8 +82,13 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         else:
             # Explicit Partitioning not needed 
             # TODO: 
-            num_vertices = None
-            partition_to_qpu = None
+            (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+            num_vertices = len(index_vector)
+
+            #num_vertices = None
+            partition_to_qpu = {}
+            partition_to_qpu[0] = 0
+            
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(num_nodes = num_vertices)
             self.property_set["partition_to_qpu"] = partition_to_qpu
 
