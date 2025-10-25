@@ -1,3 +1,6 @@
+> [!WARNING]
+> This code is still under development and features may change without prior warning.
+
 # ecc_mapping
 Mapping QECC to distributed systems
 
@@ -54,14 +57,23 @@ The mapping-and-routing is implemented for seamless integration into the transpi
 ### Constructing circuits and experiments
 For running the experiments the following additional libraries are necessary:
 
-- [eccentric_bench](https://github.com/aswierkowska/eccentric_bench/): Follow installation instructions in repo
-- [TQEC](https://github.com/tqec/tqec): `pip install git+https://github.com/tqec/tqec.git`
-- [PyZX](https://github.com/zxcalc/pyzx): `pip install pyzx`
+memory experiments:<br>
+-[eccentric_bench](https://github.com/aswierkowska/eccentric_bench/): Follow installation instructions in repo
+
+stability: <br>
+- TODO
+
+logical circuit: <br>
 - [Topologiq](https://github.com/jbolns/topologiq): `pip install git+https://github.com/jbolns/topologiq.git`
+- [TQEC](https://github.com/tqec/tqec): `pip install git+https://github.com/tqec/tqec.git`
 
 
 ### Mapping
 
 - [KaHyPar](https://github.com/kahypar/kahypar)
+
 - hypernetx (only for visualizing)
+
+- networkx
+
 - Potential replacement for KaHyPar: [Kaminpar](https://github.com/KaHIP/KaMinPar)
