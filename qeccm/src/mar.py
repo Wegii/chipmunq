@@ -12,7 +12,7 @@ from qeccm.backends import BackendChipletV2
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 from qeccm.src.mapper import CongestionMapper, RandomMapper
-from qeccm.src.router import BasicSwapRouter
+from qeccm.src.router import BasicSwapRouter, ParallelSwapRouter
 
 
 class GenericMapRoute(abc.ABC):
@@ -44,7 +44,6 @@ class BasicMapRoute(GenericMapRoute):
         pass
 
 
-#class PartitionedMapRoute(GenericMapRoute):
 class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
     # Not all qubits have the same connectivity
@@ -127,8 +126,11 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #    )
         #routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
         
-        # Custom implementation
+        # Basic implementation
         routing_op = BasicSwapRouter(backend)
+
+        # Parallel SWAPRouter
+        #routing_op = ParallelSwapRouter(backend)
 
         router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
         

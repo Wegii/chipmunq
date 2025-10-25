@@ -1,9 +1,11 @@
-from threading import local
-from numpy import single
+# Qiskit
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.circuit.library.standard_gates import SwapGate
 from qiskit.transpiler.layout import Layout
+
+# Parallel implementation
+from joblib import Parallel, delayed
 
 
 class GenericRouter(TransformationPass):
@@ -107,40 +109,55 @@ class ParallelSwapRouter(GenericRouter):
         super().__init__(backend)
 
     def run(self, dag):
+        """Parallel version of SWAPRouter
+
+        Note: Currently there are a couple of things missing, and this is not a correct implementation!!!
+        Note: The parallel implementation is currently slower than the single-core implementation!!!
+
+        Iterate over Chiplets and route all nodes of this chiplet:
+            - Each node also gets a timing-position, in order to construct the dag afterwards
+            - Local routing of Gates if source and target on chip: local_nodes
+            - Global routing of gates if target outside of this chip: remote_nodes
+            - local_routing of local_nodes
+            - global_routing of remote_nodes
+
+        :param dag: _description_
+        :type dag: _type_
+        :return: _description_
+        :rtype: _type_
+        """
         print("Starting routing")
 
         current_layout = self.property_set["layout"]
 
-
-        # Iterate over Chiplets
-            # Get all nodes of this chiplet
-            # Iterate over dag and extract 
-            #   - Each node also gets a timing-position, in order to construct the dag afterwards
-            #   - Local routing of Gates if source and target on chip: local_nodes
-            #   - Global routing of gates if target outside of this chip: remote_nodes
-            # local_routing of local_nodes
-            # global_routing of remote_nodes
-        local_dag_nodes, remote_dag_nodes, single_dag_nodes = self._dag_node_extraction()
+        local_dag_nodes, remote_dag_nodes, single_dag_instr = self._dag_node_extraction(dag)
         
         # Local routing on chiplet
-        local_dag_instr = self._local_routing(local_dag_nodes)
+        print("local routing")
+        local_dag_instr = self._local_routing(dag, local_dag_nodes)
         # Global routing between chiplet
+        print("global routing")
         global_dag_instr = self._global_routing(remote_dag_nodes)
 
         # Construct dag given local and global routing instructions
-        new_dag = self._build_parallel_dag(dag, local_dag_instr, global_dag_instr, single_dag_nodes)
+        print("dag construction")
+        new_dag = self._build_parallel_dag(dag, local_dag_instr, global_dag_instr, single_dag_instr)
 
         # Note: Layout transpilation pass needs to set this property
         self.property_set["final_layout"] = current_layout
 
         return new_dag
 
-    def _build_parallel_dag(self, dag, local_dag, global_dag):
+    def _build_parallel_dag(self, dag, local_dag_instr, global_dag_instr, single_dag_instr):
         # Sort local and global routing instructions based on timing-position
 
         # TODO: sort local and global
-        # Combine local and global
+        # Combine local and global and add single_instructions
         # Construct dag
+
+        list_all_ops = []
+        list_all_ops = local_dag_instr
+
 
         new_dag = DAGCircuit()
         for qreg in dag.qregs.values():
@@ -148,31 +165,41 @@ class ParallelSwapRouter(GenericRouter):
         for creg in dag.cregs.values():
             new_dag.add_creg(creg)
 
+        for sub_dag in list_all_ops:
+            #new_dag.compose(sub_dag)
+            for op, qargs in sub_dag:
+                new_dag.apply_operation_back(op, qargs=qargs)
+            
+            #if len(dag_op.qargs) == 2:
+            #    new_dag.apply_operation_back(dag_op)
+
+        # TODO: asd
+
+        return new_dag#new_dag
+
     def _dag_node_extraction(self, dag) -> tuple[list, list]:
 
         local_dag_nodes = []
         remote_dag_nodes = []
         single_dag_nodes = []
 
-        for node in dag.topological_op_nodes():               
+        for i, node in enumerate(dag.topological_op_nodes()):               
             if len(node.qargs) == 2:
                 q0, q1 = node.qargs[0]._index, node.qargs[1]._index
                 
                 # Check if q1 or q2 not on this chip
-                remote_dag_nodes.append("remote")
-
-                local_dag_nodes.append("local")
-                
+                #remote_dag_nodes.append("remote")
+                # Node on chip
+                local_dag_nodes.append((i, node))
             else:
                 # Single-qubit gates
-                #new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
-                single_dag_nodes.append("asd")
+                single_dag_nodes.append((i, node))
 
-
-
+        #print(len(local_dag_nodes))
+        #print(len(list(dag.op_nodes())))
         return local_dag_nodes, remote_dag_nodes, single_dag_nodes
 
-    def _local_routing(self, local_dag_nodes: list):
+    def _local_routing(self, dag, local_dag_nodes: list):
         """ Perform local basic swap routing
 
         Note: Parallelization over all nodes
@@ -183,13 +210,86 @@ class ParallelSwapRouter(GenericRouter):
         :rtype: _type_
         """
 
+        """
         # TODO: parallelize routing
+        routed_local_dag_instr = []
 
-        # TODO: return list of dag instructions
-        routed_local_dag_nodes = []
+        # Check distance in coupling map
+        for (node_index, dag_node) in local_dag_nodes:
+            q0, q1 = dag_node.qargs[0]._index, dag_node.qargs[1]._index
+                
+            ops_to_apply = []
+            if not self.coupling_map.distance(q0, q1) == 1:
+                
+                # Find shortest path connecting both qubits
+                path = self.coupling_map.shortest_undirected_path(q0, q1)
+                swap = SwapGate()
+                
+                # Insert swaps along path except last edge
+                for i in range(len(path) - 2):
+                    #sub_dag.apply_operation_back(swap, qargs=[dag.qubits[path[i]], dag.qubits[path[i+1]]])
+                    ops_to_apply.append((swap, [dag.qubits[path[i]], dag.qubits[path[i+1]]]))
+                
+                # Apply original gate
+                #sub_dag.apply_operation_back(dag_node.op, qargs=[dag.qubits[path[-2]], dag.qubits[path[-1]]])
+                ops_to_apply.append((dag_node.op, [dag.qubits[path[-2]], dag.qubits[path[-1]]]))
+
+                # SWAP backwards
+                for i in reversed(range(len(path) - 2)):
+                    # sub_dag.apply_operation_back(swap, qargs=[dag.qubits[path[i]], dag.qubits[path[i+1]]])
+                    ops_to_apply.append((swap, [dag.qubits[path[i]], dag.qubits[path[i+1]]]))
+
+            else:
+                # No swapping needed
+                #sub_dag.apply_operation_back(dag_node.op, qargs=dag_node.qargs)
+                ops_to_apply.append((dag_node.op, dag_node.qargs))
+
+            # Append node swap subdag
+            routed_local_dag_instr.append(ops_to_apply)
+        """
+        def route_node(node_index, dag_node):
+            q0, q1 = dag_node.qargs[0]._index, dag_node.qargs[1]._index
+            ops_to_apply = []
+
+            # If not directly connected, find SWAP path
+            if self.coupling_map.distance(q0, q1) != 1:
+                path = self.coupling_map.shortest_undirected_path(q0, q1)
+                swap = SwapGate()
+
+                # Forward SWAPs
+                for i in range(len(path) - 2):
+                    ops_to_apply.append((swap, [dag.qubits[path[i]], dag.qubits[path[i + 1]]]))
+
+                # Apply original 2-qubit operation
+                ops_to_apply.append((dag_node.op, [dag.qubits[path[-2]], dag.qubits[path[-1]]]))
+
+                # Backward SWAPs
+                for i in reversed(range(len(path) - 2)):
+                    ops_to_apply.append((swap, [dag.qubits[path[i]], dag.qubits[path[i + 1]]]))
+            else:
+                # No routing needed
+                ops_to_apply.append((dag_node.op, dag_node.qargs))
+
+            return (node_index, ops_to_apply)
+        
+        # Parallel processing of routing tasks
+        results = Parallel(
+            n_jobs=2,
+            backend="loky",
+            batch_size=int(dag.size()/2)
+        )(
+            delayed(route_node)(node_index, dag_node)
+            for (node_index, dag_node) in local_dag_nodes
+        )
+
+        # Sort results back into the original order (to preserve DAG order)
+        print("sorting")
+        routed_local_dag_instr = [ops for _, ops in sorted(results, key=lambda x: x[0])]
 
 
-        return routed_local_dag_nodes
+        # List of dags containing swapping operations
+        return routed_local_dag_instr
+
 
     def _global_routing(self, remote_dag_nodes: list):
         """Perform global basic swap routing
@@ -202,12 +302,14 @@ class ParallelSwapRouter(GenericRouter):
         :rtype: _type_
         """
 
+        # TODO: simple swap between the nodes
+
         # TODO: parallelize routing
 
         # TODO: return list of dag instructions
-        routed_remote_dag_nodes = []
+        routed_remote_dag_instr = []
 
-        return routed_remote_dag_nodes
+        return routed_remote_dag_instr
 
 
 class SABRERouter(GenericRouter):
