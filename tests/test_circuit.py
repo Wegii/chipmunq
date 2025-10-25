@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # Circuits
-from experiments.circuit_generator import QECCircuit, QECMemory
+from experiments.exp_utils.circuit_generator import QECCircuit, QECMemory
 
 # Qiskit DAG
 from qiskit.converters import circuit_to_dag

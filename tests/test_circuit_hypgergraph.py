@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # Circuits
-from experiments.utils.circuit_generator import QECMemory
+from experiments.exp_utils.circuit_generator import QECMemory
 # Hypergraph
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 # Qiskit

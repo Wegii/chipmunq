@@ -1,3 +1,10 @@
+import os
+import sys
+sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
+sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
+sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
+from qiskit_qec.utils import get_stim_circuits
+
 from qiskit import QuantumCircuit
 
 # Typing
@@ -8,12 +15,6 @@ from qiskit.providers import BackendV2
 from glue.eccentric_bench.backends import QubitTracking
 from glue.eccentric_bench.noise import get_noise_model
 from glue.eccentric_bench.decoders import decode
-
-# TODO: fix this import
-import os
-import sys
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
-from qiskit_qec.utils import get_stim_circuits
 
 
 class QECCircuitStats():
@@ -29,7 +30,9 @@ class QECCircuitStats():
 
             # Transpiled stim circuit
             detectors, logicals = self.stim_circuit.stim_detectors()
-            self.transpiled_stim_circuit = get_stim_circuits(transpiled_circuit, detectors=detectors, logicals=logicals)[0][0]
+            self.transpiled_stim_circuit = get_stim_circuits(transpiled_circuit,
+                                                             detectors=detectors,
+                                                             logicals=logicals)[0][0]
 
         if backend != None:
             self.backend = backend
@@ -39,32 +42,33 @@ class QECCircuitStats():
         self.circ = transpiled_circuit
 
 
-    def get_logical_error_rate(self):
+    def get_logical_error_rate(self, num_samples):
 
 
-        error_type = ""
-        error_prob = ""
-        code_name = ""
-        decoder = ""
-        backend_name = ""
+        error_type = "modsi1000"
+        error_prob = 5e-3
+        code_name = "surface"
+        decoder = "bposd"
+        backend_name = "custom_chiplet"
 
-        qt = QubitTracking(self.backend, self.stim_circuit.qc)
+        qt = QubitTracking(self.backend, self.circ)
         print("After GET STIM CIRCUIT")
 
         noise_model = get_noise_model(error_type, qt, error_prob, self.backend)
 
         print("After get_noise_model")
-        stim_circuit = noise_model.noisy_circuit(stim_circuit)
+        stim_circuit = noise_model.noisy_circuit(self.transpiled_stim_circuit)
 
         print("After adding noise")
         print("before decoding")
 
-        error_occured = decode(code_name, stim_circuit, 1, decoder, backend_name, error_type)
+        error_occured = decode(code_name, stim_circuit, num_samples, decoder, backend_name, error_type)
         print("After decoding")
 
-        #if error_occured == None:
-        #    exit(1)
-        #pass
+        logical_error_rate = error_occured / num_samples
+
+        return logical_error_rate
+
 
     def get_num_qubits(self):
         # Number of qubits

@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # Circuits
-from experiments.utils.circuit_generator import QECMemory, GenericCircuit
+from experiments.exp_utils.circuit_generator import QECMemory, GenericCircuit
 # Backend
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
 from qeccm.backends.backend_utils import plot_circuit_layout_utilization, plot_circuit_layout
@@ -96,6 +96,6 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
     
 
 if __name__ == "__main__":
-    # test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing()
+    test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing()
     
-    test_generic_circuit_routing()
+    #test_generic_circuit_routing()

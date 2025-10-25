@@ -2,13 +2,15 @@
 
 import sys
 import os
-import logging
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/utils/math"))
-#from codes.utils import get_code, get_max_d
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/math"))
+#import logging
+sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
+sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
+
+#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
+#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/utils/math"))
+from codes.utils import get_code, get_max_d
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/math"))
 
 import qiskit
 import numpy as np
@@ -42,7 +44,7 @@ from tqec.computation.cube import CubeKind, Port, YHalfCube
 from tqec.computation.pipe import PipeKind
 from tqec.utils.position import FloatPosition3D, Position3D
 from tqec.utils.scale import round_or_fail
-from experiments.utils.circuit_utils import stim_to_qiskit
+from experiments.exp_utils.circuit_utils import stim_to_qiskit
 
 # Plotting
 import matplotlib.pyplot as plt
@@ -156,9 +158,9 @@ class QECMemory():
 
         # TODO: This is more complicated, since it is necessary to modify the detectors and logicals.
 
-        pass
+        return qecc_mem
 
-    def generate_code_memory(self, codename: str, patches: int = 0) -> qiskit.QuantumCircuit:
+    def generate_code_memory(self, codename: str, patches: int = 0) -> StimCodeCircuit:
         """Generate QECC memory circuit
 
         Currently used as wrapper around the circuit generation function from eccentric_bench. Extend this function if
