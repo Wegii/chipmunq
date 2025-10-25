@@ -17,6 +17,7 @@ from qeccm.backends.BackendChipletV2 import BackendChipletV2
 # Circuits
 from experiments.utils.circuit_generator import QECMemory, GenericCircuit
 #from eccentric_bench.external.qiskit_qec.src.qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+from experiments.utils.transpilation_utils import *
 # Transpiler
 import qiskit
 from qiskit.transpiler import StagedPassManager
@@ -35,47 +36,6 @@ import logging
 
 # Enable debug logging for Qiskit
 logging.basicConfig(level=logging.DEBUG)
-
-
-def custom_partitioned_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2):
-    mar_pmsp = PartitionedMapRoutePlugin()
-    # Pass to construct hypergraph from circuit
-    init_pm = mar_pmsp._generate_initial_pass()
-    # Pass to perform partition and mapping
-    partitioning_pm = mar_pmsp._generate_layout_pass(backend)
-    # Pass to perform routing
-    routing_pm = mar_pmsp._generate_routing_pass(backend)
-    # Construct pass manager with all passes
-    staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=partitioning_pm,
-                                  routing=routing_pm)
-    # Run passes
-    routed_circuit = staged_pm.run(circuit)
-
-    return routed_circuit
-
-
-def sabre_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2):
-    
-    init_pm = PassManager([Unroll3qOrMore()])
-
-    layout_pm = PassManager([TrivialLayout(backend.coupling_map), FullAncillaAllocation(backend.coupling_map)])
-    routing_op = qiskit.transpiler.passes.SabreSwap(
-            coupling_map=CouplingMap(backend.coupling_map),
-            heuristic='decay',
-            seed=42
-            )
-    router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
-    staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=layout_pm, routing=router_pm)
-    return staged_pm.run(circuit)
-    
-    #return transpile(circuit,
-    #                 #basis_gates=qiskit_stim_gates,
-    #                 basis_gates=['u1', 'u2', 'u3', 'cx', 'swap', 'h'],
-    #                 optimization_level=0,
-    #                 backend=backend,
-    #                 layout_method="sabre",
-    #                 routing_method="sabre"
-    #    )
 
 
 def _get_backend(type, c1, c2, n, m, n_inter) -> BackendChipletV2:

@@ -1,19 +1,26 @@
+#from __future__ import annotations
+
 import sys
 import os
 import logging
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
+sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
+sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/utils/math"))
+#from codes.utils import get_code, get_max_d
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/math"))
+sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 
 import qiskit
 import numpy as np
 
 # QECMemory
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 #from glue.eccentric_bench.external.qiskit_qec
 
 # TODO: fix this, since this is no longer running
 from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
 #from glue.eccentric_bench.codes.utils import get_code, get_max_d
-from codes.utils import get_code, get_max_d
+
+#from glue.eccentric_bench.codes.utils import get_code, get_max_d
 
 # QECCircuit
 import random
@@ -54,6 +61,7 @@ class GenericCircuit():
         for i in range(self.num_qubits - 1):
             ghz.cx(i, i + 1)
 
+        """
         # Apply H on qubit 0
         ghz.h(0)
         # Apply CNOT chain
@@ -71,6 +79,7 @@ class GenericCircuit():
         # Apply CNOT chain
         for i in range(self.num_qubits - 1):
             ghz.cx(i, i + 1)
+        """
 
         # Create num_patches of the GHZ circuit
         total_qubits = self.num_qubits * num_patches

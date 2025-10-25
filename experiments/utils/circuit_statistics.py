@@ -1,7 +1,7 @@
 from qiskit import QuantumCircuit
 
 # Typing
-from eccentric_bench.external.qiskit_qec.src.qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+#from eccentric_bench.external.qiskit_qec.src.qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
 from qiskit.providers import BackendV2
 
 # eccentric_bench
@@ -16,12 +16,11 @@ sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qe
 from qiskit_qec.utils import get_stim_circuits
 
 
-
 class QECCircuitStats():
     """_summary_
     """
 
-    def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit: StimCodeCircuit = None,
+    def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit = None,
                 backend: BackendV2 = None):
 
         if stim_circuit != None:
@@ -81,11 +80,26 @@ class QECCircuitStats():
         
         pass
 
-    def get_num_two_gates(self):
-        # Get number of two-qubit gates
-        pass
+    def get_num_two_gates(self) -> int:
+        """Calculate number of two-qubit gates.
+
+        :return: Number of two-qubit gates
+        :rtype: int
+        """
+
+        return sum(1 for instr, qargs, cargs in self.circ.data if len(qargs) == 2)
+
 
     def get_num_single_gates(self):
         # Get number of single-qubit gates
         pass
+
+    def get_depth(self) -> int:
+        """Calculate depth of circuit.
+
+        :return: Depth of circuit
+        :rtype: int
+        """
+
+        return self.circ.depth()
     
