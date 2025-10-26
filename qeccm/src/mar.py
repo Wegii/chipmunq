@@ -11,7 +11,7 @@ from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAnci
 from qeccm.backends import BackendChipletV2
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
-from qeccm.src.mapper import CongestionMapper, RandomMapper
+from qeccm.src.mapper import CongestionMapper, RandomMapper, TrivialMapper
 from qeccm.src.router import BasicSwapRouter, ParallelSwapRouter
 
 
@@ -87,7 +87,8 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         partition_op = KaHyParPartitioning(backend)
 
         # Mapping pass
-        mapping_op = RandomMapper(backend)
+        #mapping_op = RandomMapper(backend)
+        mapping_op = TrivialMapper(backend)
         #mapping_op = TrivialLayout(pass_manager_config.coupling_map)
 
         # Extend the dag with ancillas and idling qubits
@@ -132,6 +133,6 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # Parallel SWAPRouter
         #routing_op = ParallelSwapRouter(backend)
 
-        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout()])#, routing_op])#, routing_op])
+        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
         
         return router_pm

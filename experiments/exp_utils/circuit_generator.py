@@ -104,7 +104,7 @@ class QECMemory():
         - Color Code
         - Surface Code
         - Steane Code
-        - BB Codes
+        - BB Codes: have a look at https://github.com/AndersenQubitLab/small_qLDPC_codes
     """
 
     # QECC Memory circuits

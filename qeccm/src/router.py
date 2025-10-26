@@ -66,6 +66,9 @@ class BasicSwapRouter(GenericRouter):
                     if not self.coupling_map.distance(q0, q1) == 1:
                         # Find shortest path connecting both qubits
                         path = self.coupling_map.shortest_undirected_path(q0, q1)
+                        # TODO: this can be replaced with a easier calculation, by considering the grid layout of the
+                        #       backend. Note: only works for grid layout then.
+                        # TODO: remote gates need the shortest_undirected_path function again
                         
                         # Insert swaps along path except last edge
                         for i in range(len(path) - 2):
@@ -85,6 +88,7 @@ class BasicSwapRouter(GenericRouter):
                                 swap,
                                 qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
                             )
+                        
                     else:
                         # Local two-qubit gates
                         new_dag.apply_operation_back(node.op, qargs=node.qargs)

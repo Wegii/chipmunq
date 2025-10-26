@@ -13,8 +13,8 @@ sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qe
 import time
 
 # Custom utils
-from experiments.utils.transpilation_utils import *
-from experiments.utils.circuit_generator import QECMemory, GenericCircuit
+from experiments.exp_utils.transpilation_utils import *
+from experiments.exp_utils.circuit_generator import QECMemory, GenericCircuit
 
 # Plotting
 import matplotlib.pyplot as plt
@@ -59,6 +59,7 @@ def _transpile(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2) -> tup
     _ = custom_partitioned_transpilation(circuit, backend)
     end_c = time.time()
     c_time = end_c - start_c
+    print("custom done")
 
     start = time.time()
     _ = sabre_transpilation(circuit, backend)
@@ -116,7 +117,7 @@ if __name__ == "__main__":
 
     small_backend = BackendChipletV2((2, 2, 10, 10), n_inter)
     medium_backend = BackendChipletV2((8, 8, 10, 10), n_inter)
-    big_backend = BackendChipletV2((16, 16, 10, 10), n_inter)
+    big_backend = BackendChipletV2((20, 20, 10, 10), n_inter)
 
     # Small backend
     small_generic_patch_circuit = _get_circuit("", 2*2)
@@ -127,11 +128,11 @@ if __name__ == "__main__":
     custom_time_medium, sabre_time_medium = _transpile(medium_generic_patch_circuit, medium_backend)
 
     # Big backend
-    big_generic_patch_circuit = _get_circuit("", 16*16)
+    big_generic_patch_circuit = _get_circuit("", 20*20)
     custom_time_big, sabre_time_big = _transpile(big_generic_patch_circuit, big_backend)
     
     custom_timing = [custom_time_small, custom_time_medium, custom_time_big]
     sabre_timing = [sabre_time_small, sabre_time_medium, sabre_time_big]
     print(custom_timing)
     print(sabre_timing)
-    plot_execution_time_bar_chart(custom_timing, sabre_timing)
+    #plot_execution_time_bar_chart(custom_timing, sabre_timing)

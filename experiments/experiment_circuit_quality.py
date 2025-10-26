@@ -15,9 +15,9 @@ sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qe
 import time
 
 # Custom utils
-from experiments.utils.transpilation_utils import *
-from experiments.utils.circuit_generator import QECMemory, GenericCircuit
-from experiments.utils.circuit_statistics import QECCircuitStats
+from experiments.exp_utils.transpilation_utils import *
+from experiments.exp_utils.circuit_generator import QECMemory, GenericCircuit
+from experiments.exp_utils.circuit_statistics import QECCircuitStats
 
 # Plotting
 import matplotlib.pyplot as plt
@@ -163,6 +163,11 @@ if __name__ == "__main__":
     sabre_small_stats = QECCircuitStats(transpiled_circuit = sabre_small, backend = small_backend)
     #basic_small_stats = QECCircuitStats(transpiled_circuit = basic_small, backend = small_backend)
 
+    print(custom_small)
+    print(custom_small_stats.get_depth())
+    print(sabre_small_stats.get_depth())
+
+    """
     # Medium backend
     medium_generic_patch_circuit = _get_circuit("", 8*8)
     custom_medium, sabre_medium = _transpile(medium_generic_patch_circuit, medium_backend)
@@ -201,3 +206,4 @@ if __name__ == "__main__":
 
     plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
     plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
+    """
