@@ -48,7 +48,7 @@ class BackendChipletV2(BackendV2):
         BackendV2 (_type_): _description_
     """
 
-    def __init__(self, size, n_inter) -> None:
+    def __init__(self, size, n_inter, connectivity: str = "nn") -> None:
         """Instantiate new multi-chip backend.
 
         :param size: _description_
@@ -72,7 +72,7 @@ class BackendChipletV2(BackendV2):
 
         # TODO: Add linear,
         # TODO: Add heavy hex
-        self.typology = "grid"
+        self.topology = "grid"
 
         # Different variants for connecting and placing chiplets:
         # - line: simple line (Peano Curve for placement)
@@ -86,8 +86,7 @@ class BackendChipletV2(BackendV2):
 
         # Type of connectivity (nn: neares-neighbour, torus: connectivity of 6)
         # Note: This can't necessarily be applied on all type of topologies.
-        self.connectivity = "nn"
-        #self.connectivity = 'torus'
+        self.connectivity = connectivity
 
         # TODO: not usable qubits
         # TODO: Create a either a list of qubits that can not be used, or potentially remove the completely from the 
@@ -125,29 +124,57 @@ class BackendChipletV2(BackendV2):
         #   https://github.com/munich-quantum-toolkit/qecc/blob/ls-compilation/scripts/co3/layouts.py
         # There, the layout has fixed coordinates.
 
-        if self.typology == "grid":
+        if self.topology == "grid":
             if self.connectivity == "nn":
                 # Generate simple grid graph with edge to nearest neighbour
                 G = rustworkx.generators.grid_graph(self.n, self.m, multigraph=False)
-
-                # TODO: Add higher-order connectivity
                 
                 # Add edge payload
                 for edge_index in range(G.num_edges()):
                     G.update_edge_by_index(edge_index, LABEL_ON_CHIP)
 
             if self.connectivity == "torus":
-                # TODO: Check if utilization of self.n and self.m is correct
-                G = rx.generators.directed_grid_graph(self.n, self.m)
-                for column in range(self.n):
-                    G.add_edge(column, (self.m-1) * self.n + column, None)
-                for row in range(self.m):
-                    G.add_edge(row * self.n, row * self.m + (self.n-1), None)
+                # Generate torus layout
+                G = rustworkx.generators.grid_graph(self.n, self.m, multigraph=False)
 
-        elif self.typology == "heavy-hex":
+                def idx(r, c):
+                    return (r % self.n) * self.m + (c % self.m)
+
+                # Vertical modulo wrap
+                for c in range(self.m):
+                    top_node = idx(0, c)
+                    bottom_node = idx(self.n - 1, c)
+                    if not G.has_edge(bottom_node, top_node):
+                        G.add_edge(bottom_node, top_node, None)
+
+                # Horizontal modulo wrap
+                for r in range(self.n):
+                    left_node = idx(r, 0)
+                    right_node = idx(r, self.m - 1)
+                    if not G.has_edge(right_node, left_node):
+                        G.add_edge(right_node, left_node, None)
+
+                # Long-range connections "inside" the chip
+                for r in range(self.n):
+                    for c in range(self.m):
+                        node = idx(r, c)
+
+                        # Two remote neighbors (with wrap-around)
+                        remote_neighbors = [
+                            idx(r + 1, c + 2),  # offset: +1 row, +2 columns
+                            idx(r - 1, c - 2),  # offset: -1 row, -2 columns
+                        ]
+
+                        for nb in remote_neighbors:
+                            if nb != node and not G.has_edge(node, nb):
+                                G.add_edge(node, nb, None)
+                
+                
+
+        elif self.topology == "heavy-hex":
             distance = 3
             G = rx.generators.directed_heavy_hex_graph(distance, bidirectional=False)
-        elif self.typology == "line":
+        elif self.topology == "line":
             raise NotImplemented
 
 
@@ -200,6 +227,11 @@ class BackendChipletV2(BackendV2):
                     error=rng.uniform(7e-4, 5e-3),
                     duration=rng.uniform(1e-8, 9e-7),
                 )
+            #for edge in G.edge_list():
+            #    cz_props[edge] = InstructionProperties(
+            #        error=rng.uniform(7e-4, 5e-3),
+            #        duration=rng.uniform(1e-8, 9e-7),
+            #    )
 
         self._target.add_instruction(CZGate(), cz_props)
 

@@ -1,12 +1,14 @@
 import qiskit
 from qiskit.visualization import plot_gate_map
 from qiskit.visualization.exceptions import VisualizationError
+import matplotlib.pyplot as plt
 
 from qeccm.backends import BackendChipletV2
 import numpy as np
+import math
 
 
-def plot_gate_map(backend: BackendChipletV2, filename: str = ""):
+def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_color: bool = False):
     """ Custom implementation of qiskit.visualization.plot_gate_map
     
     Creates coordinates based on backend type rectangular, etc.
@@ -17,15 +19,96 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = ""):
     """
 
     qubit_coordinates = generate_coordinates(backend)
-    line_colors, qubit_colors = generate_formatting(backend)
+    line_colors, qubit_colors = generate_formatting(backend, qubit_coordinates)
 
-    qiskit.visualization.plot_gate_map(
-        backend,
-        qubit_coordinates = qubit_coordinates,
-        qubit_color = qubit_colors,
-        line_color = line_colors,
-        filename = filename,
-    )
+    if backend.connectivity == "nn":
+        qiskit.visualization.plot_gate_map(
+            backend,
+            qubit_coordinates = qubit_coordinates,
+            qubit_color = qubit_colors,
+            line_color = line_colors,
+            filename = filename,
+        )
+    else:
+
+        # Add similar coloring to nodes as in: https://arxiv.org/pdf/2506.03094
+        qubit_shapes = []
+
+        if show_bb_node_color:
+            # Prepare color and shape lists
+            qubit_colors = []
+            
+            for i, (x, y) in enumerate(qubit_coordinates):
+                row = abs(int(x))
+
+                if row % 2 == 0:
+                    if i % 2 == 0:
+                        qubit_colors.append('#2A9374')
+                        qubit_shapes.append('s')
+                    else:
+                        qubit_colors.append('#046494')
+                        qubit_shapes.append('o')
+                else:
+                    if i % 2 == 0:
+                        qubit_colors.append('#FDD689')
+                        qubit_shapes.append('o')
+                    else:
+                        qubit_colors.append('#E18AAA')
+                        qubit_shapes.append('s')
+        else:
+            for i, (x, y) in enumerate(qubit_coordinates):
+                qubit_shapes.append('s')
+
+        plt.figure()#figsize=(8, 8))
+
+        # Draw nodes
+        for i, (x, y) in enumerate(qubit_coordinates):
+
+            plt.scatter(x, y, s=500, color=qubit_colors[i], marker=qubit_shapes[i], zorder=3)
+            plt.text(
+                x, y,
+                str(i),
+                color='white',
+                ha='center',
+                va='center',
+                fontsize=10,
+                weight='bold',
+                zorder=4
+            )
+
+        # Draw connections
+        G = qiskit.transpiler.coupling.CouplingMap(backend.coupling_map).graph
+        for (edge, color) in zip(G.edge_list(), line_colors):
+            a, b = edge
+            x1, y1 = qubit_coordinates[a]
+            x2, y2 = qubit_coordinates[b]
+
+            # Optionally alternate curvature direction to reduce overlap
+            import math
+            distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            curvature = 0 if distance == 1 else -0.15
+
+            plt.annotate(
+                "",
+                xy=(x2, y2),
+                xycoords='data',
+                xytext=(x1, y1),
+                textcoords='data',
+                arrowprops=dict(
+                    arrowstyle="-",
+                    color=color,
+                    lw=1.5,
+                    alpha=0.9,
+                    connectionstyle=f"arc3,rad={curvature}",  # 👈 add smooth curve
+                ),
+                zorder=1,
+            )
+
+        # Final formatting
+        plt.axis("off")
+        plt.gca().set_aspect("equal")
+        plt.tight_layout()
+        plt.savefig(filename)
 
 
 def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2, filename: str = ""):
@@ -37,9 +120,7 @@ def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV
     """
     
     qubit_coordinates = generate_coordinates(backend)
-
-    line_colors, qubit_colors = generate_formatting(backend)
-    
+    line_colors, qubit_colors = generate_formatting(backend, qubit_coordinates)
 
     view = ""
     view="virtual"
@@ -133,7 +214,7 @@ def plot_circuit_layout_utilization(circuit: qiskit.QuantumCircuit, backend: Bac
 
     # Generate coordinates and line color (chiplet connections)
     qubit_coordinates = generate_coordinates(backend)
-    line_colors, _ = generate_formatting(backend)
+    line_colors, _= generate_formatting(backend, qubit_coordinates)
     
     qiskit.visualization.plot_gate_map(
         backend,
@@ -146,7 +227,7 @@ def plot_circuit_layout_utilization(circuit: qiskit.QuantumCircuit, backend: Bac
 def generate_coordinates(backend):
     # Generate coordinates for nodes
 
-    if backend.typology == "grid":
+    if backend.topology == "grid":
         x_range = range(-backend.n//2, backend.n//2)
         y_range = range(-backend.m//2, backend.m//2)
         #print(len(x_range))
@@ -194,18 +275,28 @@ def generate_coordinates(backend):
         
 
     else:
-        total_qubit_coordinates.append(coordinate)
+        total_qubit_coordinates.extend(coordinates)
 
     #print(total_qubit_coordinates)
     #print(len(total_qubit_coordinates))
     return total_qubit_coordinates
 
 
-def generate_formatting(backend: BackendChipletV2):
+def generate_formatting(backend: BackendChipletV2, qubit_coordinates: list):
     target = backend.target
     coupling_map_backend = target.build_coupling_map()
 
-    line_colors = ["#6D8196" for edge in coupling_map_backend.get_edges()]
+    # Select color depending on distance of connections. Direct connections receive blue color for edge, while remote
+    # connections (i. e. physical distance > 1) receive violet color for edge
+    line_colors = [
+        "#6D8196" if math.isclose(
+            math.sqrt((qubit_coordinates[a][0] - qubit_coordinates[b][0])**2 +
+                    (qubit_coordinates[a][1] - qubit_coordinates[b][1])**2),
+            1.0
+        ) else "#9400D3" 
+        for a, b in coupling_map_backend.get_edges()
+    ]
+        
     ecr_edges = []
     
     # Get tuples for the edges which have an ecr instruction attached
@@ -217,8 +308,6 @@ def generate_formatting(backend: BackendChipletV2):
         if edge in ecr_edges:
             line_colors[i] = "#FF746C"
 
-
     qubit_colors = ["#007878" for qubit in coupling_map_backend.physical_qubits]
-
 
     return line_colors, qubit_colors
