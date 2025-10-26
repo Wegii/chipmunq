@@ -6,6 +6,7 @@ from qiskit.dagcircuit import DAGCircuit
 from qiskit.transpiler.basepasses import AnalysisPass
 from qiskit.transpiler.layout import Layout
 from qiskit.circuit import Qubit, QuantumRegister
+import random
 
 
 
@@ -55,7 +56,6 @@ class RandomMapper(GenericMapper):
     def run(self, dag: DAGCircuit) -> None:
 
         # Construct dictionary with block as key and value as (random) mapping from node to backend node 
-        block_node_map = {}
         full_node_map = {}
 
         # KaHyPar partitioning as HyperNetX
@@ -68,27 +68,18 @@ class RandomMapper(GenericMapper):
             # Extract index from key
             block_idx = int(block[0][2:])
 
-            # Iterate over nodes
-            node_map = {}
-
             # Get qubit nodes from chiplet to which this partition/block is mapped to
-            #print(partition_to_qpu[block_idx])
-            #print(block_idx)
-
             nodes_in_backend = self.backend.get_chiplet_at(partition_to_qpu[block_idx])
+            print(nodes_in_backend)
 
-            #print(nodes_in_backend)
+            # Map all nodes randomly to chiplet
             for n, node in enumerate(block[1]):
-                #node_map[node] = nodes_in_backend[n]
-                # Continuous dict
-                full_node_map[node] = nodes_in_backend[n]
+                # Pick a random element
+                picked = random.choice(nodes_in_backend)
+                # Remove the picked element from the list
+                nodes_in_backend.remove(picked)
 
-            # For bookkeeping story the mapping for each block
-            #block_node_map[block_idx] = node_map
-
-        #self.property_set["block_node_map"] = block_node_map
-
-        #print(full_node_map)
+                full_node_map[node] = picked#nodes_in_backend[n]
 
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())

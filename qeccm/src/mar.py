@@ -132,6 +132,6 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # Parallel SWAPRouter
         #routing_op = ParallelSwapRouter(backend)
 
-        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
+        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout()])#, routing_op])#, routing_op])
         
         return router_pm
