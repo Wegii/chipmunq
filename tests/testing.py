@@ -1,36 +1,81 @@
-import networkx as nx
-import matplotlib.pyplot as plt
+import sys
+import os
+sys.path.append(os.path.join(os.getcwd(), "."))
 
-# Example graph
-G = nx.karate_club_graph()
+import stim
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+from glue.qiskit_qec.stim_tools import get_stim_circuits, get_stim_circuits_with_detectors
 
-# Example partitions (as lists of nodes)
-partition1 = [0, 1, 2, 3, 4, 5]
-partition2 = [6, 7, 8, 9, 10, 11, 12]
-partition3 = [13, 14, 15, 16, 17, 18, 19, 20]
+stim_ex1 = stim.Circuit('''
+            QUBIT_COORDS(0, 0) 0
+            QUBIT_COORDS(2, 0) 1
+            QUBIT_COORDS(0, 2) 3
+            QUBIT_COORDS(2, 2) 4
+                                      
+            H 0
+            CX 0 1
+                        
+            TICK
+            M 0 1
+            DETECTOR(0, 0, 0) rec[-1] rec[-2]
+            SHIFT_COORDS(0, 0)
+            OBSERVABLE_INCLUDE(0) rec[-2]       
+            TICK
+ 
+            CX 0 3
+            CX 1 4
 
-#partitions = [partition1, partition2, partition3]
-g1_nodes, g2_nodes = nx.algorithms.community.kernighan_lin_bisection(G, max_iter=10)
-partitions = [g1_nodes, g2_nodes]
-colors = ['red', 'green']  # color per partition
+            ''')
 
-# Create a mapping: node -> color
-node_colors = {}
-for part, color in zip(partitions, colors):
-    for node in part:
-        node_colors[node] = color
+stim_code = StimCodeCircuit(stim_circuit = stim_ex1)
+#print(stim_ex1)
+#print(stim_code)
 
-# Get color list for drawing
-color_list = [node_colors.get(node, 'gray') for node in G.nodes()]
+stim_ex1_after_workflow = get_stim_circuits_with_detectors(stim_code.qc)[0][0]
+#print("\n\nAfterwards: ")
+#print(stim_ex1_after_workflow)
 
-# Layout for visualization
-pos = nx.spring_layout(G, seed=42)  # positions for all nodes
+"""
+# --- Define custom metadata instructions --- #
+class DetectorInstruction(Instruction):
+    def __init__(self, coords, rec_indices):
+        params = {"coords": coords, "rec_indices": rec_indices}
+        super().__init__("DETECTOR", 1, 0, [params])  # apply to all qubits for visualization
 
-# Draw nodes with partition colors
-nx.draw_networkx_nodes(G, pos, node_color=color_list, node_size=500)
-nx.draw_networkx_edges(G, pos, alpha=0.5)
-nx.draw_networkx_labels(G, pos, font_size=10)
 
-plt.axis('off')
-#plt.show()
-plt.savefig("tests/test.png")
+class ShiftCoordsInstruction(Instruction):
+    def __init__(self, shift_vector):
+        params = {"shift_vector": shift_vector}
+        super().__init__("SHIFT_COORDS", 3, 0, [params])  # 3 qubits, no clbits
+
+
+# --- Create circuit --- #
+qreg = QuantumRegister(3)
+creg = ClassicalRegister(3)
+qc = QuantumCircuit(qreg, creg)
+
+# 1. CNOT 0 2
+qc.cx(0, 2)
+
+# 2. CNOT 1 2
+qc.cx(1, 2)
+
+# 3. MR 2 (measure qubit 2)
+qc.measure(2, 2)
+
+# 4. DETECTOR(10.5, 0) rec[-1] rec[-2]
+det_inst = DetectorInstruction(coords=(10.5, 0), rec_indices=[-1, -2])
+qc_reg = qc.qregs[0]
+for q in qc_reg:
+    print(q)
+    qc.append(det_inst, qargs=[q],)
+#qc.append(det_inst, qargs=[qreg[1]])
+
+# 5. SHIFT_COORDS(0, 1)
+shift_inst = ShiftCoordsInstruction(shift_vector=(0, 1))
+qc.append(shift_inst, qargs=[qreg[0], qreg[1], qreg[2]])
+
+print(qc)
+"""
+
+

@@ -26,29 +26,8 @@ import seaborn as sns
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
-def _get_circuit(type, num_patches):
-    # Get circuit with non-interacting patches
-
-    if type == "surface":
-        distance = 9
-        # calculate num_qubits for distance
-        num_qubits = 100
-
-        circuit_generator = QECMemory(num_qubits)
-        # Selects the maximum code distance given the number of qubits
-        # Note: This is a stim circuit!
-        circuit = circuit_generator.generate_code_memory('surface', num_patches)
-    else:
-        num_qubits = 10*10 - 10
-        circuit_generator = GenericCircuit(num_qubits)
-        # Note: This is not a stim_circuit !
-        circuit = circuit_generator.generate_circuit(num_patches)
-
-    return circuit
-
-
 def _transpile(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2) -> tuple[float, float]:
-    """Time transpilation of circuit to backend using custom and sabre transpilation passes
+    """Transpilation of circuit to backend using custom and sabre transpilation passes
 
     :param circuit: _description_
     :type circuit: qiskit.QuantumCircuit
@@ -106,6 +85,7 @@ def plot_gate_statistics_bar_chart(custom_gates, sabre_gates):
     plt.savefig(f"experiments/data/figures/statistics/circuit_statistics_gates.png", bbox_inches='tight')
     plt.close()
 
+
 def plot_depth_statistics_bar_chart(custom_depth, sabre_depth):
 
     groups = {
@@ -149,6 +129,28 @@ def plot_depth_statistics_bar_chart(custom_depth, sabre_depth):
     plt.close()
 
 
+def _get_circuit(type, num_patches, num_qubits):
+    # Get circuit with non-interacting patches
+
+    if type == "memory":
+        #Note: Selects the maximum code distance given the number of qubits
+        circuit_generator = QECMemory(num_qubits)
+
+        # Note: This is a stim circuit!
+        circuit = circuit_generator.generate_code_memory('surface', num_patches)
+
+    elif type == "2-qubit surgery":
+        pass
+    elif type == "generic":
+        num_qubits = num_qubits - 10
+        circuit_generator = GenericCircuit(num_qubits)
+
+        # Note: This is not a stim_circuit !
+        circuit = circuit_generator.generate_circuit(num_patches)
+
+    return circuit
+
+
 if __name__ == "__main__":
     n_inter = 5
 
@@ -163,11 +165,8 @@ if __name__ == "__main__":
     sabre_small_stats = QECCircuitStats(transpiled_circuit = sabre_small, backend = small_backend)
     #basic_small_stats = QECCircuitStats(transpiled_circuit = basic_small, backend = small_backend)
 
-    print(custom_small)
-    print(custom_small_stats.get_depth())
-    print(sabre_small_stats.get_depth())
 
-    """
+    
     # Medium backend
     medium_generic_patch_circuit = _get_circuit("", 8*8)
     custom_medium, sabre_medium = _transpile(medium_generic_patch_circuit, medium_backend)
@@ -176,34 +175,41 @@ if __name__ == "__main__":
     #basic_medium_stats = QECCircuitStats(transpiled_circuit = basic_medium, backend = medium_backend)
 
     # Big backend
+    """
     big_generic_patch_circuit = _get_circuit("", 16*16)
     custom_big, sabre_big = _transpile(big_generic_patch_circuit, big_backend)
     custom_big_stats = QECCircuitStats(transpiled_circuit = custom_big, backend = big_backend)
     sabre_big_stats = QECCircuitStats(transpiled_circuit = sabre_big, backend = big_backend)
     #basic_big_stats = QECCircuitStats(transpiled_circuit = basic_big, backend = big_backend)
+    """
     
     two_qubit_gates = []
     custom_gates = [custom_small_stats.get_num_two_gates(),
-                    custom_medium_stats.get_num_two_gates(),
-                    custom_big_stats.get_num_two_gates()]
+                    custom_medium_stats.get_num_two_gates(),]
+                    #custom_big_stats.get_num_two_gates()]
     
     custom_depth = [custom_small_stats.get_depth(),
-                    custom_medium_stats.get_depth(),
-                    custom_big_stats.get_depth()]
+                    custom_medium_stats.get_depth(),]
+                    #custom_big_stats.get_depth()]
     
     sabre_gates = [sabre_small_stats.get_num_two_gates(),
-                   sabre_medium_stats.get_num_two_gates(),
-                   sabre_big_stats.get_num_two_gates()]
+                   sabre_medium_stats.get_num_two_gates(),]
+                   #sabre_big_stats.get_num_two_gates()]
     
     sabre_depth = [sabre_small_stats.get_depth(),
-                   sabre_medium_stats.get_depth(),
-                   sabre_big_stats.get_depth()]
+                   sabre_medium_stats.get_depth(),]
+                   #sabre_big_stats.get_depth()]
 
-    print(custom_gates)
+    #print(custom_gates)
     print(custom_depth)
-    print(sabre_gates)
+    #print(sabre_gates)
     print(sabre_depth)
 
-    plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
-    plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
-    """
+    # Custom:
+    #   Trivial: 1406
+    #   Random: 12107 -> Much much worse
+    # SABRE: 330
+
+    #plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
+    #plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
+    

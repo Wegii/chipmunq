@@ -135,4 +135,5 @@ if __name__ == "__main__":
     sabre_timing = [sabre_time_small, sabre_time_medium, sabre_time_big]
     print(custom_timing)
     print(sabre_timing)
+
     #plot_execution_time_bar_chart(custom_timing, sabre_timing)

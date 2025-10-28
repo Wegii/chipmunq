@@ -30,13 +30,13 @@ def test_routing():
 def test_generic_circuit_routing():
     """Test routing of hypergraph"""
 
-    num_qubits = 5*5 -10
+    num_qubits = 10*10 -10
     circuit_generator = GenericCircuit(num_qubits)
     # Note: This is not a stim_circuit !
-    circuit = circuit_generator.generate_circuit(2*2)
+    circuit = circuit_generator.generate_circuit(16*16)
 
     # Initialize backend to map to
-    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 2)
+    chiplet_backend = BackendChipletV2((18, 18, 10, 10), 5)
     
     mar_pmsp = PartitionedMapRoutePlugin()
     # Construct hypergraph from circui[t
@@ -59,7 +59,15 @@ def test_generic_circuit_routing():
     print(routed_circuit.count_ops())
     print(routed_circuit.depth())
 
-    plot_circuit_layout(routed_circuit, chiplet_backend, "data/backends/mapping/routed_circuit_on_backend.png")
+    # 16x16x100
+    # Total: 11.467
+    # No routing: 5.21
+
+    # 18x18x100
+    # Total: 
+    # No routing: 
+
+    #plot_circuit_layout(routed_circuit, chiplet_backend, "data/backends/mapping/routed_circuit_on_backend.png")
     #plot_circuit_layout_utilization(routed_circuit, chiplet_backend, "data/backends/mapping/routed_circuit_on_backend_utilization.png")
 
 

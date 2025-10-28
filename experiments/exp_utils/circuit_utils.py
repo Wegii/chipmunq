@@ -1,9 +1,10 @@
 from qiskit import QuantumCircuit
 
-import os
-import sys
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
-from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+#import os
+#import sys
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
+#from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 
 def stim_to_qiskit(stim_circuit) -> QuantumCircuit:
@@ -20,7 +21,7 @@ def stim_to_qiskit(stim_circuit) -> QuantumCircuit:
     # Convert stim circuit to qiskit
     stim_code = StimCodeCircuit(stim_circuit = stim_circuit)
     
-    return stim_code.qc
+    return stim_code
 
 
 def qiskit_to_stim():
