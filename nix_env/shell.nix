@@ -9,6 +9,9 @@ mkShell rec {
     graphviz
     fontconfig
     dejavu_fonts
+
+    rustc
+    cargo
   ];
 
   NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
