@@ -1,28 +1,20 @@
-#from __future__ import annotations
+from __future__ import annotations
 
 import sys
 import os
 #import logging
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
 
-#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/utils/math"))
-from codes.utils import get_code, get_max_d
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/math"))
+#from codes.utils import get_code, get_max_d
 
 import qiskit
 import numpy as np
 
-# QECMemory
-#from glue.eccentric_bench.external.qiskit_qec
-
 # TODO: fix this, since this is no longer running
-from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
-#from glue.eccentric_bench.codes.utils import get_code, get_max_d
+#from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
 
-#from glue.eccentric_bench.codes.utils import get_code, get_max_d
 
 # QECCircuit
 import random
@@ -36,6 +28,7 @@ from topologiq.utils.interop_pyzx import pyzx_g_to_simple_g
 from topologiq.utils.utils_zx_graphs import kind_to_zx_type
 import sinter
 from tqec import compile_block_graph, NoiseModel
+
 from tqec.utils.enums import Basis
 from tqec.simulation.plotting.inset import plot_observable_as_inset
 from tqec.simulation.simulation import start_simulation_using_sinter
@@ -44,10 +37,15 @@ from tqec.computation.cube import CubeKind, Port, YHalfCube
 from tqec.computation.pipe import PipeKind
 from tqec.utils.position import FloatPosition3D, Position3D
 from tqec.utils.scale import round_or_fail
+from tqec.gallery import cnot, three_cnots
+from tqec.gallery.steane_encoding import steane_encoding
 from experiments.exp_utils.circuit_utils import stim_to_qiskit
+
+import stim
 
 # Plotting
 import matplotlib.pyplot as plt
+
 
 class GenericCircuit():
     def __init__(self, nq: int):
@@ -205,6 +203,29 @@ class QECCircuit:
     - Workflow taken from tQEC library
     """
     def __init__(self):
+        pass
+
+    def single_cnot(self, distance_scale: int = 1) -> stim.Circuit:
+        """Generate single logical CNOT with lattice surgery.
+
+        Code adapted from: https://tqec.github.io/tqec/gallery/cnot.html
+
+        :param distance_scale: Scale of surface code patch, defaults to 1
+        :type distance_scale: int, optional
+        """
+
+        graph = cnot(Basis.X)
+        compiled_graph = compile_block_graph(graph)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+        )
+
+        return stim_to_qiskit(stim_circuit), stim_circuit
+
+    def three_cnot():
+        pass
+
+    def steane_encoding():
         pass
 
     def simple_circuit(self):
