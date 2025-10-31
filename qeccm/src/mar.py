@@ -87,7 +87,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         partition_op = KaHyParPartitioning(backend)
 
         # Mapping pass
-        #mapping_op = RandomMapper(backend)
+        # mapping_op = RandomMapper(backend)
         mapping_op = TrivialMapper(backend)
         #mapping_op = TrivialLayout(pass_manager_config.coupling_map)
 

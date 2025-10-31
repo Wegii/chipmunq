@@ -59,48 +59,43 @@ class BasicSwapRouter(GenericRouter):
             new_dag.add_creg(creg)
         
         for node in dag.topological_op_nodes():               
-                if len(node.qargs) == 2:
-                    q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+            if len(node.qargs) == 2:
+                q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+                
+                # Check distance in coupling map
+                if not self.coupling_map.distance(q0, q1) == 1:
+                    # Find shortest path connecting both qubits
+                    path = self.coupling_map.shortest_undirected_path(q0, q1)
+                    # TODO: this can be replaced with a easier calculation, by considering the grid layout of the
+                    #       backend. Note: only works for grid layout then.
+                    # TODO: remote gates need the shortest_undirected_path function again
                     
-                    # Check distance in coupling map
-                    if not self.coupling_map.distance(q0, q1) == 1:
-                        # Find shortest path connecting both qubits
-                        path = self.coupling_map.shortest_undirected_path(q0, q1)
-                        # TODO: this can be replaced with a easier calculation, by considering the grid layout of the
-                        #       backend. Note: only works for grid layout then.
-                        # TODO: remote gates need the shortest_undirected_path function again
-                        
-                        # Insert swaps along path except last edge
-                        for i in range(len(path) - 2):
-                            swap = SwapGate()
-                            new_dag.apply_operation_back(
-                                swap,
-                                qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
-                            )
-                        
-                        # Apply original gate
-                        new_dag.apply_operation_back(node.op, qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]])
+                    # Insert swaps along path except last edge
+                    for i in range(len(path) - 2):
+                        swap = SwapGate()
+                        new_dag.apply_operation_back(
+                            swap,
+                            qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                        )
+                    
+                    # Apply original gate
+                    new_dag.apply_operation_back(node.op, qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]])
 
-                        # SWAP backwards
-                        for i in reversed(range(len(path) - 2)):
-                            swap = SwapGate()
-                            new_dag.apply_operation_back(
-                                swap,
-                                qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
-                            )
-                        
-                    else:
-                        # Local two-qubit gates
-                        new_dag.apply_operation_back(node.op, qargs=node.qargs)
+                    # SWAP backwards
+                    for i in reversed(range(len(path) - 2)):
+                        swap = SwapGate()
+                        new_dag.apply_operation_back(
+                            swap,
+                            qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                        )
+                    
                 else:
-                    # Single-qubit gates
-                    new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
+                    # Local two-qubit gates
+                    new_dag.apply_operation_back(node.op, qargs=node.qargs)
+            else:
+                # Single-qubit gates
+                new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
         
-
-        #from qiskit.visualization import dag_drawer
-        #dag_drawer(dag, filename="data/backends/mapping/dag.png")
-        #dag_drawer(new_dag, filename="data/backends/mapping/routed_dag.png")
-
         # This pass must set the following property: self.property_set["final_layout"]
         self.property_set["final_layout"] = current_layout
 

@@ -130,6 +130,7 @@ def get_stim_circuits_with_detectors(
                                     qubit_indices[0],
                                 ],
                             )
+                            #stim_circuit.append("TICK")
                         else:
                             raise Exception(
                                 "Classically controlled gate must be conditioned on bit value 1"
@@ -140,6 +141,7 @@ def get_stim_circuits_with_detectors(
                         )
                 else:  # gates/measurements acting on qubits
                     stim_circuit.append(qiskit_to_stim_dict[inst.name], qubit_indices)
+                    #stim_circuit.append("TICK")
             elif inst.name in stim_detector_gates:
                 if inst.name == "QUBIT_COORDS":
                     stim_circuit.append("QUBIT_COORDS", [inst.params[0]['index']], inst.params[0]['coords'])

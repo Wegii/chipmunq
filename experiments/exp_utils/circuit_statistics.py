@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 from qiskit import QuantumCircuit
 
 # Typing
-#from eccentric_bench.external.qiskit_qec.src.qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+from collections.abc import Callable, Iterable, Iterator
 from qiskit.providers import BackendV2
 
 # Qiskit to stim translation
@@ -137,8 +137,8 @@ from tqec.simulation.plotting.inset import plot_observable_as_inset
 from tqec.simulation.simulation import start_simulation_using_sinter
 from tqec.utils.enums import Basis
 
-class LatticeSurgeryStats():
-    """Statistics of a general circuit with Lattice Surgery
+class SingleLatticeSurgeryStats():
+    """Statistics of a single circuit with Lattice Surgery
     """
 
     def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit = None,
@@ -158,73 +158,26 @@ class LatticeSurgeryStats():
         # while transpiled_circuit is the transpiled version
         self.circ = transpiled_circuit
 
-    def test_logical_error_rate(self):
+    def test_logical_error_rate(self) -> float:
+        """Run simple decoding task for calculating logical error rate
+
+        :return: _description_
+        :rtype: float
+        """
+        
         error_type = "modsi1000"
-        error_prob = 5e-3
+        error_prob = 5e-2
         code_name = "surface"
         decoder = "mwpm"
         backend_name = "custom_chiplet"
-        num_samples = 10_000
+        num_samples = 1_000_000
 
         qt = QubitTracking(self.backend, self.circ)
-        print(qt)
-        print("After GET STIM CIRCUIT")
-
         noise_model = get_noise_model(error_type, qt, error_prob, self.backend)
-
-        print("After get_noise_model")
         stim_circuit = noise_model.noisy_circuit(self.transpiled_stim_circuit)
 
-        print("After adding noise")
-        print("before decoding")
-
         error_occured = decode(code_name, stim_circuit, num_samples, decoder, backend_name, error_type)
-        print("After decoding")
 
         logical_error_rate = error_occured / num_samples
         return logical_error_rate
 
-    def get_logical_error_rate(self, support_observable_basis: Basis) -> None:
-        block_graph = cnot(support_observable_basis)
-        zx_graph = block_graph.to_zx_graph()
-
-        correlation_surfaces = block_graph.find_correlation_surfaces()
-
-        stats = start_simulation_using_sinter(
-            block_graph,
-            range(1, 4),
-            list(numpy.logspace(-4, -1, 10)),
-            NoiseModel.uniform_depolarizing,
-            manhattan_radius=2,
-            observables=correlation_surfaces,
-            num_workers=cpu_count(),
-            #max_shots=1_000_000,
-            max_shots=10_000,
-            max_errors=5_000,
-            decoders=["pymatching"],
-            print_progress=True,
-            #save_resume_filepath=Path(
-            #    f"data/tqec/_examples_database/cnot_stats_{support_observable_basis.value}.csv"
-            #),
-            #database_path=Path("data/tqec/_examples_database/database.pkl"),
-        )
-
-
-        for i, stat in enumerate(stats):
-            fig, ax = plt.subplots()
-            sinter.plot_error_rate(
-                ax=ax,
-                stats=stat,
-                x_func=lambda stat: stat.json_metadata["p"],
-                group_func=lambda stat: stat.json_metadata["d"],
-            )
-            plot_observable_as_inset(ax, zx_graph, correlation_surfaces[i])
-            ax.grid(axis="both")
-            ax.legend()
-            ax.loglog()
-            ax.set_title("Logical CNOT Error Rate")
-            ax.set_xlabel("Physical Error Rate")
-            ax.set_ylabel("Logical Error Rate")
-            fig.savefig(f"logical_cnot_result_{support_observable_basis}_observable_{i}.png"
-            )
-        

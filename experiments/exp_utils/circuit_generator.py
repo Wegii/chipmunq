@@ -205,7 +205,7 @@ class QECCircuit:
     def __init__(self):
         pass
 
-    def single_cnot(self, distance_scale: int = 1) -> stim.Circuit:
+    def single_cnot(self, distance_scale: int = 1):
         """Generate single logical CNOT with lattice surgery.
 
         Code adapted from: https://tqec.github.io/tqec/gallery/cnot.html
@@ -214,10 +214,13 @@ class QECCircuit:
         :type distance_scale: int, optional
         """
 
+        # TODO: add option for manhattan radius
+
         graph = cnot(Basis.X)
         compiled_graph = compile_block_graph(graph)
         stim_circuit = compiled_graph.generate_stim_circuit(
             k = distance_scale,
+            manhattan_radius=2
         )
 
         return stim_to_qiskit(stim_circuit), stim_circuit
