@@ -72,9 +72,9 @@ def _get_circuit(type, distance_scale: int = 1):
     if type == "cnot":
         qiskit_circuit, stim_circuit = lattice_surgery_circuit.single_cnot(distance_scale = distance_scale)
     elif type == "three_cnot":
-        pass
+        qiskit_circuit, stim_circuit = lattice_surgery_circuit.three_cnot(distance_scale = distance_scale)
     elif type == "steane":
-        pass
+        qiskit_circuit, stim_circuit = lattice_surgery_circuit.steane_encoding(distance_scale = distance_scale)
   
     return qiskit_circuit, stim_circuit
 
@@ -180,7 +180,16 @@ def get_transpiled_circuit_as_sinter_task(backend, circuit_type) -> sinter.TaskS
     return stat
 
 
-def get_circuit_as_sinter_task(circuit_type):
+def get_circuit_as_sinter_task(circuit_type) -> sinter.TaskStats:
+    """Calculate logical error rate for circuit
+
+    :param circuit_type: _description_
+    :type circuit_type: _type_
+    :return: _description_
+    :rtype: sinter.TaskStats
+    :yield: _description_
+    :rtype: Iterator[sinter.TaskStats]
+    """
 
 
     # Code distance to consider
@@ -222,19 +231,20 @@ if __name__ == "__main__":
     # Single CNOT
     n_inter = 5
     small_backend = BackendChipletV2((2, 2, 10, 10), n_inter)
+    small_backend = BackendChipletV2((4, 4, 10, 10), n_inter)
 
     # Types of simple gates
-    gates = ["cnot", "three_cnot", "steane"]
+    gates = ["three_cnot"]#["cnot", "three_cnot"]#, "steane"]
 
     for gate in gates:
 
-        transpiled_stat = get_transpiled_circuit_as_sinter_task(small_backend, "cnot")
+        transpiled_stat = get_transpiled_circuit_as_sinter_task(small_backend, gate)
         plot_sinter_stats(transpiled_stat,
-                        filename = f"experiments/data/tqec/figures/transpiled_single_cnot_logical_error.png",
+                        filename = f"experiments/data/tqec/figures/transpiled_{gate}_logical_error.png",
                         with_transpilation = True)
 
-        non_transpiled_stat = get_circuit_as_sinter_task("cnot")
+        non_transpiled_stat = get_circuit_as_sinter_task(gate)
         plot_sinter_stats(non_transpiled_stat,
-                        filename = f"experiments/data/tqec/figures/single_cnot_logical_error.png",
+                        filename = f"experiments/data/tqec/figures/{gate}_logical_error.png",
                         with_transpilation = False)
 

@@ -30,8 +30,6 @@ import sinter
 from tqec import compile_block_graph, NoiseModel
 
 from tqec.utils.enums import Basis
-from tqec.simulation.plotting.inset import plot_observable_as_inset
-from tqec.simulation.simulation import start_simulation_using_sinter
 from tqec.computation.block_graph import BlockGraph, BlockKind, block_kind_from_str
 from tqec.computation.cube import CubeKind, Port, YHalfCube
 from tqec.computation.pipe import PipeKind
@@ -225,11 +223,45 @@ class QECCircuit:
 
         return stim_to_qiskit(stim_circuit), stim_circuit
 
-    def three_cnot():
-        pass
+    def three_cnot(self, distance_scale: int = 1):
+        """Generate three logical CNOTs with lattice surgery.
 
-    def steane_encoding():
-        pass
+        Code adapted from: https://tqec.github.io/tqec/gallery/three_cnots.html
+
+        :param distance_scale: _description_, defaults to 1
+        :type distance_scale: int, optional
+        :return: _description_
+        :rtype: _type_
+        """
+
+        graph = three_cnots(Basis.X)
+        compiled_graph = compile_block_graph(graph)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+            manhattan_radius=2
+        )
+
+        return stim_to_qiskit(stim_circuit), stim_circuit
+
+    def steane_encoding(self, distance_scale: int = 1):
+        """Generate logical steane encoding
+
+        Code adapted from: https://tqec.github.io/tqec/gallery/steane_encoding.html
+
+        :param distance_scale: _description_, defaults to 1
+        :type distance_scale: int, optional
+        :return: _description_
+        :rtype: _type_
+        """
+
+        graph = steane_encoding(Basis.X)
+        compiled_graph = compile_block_graph(graph)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+            manhattan_radius=2
+        )
+
+        return stim_to_qiskit(stim_circuit), stim_circuit
 
     def simple_circuit(self):
         def steane_circuit_qiskit():
