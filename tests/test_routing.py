@@ -27,6 +27,19 @@ def test_routing():
     pass
 
 
+def test_accelerated_routing():
+    # Test routing using rust implementation
+
+    # TODO: Construct circuit
+    # TODO: Construct dag
+
+    # TODO: Construct backend
+
+    # TODO: Call rust implementation given dag and backend
+
+    pass
+
+
 def test_generic_circuit_routing():
     """Test routing of hypergraph"""
 

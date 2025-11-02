@@ -1,0 +1,6 @@
+[submodule "glue/glue/qiskit"]
+	path = glue/glue/qiskit
+	url = git@github.com:Wegii/qiskit.git
+[submodule "glue/qiskit"]
+	path = glue/qiskit
+	url = git@github.com:Wegii/qiskit.git
