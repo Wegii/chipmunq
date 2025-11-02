@@ -55,11 +55,6 @@ def _transpile_to_tqec(circuit, backend) -> tuple[float, float]:
     custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
     sabre_circuit_stim = get_stim_circuits_with_detectors(sabre_circuit)[0][0]
 
-
-    #print(stim_code_circuit)
-    #print(sabre_circuit_stim)
-
-
     return custom_circuit_stim, custom_circuit, sabre_circuit_stim, sabre_circuit
 
 
@@ -118,11 +113,66 @@ def plot_sinter_stats(stat, filename, with_transpilation = False):
     ax.grid(axis="both")
     ax.legend()
     ax.loglog()
-    ax.set_title("Logical CNOT Error Rate")
+    ax.set_title("Logical Error Rate")
     ax.set_xlabel("Physical Error Rate")
     ax.set_ylabel("Logical Error Rate")
     fig.savefig(filename)
 
+
+def plot_error_improvement(stats, filename):
+    # TODO: Show improvement of custom and sabre over transpilatin="none"
+    pass
+
+
+def plot_gate_overhead(stats, filename):
+    """Plot two-qubit gate overhead.
+
+    Plot the two-qubit gate overhead over multiple circuits for custom and sabre transpilation.
+    Extract the gate overhead of the lattice surgery circuit using code distance = 7.
+
+    :param stats: _description_
+    :type stats: _type_
+    :param filename: _description_
+    :type filename: _type_
+    """
+
+    base_palette = sns.color_palette("pastel", n_colors=2*3)
+    colors = {}
+    for c in range(len(stats.keys())):
+        colors[c] = base_palette[c+1]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    width = 0.35
+    x = np.arange(len(stats.keys()))
+
+    for i, gate in enumerate(stats.keys()):
+        # Extract gate overhead for distance = 2*3 + 1 = 7 
+        custom_gates = ((stats[gate])["3"])["custom"]
+        sabre_gates = ((stats[gate])["3"])["sabre"]
+
+        if i == 0:
+            ax.bar(x[i] - width/2, sabre_gates, width, hatch='/', color=colors[0], edgecolor='black', label="SABRE")
+            ax.bar(x[i] + width/2, custom_gates, width, hatch='o', color=colors[1], edgecolor='black', label="Custom")
+        else:
+            ax.bar(x[i] - width/2, sabre_gates, width, hatch='/', color=colors[0], edgecolor='black')
+            ax.bar(x[i] + width/2, custom_gates, width, hatch='o', color=colors[1], edgecolor='black')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(stats.keys(), fontsize=12)
+    ax.set_ylabel('Two-Qubit Gate Overhead', fontsize=12)
+    ax.set_xlabel('Lattice Surgery Circuit', fontsize=12)
+    #ax.set_yscale("log")
+    ax.text(-0.025, 1.05, 'Lower is better ↓', transform=ax.transAxes, fontsize=10, fontweight='bold', va='top', ha='left')
+    ax.legend(title="Method",
+              fontsize=10,
+              loc='center left',
+              bbox_to_anchor=(1.02, 0.5))
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    
 
 def get_transpiled_circuit_as_sinter_task(backend, circuit_type) -> sinter.TaskStats:
     """Calculate logical error rate for transpiled circuit
@@ -191,33 +241,32 @@ def get_circuit_as_sinter_task(circuit_type) -> sinter.TaskStats:
     :rtype: Iterator[sinter.TaskStats]
     """
 
-
     # Code distance to consider
     ks = [1, 2, 3]
 
-    # Noise model
-    noise_model_factory = NoiseModel.uniform_depolarizing
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
-    # Construct circuit and noise models
-    noise_models = {p: noise_model_factory(p) for p in ps}
-
+    
     circuits = {
         k: (_get_circuit(type = circuit_type, distance_scale = k)[1])
         for k in ks
     }
-
+    
     def _get_sinter_task():
         # Construct sinter task for multiple code distances and noise levels
         yield from (
             sinter.Task(
                 circuit=circuit,
-                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p},
+                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": "none"},
             )
             for circuit, k, p in (
-                (nm.noisy_circuit(circuit), k, p)
+                #(nm.noisy_circuit(circuit), k, p)
+                ((get_noise_model("constant",
+                                  None,
+                                  p,
+                                  None)).noisy_circuit(circuit), k, p)
                 for k, circuit in circuits.items()
-                for p, nm in noise_models.items()
+                for p in ps
             )
         )
 
@@ -234,17 +283,41 @@ if __name__ == "__main__":
     small_backend = BackendChipletV2((4, 4, 10, 10), n_inter)
 
     # Types of simple gates
-    gates = ["three_cnot"]#["cnot", "three_cnot"]#, "steane"]
+    gates = ["cnot", "three_cnot", "steane"]
 
+    """
     for gate in gates:
-
+        # Combine transpiled and non_transpiled stats
         transpiled_stat = get_transpiled_circuit_as_sinter_task(small_backend, gate)
-        plot_sinter_stats(transpiled_stat,
-                        filename = f"experiments/data/tqec/figures/transpiled_{gate}_logical_error.png",
-                        with_transpilation = True)
-
         non_transpiled_stat = get_circuit_as_sinter_task(gate)
-        plot_sinter_stats(non_transpiled_stat,
-                        filename = f"experiments/data/tqec/figures/{gate}_logical_error.png",
-                        with_transpilation = False)
+        
+        transpiled_stat = transpiled_stat.__add__(non_transpiled_stat)
+
+        plot_sinter_stats(transpiled_stat,
+                          filename = f"experiments/data/tqec/figures/{gate}_logical_error.png",
+                          with_transpilation = True)
+        """
+
+
+    # Count gate overhead before and after transpilation
+    ks_gates = {}
+    for gate in gates:
+        # Calculate gate overhead for distance = 2*ks + 1 = 7 circuit
+        ks = [3]#[1, 2, 3]
+        ks_results = {}
+        
+        for k in ks:
+            circuit = _get_circuit(type = gate, distance_scale = k)[0]
+            custom_circuit_stim, custom_circuit, sabre_circuit_stim, sabre_circuit = _transpile_to_tqec(
+                _get_circuit(type = gate, distance_scale = k)[1], small_backend)
+            
+            gates = sum(1 for instr, qargs, cargs in (circuit.qc).data if len(qargs) == 2)
+            custom_gates = sum(1 for instr, qargs, cargs in (custom_circuit).data if len(qargs) == 2)
+            sabre_gates = sum(1 for instr, qargs, cargs in (sabre_circuit).data if len(qargs) == 2)
+
+            ks_results[str(k)] = {"custom": custom_gates - gates, "sabre": sabre_gates - gates}
+
+        ks_gates[gate] = ks_results
+
+    plot_gate_overhead(ks_gates, filename = f"experiments/data/tqec/figures/all_circuit_gate_overhead.png")
 

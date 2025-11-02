@@ -183,6 +183,8 @@ if __name__ == "__main__":
     #basic_big_stats = QECCircuitStats(transpiled_circuit = basic_big, backend = big_backend)
     """
     
+
+    # TODO: Change to overhead: custom_small_stats.get_num_two_gates() - number_of_two_gates_before_transpilation
     two_qubit_gates = []
     custom_gates = [custom_small_stats.get_num_two_gates(),
                     custom_medium_stats.get_num_two_gates(),]
@@ -210,6 +212,6 @@ if __name__ == "__main__":
     #   Random: 12107 -> Much much worse
     # SABRE: 330
 
-    #plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
+    plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
     #plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
     
