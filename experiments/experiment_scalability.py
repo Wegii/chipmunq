@@ -6,10 +6,6 @@ sys.path.append(os.path.join(os.getcwd(), "."))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/"))
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
-
-# Enable debug logging for Qiskit
-#import logging
-#logging.basicConfig(level=logging.DEBUG)
 import time
 
 # Custom utils
@@ -45,7 +41,7 @@ def _get_circuit(type, num_patches):
 
 
 def _transpile(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2) -> tuple[float, float]:
-    """Time transpilation of circuit to backend using custom and sabre transpilation passes
+    """Time transpilation of circuit to backend using custom, accelerated and sabre transpilation passes
 
     :param circuit: _description_
     :type circuit: qiskit.QuantumCircuit
@@ -61,20 +57,27 @@ def _transpile(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2) -> tup
     c_time = end_c - start_c
     print("custom done")
 
+    start_ca = time.time()
+    _ = custom_accelerated_partitioned_transpilation(circuit, backend)
+    end_ca = time.time()
+    ca_time = end_ca - start_ca
+    print("custom accelerated done")
+
     start = time.time()
     _ = sabre_transpilation(circuit, backend)
     end = time.time()
     s_time = end - start
+    print("sabre done")
 
-    return c_time, s_time
+    return c_time, ca_time, s_time
 
 
-def plot_execution_time_bar_chart(custom_timing, sabre_timing):
+def plot_execution_time_bar_chart(custom_timing, custom_accelerate_timing, sabre_timing):
 
     groups = {
-        'Small': ['SABRE', 'C'],
-        'Medium': ['SABRE', 'C'],
-        'Big': ['SABRE', 'C']
+        'Small': ['SABRE', 'C', 'CA'],
+        'Medium': ['SABRE', 'C', 'CA'],
+        'Big': ['SABRE', 'C', 'CA']
     }
 
     base_palette = sns.color_palette("pastel", n_colors=2*3)
@@ -90,11 +93,14 @@ def plot_execution_time_bar_chart(custom_timing, sabre_timing):
 
     for i in range(len(custom_timing)):
         if i == 0:
-            ax.bar(x[i] - width/2, sabre_timing[i], width, hatch='/', color=colors[0], edgecolor='black', label="SABRE")
-            ax.bar(x[i] + width/2, custom_timing[i], width, hatch='o', color=colors[1], edgecolor='black', label="Custom")
+            ax.bar(x[i] - width, sabre_timing[i], width, hatch='/', color=colors[0], edgecolor='black', label="SABRE")
+            ax.bar(x[i], custom_accelerate_timing[i], width, hatch='x', color=colors[2], edgecolor='black',
+                   label="Custom (accelerate)")
+            ax.bar(x[i] + width, custom_timing[i], width, hatch='o', color=colors[1], edgecolor='black', label="Custom")
         else:
-            ax.bar(x[i] - width/2, sabre_timing[i], width, hatch='/', color=colors[0], edgecolor='black')
-            ax.bar(x[i] + width/2, custom_timing[i], width, hatch='o', color=colors[1], edgecolor='black')
+            ax.bar(x[i] - width, sabre_timing[i], width, hatch='/', color=colors[0], edgecolor='black')
+            ax.bar(x[i], custom_accelerate_timing[i], width, hatch='x', color=colors[2], edgecolor='black')
+            ax.bar(x[i] + width, custom_timing[i], width, hatch='o', color=colors[1], edgecolor='black')
 
     ax.set_xticks(x)
     ax.set_xticklabels(groups.keys(), fontsize=12)
@@ -117,23 +123,27 @@ if __name__ == "__main__":
 
     small_backend = BackendChipletV2((2, 2, 10, 10), n_inter)
     medium_backend = BackendChipletV2((8, 8, 10, 10), n_inter)
-    big_backend = BackendChipletV2((20, 20, 10, 10), n_inter)
+    big_backend = BackendChipletV2((12, 12, 10, 10), n_inter)
 
     # Small backend
     small_generic_patch_circuit = _get_circuit("", 2*2)
-    custom_time_small, sabre_time_small = _transpile(small_generic_patch_circuit, small_backend)
+    custom_time_small, custom_accelerate_time_small, sabre_time_small = _transpile(small_generic_patch_circuit,
+                                                                                   small_backend)
 
     # Medium backend
     medium_generic_patch_circuit = _get_circuit("", 8*8)
-    custom_time_medium, sabre_time_medium = _transpile(medium_generic_patch_circuit, medium_backend)
+    custom_time_medium, custom_accelerate_time_medium, sabre_time_medium = _transpile(medium_generic_patch_circuit,
+                                                                                      medium_backend)
 
     # Big backend
-    big_generic_patch_circuit = _get_circuit("", 20*20)
-    custom_time_big, sabre_time_big = _transpile(big_generic_patch_circuit, big_backend)
+    big_generic_patch_circuit = _get_circuit("", 12*12)
+    custom_time_big, custom_accelerate_time_big, sabre_time_big = _transpile(big_generic_patch_circuit, big_backend)
     
     custom_timing = [custom_time_small, custom_time_medium, custom_time_big]
+    custom_accelerate_timing = [custom_accelerate_time_small, custom_accelerate_time_medium, custom_accelerate_time_big]
     sabre_timing = [sabre_time_small, sabre_time_medium, sabre_time_big]
     print(custom_timing)
+    print(custom_accelerate_timing)
     print(sabre_timing)
 
-    #plot_execution_time_bar_chart(custom_timing, sabre_timing)
+    plot_execution_time_bar_chart(custom_timing, custom_accelerate_timing, sabre_timing)

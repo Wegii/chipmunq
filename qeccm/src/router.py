@@ -3,6 +3,8 @@ from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.circuit.library.standard_gates import SwapGate
 from qiskit.transpiler.layout import Layout
+# Accelerated implementation
+from qiskit._accelerate.basic_swap import basic_routing
 
 # Parallel implementation
 from joblib import Parallel, delayed
@@ -100,6 +102,43 @@ class BasicSwapRouter(GenericRouter):
         self.property_set["final_layout"] = current_layout
 
         return new_dag
+    
+class AcceleratedBasicSwapRouter(GenericRouter):
+    """ Accelerated version of qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
+
+    def __init__(self, backend):
+        super().__init__(backend)
+
+    def run(self, dag):
+        print("Starting routing")
+        return self._local_routing(dag)
+
+    def _local_routing(self, dag: DAGCircuit):
+        """Perform local *and* global routing by naive SWAPgate insertion using a custom layout.
+
+        Note: All of Qiskit’s built-in routing stages will additionally run the VF2PostLayout pass after routing. This
+              might reassign the initial layout, if lower-error qubits can be found. Thus, we are not going to use the
+              default implementation, as we want to keep the qubit mapping.
+
+        This routing pass utilizes the same algorithm as in qiskit.transpiler.passes.BasicSwap
+
+        :param dag: _description_
+        :type dag: DAGCircuit
+        :return: _description_
+        :rtype: _type_
+        """
+
+        current_layout = self.property_set["layout"]
+        
+
+        # TODO: call basic swap
+        new_dag = basic_routing(dag, self.backend.target)
+
+        # This pass must set the following property: self.property_set["final_layout"]
+        self.property_set["final_layout"] = current_layout
+
+        return new_dag
+    
 
 class ParallelSwapRouter(GenericRouter):
     """ Parallel implementation of BasicSwapRouter"""
