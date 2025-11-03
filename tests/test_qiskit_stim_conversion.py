@@ -32,8 +32,15 @@ def test_simple_conversion():
     stim_code = StimCodeCircuit(stim_circuit = stim_ex1)
 
     stim_ex1_after_workflow = get_stim_circuits_with_detectors(stim_code.qc)[0][0]
+    print(stim_ex1)
     print("\n\nAfterwards: ")
     print(stim_ex1_after_workflow)
+
+
+def test_tqec_conversion():
+    # Test conversion of a lattice surgery circuit
+    #     
+    pass
 
 
 if __name__ == "__main__":

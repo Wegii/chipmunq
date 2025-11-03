@@ -23,9 +23,7 @@ zx.settings.colors = zx.rgb_colors
 
 import qiskit.qasm2 as qasm2
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
-from topologiq.scripts.runner import runner
-from topologiq.utils.interop_pyzx import pyzx_g_to_simple_g
-from topologiq.utils.utils_zx_graphs import kind_to_zx_type
+
 import sinter
 from tqec import compile_block_graph, NoiseModel
 
@@ -264,6 +262,10 @@ class QECCircuit:
         return stim_to_qiskit(stim_circuit), stim_circuit
 
     def simple_circuit(self):
+        from topologiq.scripts.runner import runner
+        from topologiq.utils.interop_pyzx import pyzx_g_to_simple_g
+        from topologiq.utils.utils_zx_graphs import kind_to_zx_type
+
         def steane_circuit_qiskit():
             """Function to generate the Steane code encoding circuit. """
 

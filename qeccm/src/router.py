@@ -3,12 +3,6 @@ from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.circuit.library.standard_gates import SwapGate
 from qiskit.transpiler.layout import Layout
-# Accelerated implementation
-from qiskit._accelerate.basic_swap import basic_routing
-
-# Parallel implementation
-from joblib import Parallel, delayed
-
 
 class GenericRouter(TransformationPass):
 
@@ -130,6 +124,8 @@ class AcceleratedBasicSwapRouter(GenericRouter):
 
         current_layout = self.property_set["layout"]
         
+        # Accelerated implementation
+        from qiskit._accelerate.basic_swap import basic_routing
 
         # TODO: call basic swap
         new_dag = basic_routing(dag, self.backend.target)
@@ -142,6 +138,9 @@ class AcceleratedBasicSwapRouter(GenericRouter):
 
 class ParallelSwapRouter(GenericRouter):
     """ Parallel implementation of BasicSwapRouter"""
+
+    # Parallel implementation
+    from joblib import Parallel, delayed
 
     def __init__(self, backend):
         super().__init__(backend)

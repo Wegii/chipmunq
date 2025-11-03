@@ -7,11 +7,8 @@ from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaA
 from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAncilla
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 # Custom implementation
-from qeccm.src.router import AcceleratedBasicSwapRouter
 from qeccm.src.mar import PartitionedMapRoutePlugin
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
-# Custom implementation of basic routing 
-from qiskit._accelerate.basic_swap import basic_routing
 
 
 def custom_partitioned_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2) -> qiskit.QuantumCircuit:
@@ -52,6 +49,10 @@ def custom_accelerated_partitioned_transpilation(circuit: QuantumCircuit,
     :return: _description_
     :rtype: qiskit.QuantumCircuit
     """
+    from qeccm.src.router import AcceleratedBasicSwapRouter
+
+    # Custom implementation of basic routing 
+    from qiskit._accelerate.basic_swap import basic_routing
 
     mar_pmsp = PartitionedMapRoutePlugin()
     # Pass to construct hypergraph from circuit
