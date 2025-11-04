@@ -1,3 +1,8 @@
+# Explore how the mapping influences circuit for quantum memory
+
+
+
+
 from __future__ import annotations
 
 import sys
@@ -52,9 +57,71 @@ def plot_sinter_stats(stat, filename, with_transpilation = False):
     ax.set_ylabel("Logical Error Rate")
     fig.savefig(filename)
 
+
+def plot_error_improvement(stats, filename):
+    # TODO: Show improvement of custom and sabre over transpilation="none"
+    #error_by_t = {task.t: task.errors / task.shots for task in stats}
+    from collections import defaultdict
+    import matplotlib.pyplot as plt
+
+    # Calculate error rate and group
+    error_rates = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    physical_error_rates = set()
+    d_values = set()
+    for s in stats:
+        ler = s.errors / (s.shots - s.discards)
+        p = s.json_metadata['p']
+        t = s.json_metadata['transpilation']
+        d = s.json_metadata['d']
+
+        error_rates[t][p][d].append(ler)
+        physical_error_rates.add(p)
+        d_values.add(d)
+
+    print(error_rates)
+    # Compute difference in error_rate
+    custom_diff_by_d = defaultdict(dict)
+    sabre_diff_by_d = defaultdict(dict)
+
+    for d in d_values:
+        for p in physical_error_rates:
+            if p in error_rates['none'] and d in error_rates['none'][p]:
+                # Custom vs none
+                if 'custom' in error_rates and d in error_rates['custom'][p]:
+                    # take only value for this p,d pair
+                    custom_diff_by_d[d][p] = error_rates['custom'][p][d][0] - error_rates['none'][p][d][0]
+
+                # Sabre vs none
+                if 'sabre' in error_rates and d in error_rates['sabre'][p]:
+                    sabre_diff_by_d[d][p] = error_rates['sabre'][p][d][0] - error_rates['none'][p][d][0]
+
+    plt.figure(figsize=(8,6))
+
+    # Plot error rate difference for each transpilation method and distance
+    for d in sorted(d_values):
+        ps_custom = sorted(custom_diff_by_d[d].keys())
+        ys_custom = [custom_diff_by_d[d][p] for p in ps_custom]
+        plt.plot(ps_custom, ys_custom, marker='o', label=f'custom, d={d}')
+
+        ps_sabre = sorted(sabre_diff_by_d[d].keys())
+        ys_sabre = [sabre_diff_by_d[d][p] for p in ps_sabre]
+        plt.plot(ps_sabre, ys_sabre, marker='x', label=f'sabre, d={d}')
+
+    plt.xscale('log')
+    #plt.yscale('log')
+    plt.xlabel("Physical Error Rate (p)")
+    plt.ylabel("Delta Logical Error Rate")
+    plt.title("Logical Error Rate Differences by d")
+    plt.legend()
+    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+
+
 def _run_sinter_simulation(tasks_fct, ks, ps):
     stats = sinter.collect(
-        num_workers = int(multiprocessing.cpu_count()/2),#multiprocessing.cpu_count(),
+        num_workers = int(multiprocessing.cpu_count()*0.75),#multiprocessing.cpu_count(),
         tasks=(tasks_fct()),
         save_resume_filepath = None,
         progress_callback=None,
@@ -90,6 +157,16 @@ def _transpile_to_stim(circuit, backend) -> tuple[float, float]:
     # Qiskit to stim
     custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
     sabre_circuit_stim = get_stim_circuits_with_detectors(sabre_circuit)[0][0]
+
+    with open("experiments/data/stim/data/cnot.txt", "w") as f:
+        print(circuit, file=f)
+
+    with open("experiments/data/stim/data/cnot_transpiled_sabre.txt", "w") as f:
+        print(sabre_circuit_stim, file=f)
+
+    with open("experiments/data/stim/data/cnot_transpiled_custom.txt", "w") as f:
+        print(custom_circuit_stim, file=f)
+
 
     return custom_circuit_stim, custom_circuit, sabre_circuit_stim, sabre_circuit
 
@@ -135,7 +212,7 @@ def get_transpiled_circuit_as_sinter_task(backend, circuit_type) -> sinter.TaskS
             for circuit, k, p, t in (
                 # Add noise to circuit using eccentric_bench noisy_circuit.
                 # Note: This needs the QubitTracking
-                ((get_noise_model("constant",
+                ((get_noise_model("si1000",
                                   QubitTracking(backend, circuit[1 if t == "custom" else 3]),
                                   p,
                                   backend)).noisy_circuit(circuit[0 if t == "custom" else 2]), k, p, t)
@@ -181,7 +258,7 @@ def get_circuit_as_sinter_task(circuit_type) -> sinter.TaskStats:
             )
             for circuit, k, p in (
                 #(nm.noisy_circuit(circuit), k, p)
-                ((get_noise_model("constant",
+                ((get_noise_model("si1000",
                                   None,
                                   p,
                                   None)).noisy_circuit(circuit), k, p)
@@ -262,8 +339,11 @@ if __name__ == "__main__":
     transpiled_stat = transpiled_stat.__add__(non_transpiled_stat)
 
     plot_sinter_stats(transpiled_stat,
-                    filename = f"experiments/data/stim/figures/surface_memory_logical_error.png",
-                    with_transpilation = True)
+                      filename = f"experiments/data/stim/figures/surface_memory_logical_error.png",
+                      with_transpilation = True)
+    
+    plot_error_improvement(transpiled_stat,
+                           filename="experiments/data/stim/figures/surface_memory_logical_error_difference.png")
 
     """
     sabre_small_stats = QECCircuitStats(transpiled_circuit = sabre_small, backend = small_backend)

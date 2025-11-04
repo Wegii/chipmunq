@@ -142,8 +142,9 @@ class QECMemory():
 
         if codename == "surface":
             stim_circuit = stim.Circuit.generated(
-                "surface_code:rotated_memory_z",
-                rounds=d,
+                "surface_code:unrotated_memory_z",
+                #"surface_code:rotated_memory_z",
+                rounds=1,
                 distance=d
                 )
         else:

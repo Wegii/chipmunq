@@ -141,10 +141,14 @@ def get_stim_circuits_with_detectors(
                         )
                 else:  # gates/measurements acting on qubits
                     stim_circuit.append(qiskit_to_stim_dict[inst.name], qubit_indices)
-                    #stim_circuit.append("TICK")
+                    stim_circuit.append("TICK")
             elif inst.name in stim_detector_gates:
                 if inst.name == "QUBIT_COORDS":
-                    stim_circuit.append("QUBIT_COORDS", [inst.params[0]['index']], inst.params[0]['coords'])
+                    # NOTE: ignore these for now, since stimcircuit has issues converting this back
+                    #stim_circuit.append("QUBIT_COORDS", [inst.params[0]['index']], inst.params[0]['coords'])
+                    #stim_circuit.append("TICK")
+
+                    pass
                 elif inst.name == "DETECTOR" or inst.name == "OBSERVABLE_INCLUDE":
                     stim_record_targets = []
                     for rec in inst.params[0]['rec_indices']:

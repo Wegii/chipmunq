@@ -180,11 +180,14 @@ class StimCodeCircuit(CodeCircuit):
                                 self.qc.x(flip_qubits)
                             meas_count += 1
 
-                            # TODO: add barrier after measurement
+                            # NODE: add barrier to simplify preservation of measurement indices
                             self.qc.barrier()
                         elif inst_name == "R":
                             qubits = [target.value for target in instruction.targets_copy()]
+
                             self.qc.reset(qubits)
+                            # NOTE: Add barrier
+                            #self.qc.barrier()
 
                         elif inst_name == "TICK" and barriers:
                             self.qc.barrier()
