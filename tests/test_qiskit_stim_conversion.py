@@ -37,9 +37,19 @@ def test_simple_conversion():
     print(stim_ex1_after_workflow)
 
 
-def test_tqec_conversion():
-    # Test conversion of a lattice surgery circuit
-    #     
+def test_tqec_conversion() -> None:
+    """Test conversion of a lattice surgery circuit
+    """  
+
+    # TODO: Generate stim cnot circuit
+
+
+    # TODO: Transpile
+
+
+    # TODO: Add noise
+
+
     pass
 
 

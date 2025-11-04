@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import sys
 import os
-#import logging
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
+import logging
+#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
-
-#from codes.utils import get_code, get_max_d
 
 import qiskit
 import numpy as np
 
-# TODO: fix this, since this is no longer running
-#from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
+
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 
 # QECCircuit
@@ -121,7 +119,7 @@ class QECMemory():
         self.gate_set
         return circuit
 
-    def _generate_code_from_eccentric_bench(self, codename: str) -> StimCodeCircuit:
+    def _generate_code_from_eccentric_bench(self, codename: str, distance_scale: int = -1) -> StimCodeCircuit:
         """Generate QECC memory circuit using eccentric_bench library
 
         :param codename: Name of QEC code to generate
@@ -129,7 +127,10 @@ class QECMemory():
         :return: QECC memory circuit
         :rtype: qiskit.QuantumCircuit
         """
-        d = get_max_d("surface", self.num_qubits)
+        if distance_scale == -1:
+            d = get_max_d("surface", self.num_qubits)
+        else:
+            d = 2*distance_scale + 1
 
         if d < 3:
             logging.error(
@@ -137,9 +138,17 @@ class QECMemory():
             exit(1)
 
         # Generate code
-        cycles = 1#d
-        #return get_code(codename, d, cycles).qc
-        return get_code(codename, d, cycles)
+        cycles = d
+
+        if codename == "surface":
+            stim_circuit = stim.Circuit.generated(
+                "surface_code:rotated_memory_z",
+                rounds=d,
+                distance=d
+                )
+        else:
+            stim_circuit = None
+        return stim_circuit
     
     def _generate_distributed_code_from_eccentric_bench(self, codename: str) -> qiskit.QuantumCircuit:
         # Simply generate multiple patches of the same code, and concatenate the generated code circuits
@@ -154,7 +163,7 @@ class QECMemory():
 
         return qecc_mem
 
-    def generate_code_memory(self, codename: str, patches: int = 0) -> StimCodeCircuit:
+    def generate_code_memory(self, codename: str, patches: int = 0, distance_scale: int = 1) -> StimCodeCircuit:
         """Generate QECC memory circuit
 
         Currently used as wrapper around the circuit generation function from eccentric_bench. Extend this function if
@@ -166,15 +175,13 @@ class QECMemory():
         :rtype: qiskit.QuantumCircuit
         """
 
-        if patches > 0:
-            qecc_mem = self._generate_distributed_code_from_eccentric_bench(codename)
-        else:
-            qecc_mem = self._generate_code_from_eccentric_bench(codename)
+        qecc_mem = self._generate_code_from_eccentric_bench(codename, distance_scale = distance_scale)
+        
 
         #TODO: Check if circuit only consists of allowed gates, i. e. it is important that the circuit only consists of
         # e. g. two qubit gates as this will influence the hypergraph construction
         # Note: The allowed gateset also needs to be taken into account in the local routing algorithm.
-        qecc_mem_transpiled = self._check_circuit_gateset(qecc_mem)
+        qecc_mem_transpiled = qecc_mem #self._check_circuit_gateset(qecc_mem)
 
         return qecc_mem_transpiled
 

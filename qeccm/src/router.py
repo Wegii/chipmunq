@@ -4,6 +4,7 @@ from qiskit.dagcircuit import DAGCircuit
 from qiskit.circuit.library.standard_gates import SwapGate
 from qiskit.transpiler.layout import Layout
 
+
 class GenericRouter(TransformationPass):
 
     def __init__(self, backend):

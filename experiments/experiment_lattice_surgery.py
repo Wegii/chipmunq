@@ -288,6 +288,34 @@ def plot_error_improvement(stats, filename):
     plt.savefig(filename, bbox_inches='tight')
     plt.close()
 
+
+    plt.figure(figsize=(8,6))
+
+    # Plot error rate difference for each transpilation method and distance
+    for d in sorted(d_values):
+        ps_custom = sorted(custom_diff_by_d[d].keys())
+        ys_custom = [error_rates['custom'][p][d][0] for p in ps_custom]        
+        plt.plot(ps_custom, ys_custom, marker='o', label=f'custom, d={d}')
+
+        ps_sabre = sorted(sabre_diff_by_d[d].keys())
+        ys_sabre = [error_rates['sabre'][p][d][0] for p in ps_sabre]
+        plt.plot(ps_sabre, ys_sabre, marker='x', label=f'sabre, d={d}')
+
+        ps_sabre = sorted(sabre_diff_by_d[d].keys())
+        ys_sabre = [error_rates['none'][p][d][0] for p in ps_sabre]
+        plt.plot(ps_sabre, ys_sabre, marker='x', label=f'd={d}')
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Physical Error Rate (p)")
+    plt.ylabel("Logical Error Rate")
+    plt.title("Logical Error Rate Differences by d")
+    plt.legend()
+    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig("experiments/data/tqec/figures/cnot_custom_logical_error.png", bbox_inches='tight')
+    plt.close()
+
     
 
 def plot_gate_overhead(stats, filename):

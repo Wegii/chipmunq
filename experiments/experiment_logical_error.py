@@ -1,15 +1,15 @@
-# TODO: Number of gates and depth
-
 from __future__ import annotations
 
 import sys
 import os
 sys.path.append(os.path.join(os.getcwd(), "."))
+sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
 # Custom utils
 from experiments.exp_utils.transpilation_utils import *
 from experiments.exp_utils.circuit_generator import QECMemory, GenericCircuit
-from experiments.exp_utils.circuit_statistics import QECCircuitStats
+#from experiments.exp_utils.circuit_statistics import QECCircuitStats
+from glue.eccentric_bench.backends import QubitTracking
 
 # Plotting
 import matplotlib.pyplot as plt
@@ -17,8 +17,185 @@ import numpy as np
 import seaborn as sns
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
+# Sinter and stim
+import sinter
+import multiprocessing
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
+from glue.eccentric_bench.noise import get_noise_model
 
-def _get_circuit(type, num_patches):
+
+def plot_sinter_stats(stat, filename, with_transpilation = False):
+    fig, ax = plt.subplots()
+
+    if with_transpilation:
+        grp_fc = lambda stat: (
+            stat.json_metadata["d"],
+            stat.json_metadata["transpilation"]
+            )
+    else:
+        grp_fc = lambda stat: (
+            stat.json_metadata["d"]
+            )
+    sinter.plot_error_rate(
+        ax=ax,
+        stats=stat,
+        x_func=lambda stat: stat.json_metadata["p"],
+        group_func=grp_fc,
+    )
+    #plot_observable_as_inset(ax, zx_graph, correlation_surfaces[i])
+    ax.grid(axis="both")
+    ax.legend()
+    ax.loglog()
+    ax.set_title("Logical Error Rate")
+    ax.set_xlabel("Physical Error Rate")
+    ax.set_ylabel("Logical Error Rate")
+    fig.savefig(filename)
+
+def _run_sinter_simulation(tasks_fct, ks, ps):
+    stats = sinter.collect(
+        num_workers = int(multiprocessing.cpu_count()/2),#multiprocessing.cpu_count(),
+        tasks=(tasks_fct()),
+        save_resume_filepath = None,
+        progress_callback=None,
+        max_shots=10_000_000, #10_000_000,
+        max_errors=5_000,
+        decoders=["pymatching"],
+        print_progress=True,
+        hint_num_tasks=len(ks) * len(ps),
+        count_observable_error_combos=True,
+    )
+
+    return stats
+
+def _transpile_to_stim(circuit, backend) -> tuple[float, float]:
+    """Transpilation of circuit to backend using custom and sabre transpilation passes
+
+    :param circuit: _description_
+    :type circuit: qiskit.QuantumCircuit
+    :param backend: _description_
+    :type backend: BackendChipletV2
+    :return: _description_
+    :rtype: tuple[float, float]
+    """
+
+    #print(circuit)
+
+    # Stim to qiskit
+    stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+
+    custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc, backend)
+    sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+
+    # Qiskit to stim
+    custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
+    sabre_circuit_stim = get_stim_circuits_with_detectors(sabre_circuit)[0][0]
+
+    return custom_circuit_stim, custom_circuit, sabre_circuit_stim, sabre_circuit
+
+
+def get_transpiled_circuit_as_sinter_task(backend, circuit_type) -> sinter.TaskStats:
+    """Calculate logical error rate for transpiled circuit
+
+    :param backend: _description_
+    :type backend: _type_
+    :param circuit_type: _description_
+    :type circuit_type: _type_
+    :return: _description_
+    :rtype: sinter.TaskStats
+    :yield: _description_
+    :rtype: Iterator[sinter.TaskStats]
+    """
+
+    # Code distance to consider
+    ks = [1, 2, 3]
+    
+    # Noise level
+    ps = list(np.logspace(-4, -1, 10))
+
+    # Transpilation
+    ts = ["custom", "sabre"]
+
+    circuits = {
+        # TODO: add observable to measure
+        k: (
+            #_transpile_to_tqec(lattice_surgery_circuit.single_cnot(distance_scale = k)[1], backend)#[1]
+            _transpile_to_stim(_get_circuit(type = circuit_type, num_patches=1, distance_scale = k), backend)
+        )
+        for k in ks
+    }
+
+    def _get_sinter_task():
+        # Construct sinter task for multiple code distances and noise levels
+        yield from (
+            sinter.Task(
+                circuit=circuit,
+                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": t},
+            )
+            for circuit, k, p, t in (
+                # Add noise to circuit using eccentric_bench noisy_circuit.
+                # Note: This needs the QubitTracking
+                ((get_noise_model("constant",
+                                  QubitTracking(backend, circuit[1 if t == "custom" else 3]),
+                                  p,
+                                  backend)).noisy_circuit(circuit[0 if t == "custom" else 2]), k, p, t)
+                for k, circuit in circuits.items()
+                for p in ps
+                for t in ts
+            )
+        )
+
+    stat = _run_sinter_simulation(_get_sinter_task, ks, ps)
+
+    return stat
+
+
+def get_circuit_as_sinter_task(circuit_type) -> sinter.TaskStats:
+    """Calculate logical error rate for circuit
+
+    :param circuit_type: _description_
+    :type circuit_type: _type_
+    :return: _description_
+    :rtype: sinter.TaskStats
+    :yield: _description_
+    :rtype: Iterator[sinter.TaskStats]
+    """
+
+    # Code distance to consider
+    ks = [1, 2, 3]
+
+    # Noise level
+    ps = list(np.logspace(-4, -1, 10))
+    
+    circuits = {
+        k: _get_circuit(type = circuit_type, num_patches=1, distance_scale = k)
+        for k in ks
+    }
+    
+    def _get_sinter_task():
+        # Construct sinter task for multiple code distances and noise levels
+        yield from (
+            sinter.Task(
+                circuit=circuit,
+                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": "none"},
+            )
+            for circuit, k, p in (
+                #(nm.noisy_circuit(circuit), k, p)
+                ((get_noise_model("constant",
+                                  None,
+                                  p,
+                                  None)).noisy_circuit(circuit), k, p)
+                for k, circuit in circuits.items()
+                for p in ps
+            )
+        )
+
+    stat = _run_sinter_simulation(_get_sinter_task, ks, ps)
+
+    return stat
+
+
+def _get_circuit(type, num_patches, distance_scale=1):
     # Get circuit with non-interacting patches
 
     distance = 9
@@ -28,7 +205,7 @@ def _get_circuit(type, num_patches):
     circuit_generator = QECMemory(num_qubits)
     # Selects the maximum code distance given the number of qubits
     # Note: This is a stim circuit!
-    circuit = circuit_generator.generate_code_memory('surface', num_patches)
+    circuit = circuit_generator.generate_code_memory('surface', num_patches, distance_scale)
 
     return circuit
 
@@ -57,6 +234,7 @@ if __name__ == "__main__":
     medium_backend = BackendChipletV2((8, 8, 10, 10), n_inter)
     big_backend = BackendChipletV2((16, 16, 10, 10), n_inter)
 
+    """
     # Small backend
     small_generic_patch_circuit = _get_circuit("", 2*2)    
     custom_small, sabre_small = _transpile(small_generic_patch_circuit.qc, small_backend)
@@ -77,7 +255,15 @@ if __name__ == "__main__":
 
     print(custom_small_error_rate)
     print(sabre_small_error_rate)
+    """
 
+    transpiled_stat = get_transpiled_circuit_as_sinter_task(small_backend, "surface")
+    non_transpiled_stat = get_circuit_as_sinter_task("surface")    
+    transpiled_stat = transpiled_stat.__add__(non_transpiled_stat)
+
+    plot_sinter_stats(transpiled_stat,
+                    filename = f"experiments/data/stim/figures/surface_memory_logical_error.png",
+                    with_transpilation = True)
 
     """
     sabre_small_stats = QECCircuitStats(transpiled_circuit = sabre_small, backend = small_backend)
