@@ -118,11 +118,14 @@ def get_transpiled_circuit_as_sinter_task(backend, circuit_type) -> sinter.TaskS
     :rtype: Iterator[sinter.TaskStats]
     """
 
+    print("Start sinter tasks")
+
     # Code distance to consider
     ks = [1, 2, 3]
     
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
+    tqec_noise_model = NoiseModel.uniform_depolarizing
 
     # Transpilation
     ts = ["custom", "sabre"]
@@ -144,12 +147,14 @@ def get_transpiled_circuit_as_sinter_task(backend, circuit_type) -> sinter.TaskS
                 json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": t},
             )
             for circuit, k, p, t in (
+                (tqec_noise_model(p).noisy_circuit(circuit[0 if t == "custom" else 2]), k, p, t)
                 # Add noise to circuit using eccentric_bench noisy_circuit.
                 # Note: This needs the QubitTracking
-                ((get_noise_model("constant",
-                                  QubitTracking(backend, circuit[1 if t == "custom" else 3]),
-                                  p,
-                                  backend)).noisy_circuit(circuit[0 if t == "custom" else 2]), k, p, t)
+                #((get_noise_model("constant",
+                #                  None, #QubitTracking(backend, circuit[1 if t == "custom" else 3]),
+                #                  p,
+                #                  None)#backend)
+                #                  ).noisy_circuit(circuit[0 if t == "custom" else 2]), k, p, t)
                 for k, circuit in circuits.items()
                 for p in ps
                 for t in ts
@@ -182,6 +187,7 @@ def get_circuit_as_sinter_task(circuit_type) -> sinter.TaskStats:
         k: (_get_circuit(type = circuit_type, distance_scale = k)[1])
         for k in ks
     }
+    tqec_noise_model = NoiseModel.uniform_depolarizing
     
     def _get_sinter_task():
         # Construct sinter task for multiple code distances and noise levels
@@ -191,11 +197,11 @@ def get_circuit_as_sinter_task(circuit_type) -> sinter.TaskStats:
                 json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": "none"},
             )
             for circuit, k, p in (
-                #(nm.noisy_circuit(circuit), k, p)
-                ((get_noise_model("constant",
-                                  None,
-                                  p,
-                                  None)).noisy_circuit(circuit), k, p)
+                (tqec_noise_model(p).noisy_circuit(circuit), k, p)
+                #((get_noise_model("constant",
+                #                  None,
+                #                  p,
+                #                  None)).noisy_circuit(circuit), k, p)
                 for k, circuit in circuits.items()
                 for p in ps
             )

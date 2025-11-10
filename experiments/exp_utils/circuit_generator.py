@@ -138,13 +138,13 @@ class QECMemory():
             exit(1)
 
         # Generate code
-        cycles = d
+        cycles = 2#d
 
         if codename == "surface":
             stim_circuit = stim.Circuit.generated(
                 "surface_code:unrotated_memory_z",
                 #"surface_code:rotated_memory_z",
-                rounds=1,
+                rounds=cycles,
                 distance=d
                 )
         else:

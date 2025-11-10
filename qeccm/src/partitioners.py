@@ -3,16 +3,21 @@ from __future__ import annotations
 # Qiskit transpiler
 from qiskit.transpiler.basepasses import AnalysisPass
 
-# Hypergrap
-import kahypar as kahypar
+# Hypergraph
+import kahypar
 from qeccm.circuit.hypergraph_circuit import HyperGraph, HypergraphCircuit, PartitionedHyperGraph
 import networkx as nx
 from networkx.algorithms import community
+from networkx.algorithms.community import k_clique_communities
 
+# Typing
 from qiskit.dagcircuit import DAGCircuit
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
 from typing import List, Tuple
 import numpy as np
+
+# Plotting utils
+import matplotlib.pyplot as plt
 
 
 class GenericHypergraphPartitioning(AnalysisPass):
@@ -20,16 +25,18 @@ class GenericHypergraphPartitioning(AnalysisPass):
         super().__init__()
 
     def run(self, dag: DAGCircuit) -> DAGCircuit:
-        # TODO: function that calculates (given a backend and circuit) into how many cuts it is necessary to partition the circuit
-        pass
+        # TODO: function that calculates (given a backend and circuit) into how many cuts it is necessary to
+        # partition the circuit
+        raise NotImplementedError
 
 
 class KaHyParPartitioning(GenericHypergraphPartitioning):
     """ Hypergraph partitioning based on multilevel hypergraph partitioning framework KaHyPar
 
-    See implementation details in `<https://kahypar.org/>`_ `<https://github.com/kahypar/mt-kahypar>`_
+    References:
+        - https://kahypar.org/
+        - https://github.com/kahypar/mt-kahypar
     """
-
 
     def __init__(self, backend: BackendChipletV2):
         """KaHyPar partitioning initializer"""
@@ -38,8 +45,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         self.backend = backend
 
         # Method for calculating the number of partitions
-        self._calculate_partitions_method = "full"
-        #self._calculate_partitions_method = "patch-aware"
+        #self._calculate_partitions_method = "full"
+        self._calculate_partitions_method = "patch-aware"
+        #self._calculate_partitions_method = "patch-splitting-aware"
 
         # Initialize KaHyPar
         self.khp_context = kahypar.Context()
@@ -66,35 +74,24 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             # Partition graph into calculated number of partitions
             kahypar_hg = self.perform_partitioning(partition_sizes)
 
-
-            # Big Issue: However, partitioning assumes full qubit connectivity inside and across the quantum processors to
-            #            reduce the problem to a graph partitioning problem. on a higher level, this constrained is already
-            #            known to a high level compiler (e. g. for lattice surgery). Thus, we should generally not get a 
-            #            circuit that has to communicate with another node, to which no direct connection is.
-            #            Note: This is not entirely true, since the ancilla qubits used in lattice surgery could become an
-            #                  issue, if it is not possible to map these also to the same node!
-            # Calculate mapping of partition to QPU. This is necessary, since KaHyPar assumes an all-to-all chiplet 
-            # topology. Depending on the backend chiplet_topology, we do not have and all-to-all connection.
-            partition_to_qpu = self.partition_to_qpu_mapping(kahypar_hg)
-
-            self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(kahypar_hg)
-            self.property_set["partition_to_qpu"] = partition_to_qpu
+            # Hypergraph
+            self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
+                partitioned_hgc = kahypar_hg,
+                hgc = self.property_set['hyper_dag_kahypar'])
         else:
             # Explicit Partitioning not needed 
-            # TODO: 
             (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
             num_vertices = len(index_vector)
 
-            #num_vertices = None
-            partition_to_qpu = {}
-            partition_to_qpu[0] = 0
+            # partition_to_qpu = {}
+            # partition_to_qpu[0] = 0
             
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(num_nodes = num_vertices)
-            self.property_set["partition_to_qpu"] = partition_to_qpu
+            # self.property_set["partition_to_qpu"] = partition_to_qpu
 
-        # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without any
-        #       edges intersecting each other. If there are intersecting edges, this is a big problem for the routing, 
-        #       since these connections need to be routed through a whole other qpu.
+        # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without
+        #       any edges intersecting each other. If there are intersecting edges, this is a big problem for the
+        #       routing, since these connections need to be routed through a whole other qpu.
         #       Goal: We do not want any intersection of edges of the partitioned graph
 
         return dag
@@ -108,11 +105,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         :rtype: kahypar.Hypergraph
         """
 
-        hgc = self.property_set['hyper_dag']
-
-        # Translate vertices and edges from general hypergraph to KaHyPar specific format
+        # Get vertices and edges in KaHyPar specific format
         (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
-        num_vertices = len(index_vector)#hgc.get_num_vertices() 
+        num_vertices = len(index_vector)
         num_hyperedges = len(index_vector) - 1
 
         # For now, all hyperedges are assumed to have the same weight
@@ -138,42 +133,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             )
 
         # Partition hypergraph
-        print("starting partitioning")
         kahypar.partition(kahypar_hg, self.khp_context)
-        print("partitioning found")
 
         return kahypar_hg
-
-    def partition_to_qpu_mapping(self, kahypar_hg: kahypar.Hypergraph) -> dict:
-        """Assign each partition to a QPU, based on the interactions with the other partitions.
-        
-        https://networkx.org/documentation/stable/reference/generated/networkx.drawing.layout.spring_layout.html
-        TODO: On which QPU does a partition need to be placed? The QPUs do not have connections to all other QPUs, so
-              this can easily become a huge bottleneck!
-
-        :param kahypar_hg: _description_
-        :type kahypar_hg: kahypar.Hypergraph
-        :return: _description_
-        :rtype: List[int]
-        """
-
-        # get backend
-        backend = self.backend
-
-        # Get number of chips
-        num_chips = backend.get_num_chips
-
-        # Number of blocks after partitioning
-        num_blocks = kahypar_hg.numBlocks()
-
-        block_to_chip = {}
-        # Simple one-to-one mapping of partition to chiplet
-        for i, b in enumerate(range(num_blocks)):
-            block_to_chip[b] = i
-
-        # TODO: Implement improved version of this mapping!
-    
-        return block_to_chip
 
     def calculate_number_partitions(self, dag: DAGCircuit, hgc: HyperGraph) -> Tuple[int, List[int]]:
         """Calculate number of partitions
@@ -189,6 +151,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         References:
             - https://networkx.org/documentation/stable/reference/algorithms/community.html
+            - https://link.springer.com/article/10.1007/s11227-025-06918-3
         
         :param dag: _description_
         :type dag: DAGCircuit
@@ -200,83 +163,124 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         num_qubits_circuit = dag.num_qubits()
 
         print("Calculate optimal k")
-        # Perform partitioning, if circuit does not fit on on chiplet
-        if num_qubits_chiplet < num_qubits_circuit:
-            if self._calculate_partitions_method == "full":
-                # Fill chiplet as much as possible
-                k = int(np.ceil(num_qubits_circuit / num_qubits_chiplet))
-                
-            elif self._calculate_partitions_method == "patch-aware":
+        # Perform partitioning, if circuit does not fit on on chiplet      
+        if self._calculate_partitions_method == "full":
+            # Fill chiplet as much as possible
+            k = int(np.ceil(num_qubits_circuit / num_qubits_chiplet))
 
-                # Approach to keep patches together:
-                #   - Try to find patches in the circuit
-                #   - How many patches can be place on a single chiplet? Calculate
-                #   - Distribute the patches to all chiplets:
-                #       - Simply distributed patches if more chiplets than patches
-                #       - If more patches than chiplets, try to have as many as possible good patches, and some bad ones.
-                #         TODO: Find out a better way how to handle this
+        elif self._calculate_partitions_method == "patch-aware":
+            # Try to find all higly connected patches in a circuit
+            
+            (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+            
+            # Create multigraph given index and edge vectors
+            H = nx.MultiGraph()
 
-                # Rustworkx to NetworkX
-                G_rx = hgc._hg
-                G_nx = nx.Graph()
+            num_hyperedges = len(index_vector) - 1
 
-                # Add nodes
-                for node_index, node_data in enumerate(G_rx.nodes()):
-                    G_nx.add_node(node_index, data=node_data)
+            # TODO: Incorporate number of paths from one to another node. Patches should have many parallel edges,
+            #       which should allow us to extract the patches
 
-                # Add edges
-                for u, v, _ in G_rx.weighted_edge_list():
-                    G_nx.add_edge(u, v)
+            for h in range(num_hyperedges):
+                start = index_vector[h]
+                end   = index_vector[h+1]
 
-                # Iteratively compute Kernighan–Lin bipartition graphs. In each iterations, the graph or already
-                # partitioned sub-graph is split into two subgraph while minimizing edge-cut.
-                # Stop if all patches can be mapped to the chiplets. The total number of communities is then used as
-                # parameter k for the graph partitioning
-                # The idea here is to find communities, which should be similar to surface code patches
-                # TODO: This corresponds to multilevel partitioning / hierarchical clustering
-                bipartite_community_detection = []
-                bipartite_community_detection.append(G_nx)
-                bipartite_communities = []
-                #print(G_nx)
-                while True:
-                    G_iter = bipartite_community_detection.pop(0)
+                # Nodes in hyperedge h
+                nodes = edge_vector[start:end]
 
-                    g1_nodes, g2_nodes = nx.algorithms.community.kernighan_lin_bisection(G_iter, max_iter=10)
-                    g1 = G_nx.subgraph(g1_nodes).copy()
-                    g2 = G_nx.subgraph(g2_nodes).copy()
+                # Hyperedge node label
+                H.add_node(h)
 
-                    if len(g1) > num_qubits_chiplet:
-                        bipartite_community_detection.append(g1)
-                    else:
-                        bipartite_communities.append(g1_nodes)
-                    if len(g2) > num_qubits_chiplet:
-                        bipartite_community_detection.append(g2)
-                    else:
-                        bipartite_communities.append(g2_nodes)
+                # Connect hyperedge to its member nodes
+                h_node = h
+                for u in nodes:
+                    if u != h:
+                        H.add_node(u)
+                        H.add_edge(h_node, u)
 
-                    if bipartite_community_detection == []:
-                        break
 
-                #print(bipartite_communities)
-                k = len(bipartite_communities)
+            plt.figure(figsize=(6, 6))
+            
+            # Draw the graph
+            nx.draw(H, with_labels=True, node_size=100)
+            plt.savefig("data/backends/mapping/hx_graph_of_circuit.png", dpi=300)
+            plt.close()
 
-                # k can be of maximum size backend_num_chiplets
-                if k > self.backend.get_num_chips():
-                    k = self.backend.get_num_chips()
-            else:
-                pass
+
+            # Girvan–Newman algorithm because this method produces a contractiontree that approximates the optimal
+            # solution in terms of spatial cost.
+            comp = nx.community.girvan_newman(H)
+            communities = tuple(sorted(c) for c in next(comp))
+            print("Found communities")
+            print(communities)
+            k = len(communities)
+            #print()
+
+        elif self._calculate_partitions_method == "patch-splitting-aware":
+
+            # Approach to keep patches together:
+            #   - Try to find patches in the circuit
+            #   - How many patches can be place on a single chiplet? Calculate
+            #   - Distribute the patches to all chiplets:
+            #       - Simply distributed patches if more chiplets than patches
+            #       - If more patches than chiplets, try to have as many as possible good patches, and some bad ones.
+            #         TODO: Find out a better way how to handle this
+
+            # Rustworkx to NetworkX
+            # TODO: This method is not working!!
+            # TODO: hgc is no longer set, as the hypergraph_circuit pass no longer calculates this, but rather
+            #       calculates a direct kahypar version
+            G_rx = hgc._hg
+            G_nx = nx.Graph()
+
+            # Add nodes
+            for node_index, node_data in enumerate(G_rx.nodes()):
+                G_nx.add_node(node_index, data=node_data)
+
+            # Add edges
+            for u, v, _ in G_rx.weighted_edge_list():
+                G_nx.add_edge(u, v)
+
+            # Iteratively compute Kernighan–Lin bipartition graphs. In each iterations, the graph or already
+            # partitioned sub-graph is split into two subgraph while minimizing edge-cut.
+            # Stop if all patches can be mapped to the chiplets. The total number of communities is then used as
+            # parameter k for the graph partitioning
+            # The idea here is to find communities, which should be similar to surface code patches
+            # TODO: This corresponds to multilevel partitioning / hierarchical clustering
+            bipartite_community_detection = []
+            bipartite_community_detection.append(G_nx)
+            bipartite_communities = []
+            #print(G_nx)
+            while True:
+                G_iter = bipartite_community_detection.pop(0)
+
+                g1_nodes, g2_nodes = nx.algorithms.community.kernighan_lin_bisection(G_iter, max_iter=10)
+                g1 = G_nx.subgraph(g1_nodes).copy()
+                g2 = G_nx.subgraph(g2_nodes).copy()
+
+                if len(g1) > num_qubits_chiplet:
+                    bipartite_community_detection.append(g1)
+                else:
+                    bipartite_communities.append(g1_nodes)
+                if len(g2) > num_qubits_chiplet:
+                    bipartite_community_detection.append(g2)
+                else:
+                    bipartite_communities.append(g2_nodes)
+
+                if bipartite_community_detection == []:
+                    break
+
+            #print(bipartite_communities)
+            k = len(bipartite_communities)
+
+            # k can be of maximum size backend_num_chiplets
+            if k > self.backend.get_num_chips():
+                k = self.backend.get_num_chips()
         else:
-            k = 1
+            pass
 
-        print("Optimal k found")
+        print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet
         partition_sizes = [num_qubits_chiplet for c in range(k)]
 
         return k, partition_sizes
-
-    def cost_analysis(self):
-        """Calculate statistics of partitioned graph
-        """
-
-        # Output metrics
-        pass

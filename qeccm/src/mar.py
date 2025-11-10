@@ -11,7 +11,7 @@ from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAnci
 from qeccm.backends import BackendChipletV2
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
-from qeccm.src.mapper import CongestionMapper, RandomMapper, TrivialMapper
+from qeccm.src.mapper import RandomMapper, TrivialMapper
 from qeccm.src.router import BasicSwapRouter, ParallelSwapRouter
 
 
@@ -105,7 +105,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #layout_pm = PassManager([partition_op, mapping_op ] + extension_op + 
         #                        [apply_mapping_op] )
         
-        layout_pm = PassManager([partition_op, mapping_op ] + extension_op)
+        layout_pm = PassManager([partition_op, mapping_op ])# + extension_op)
 
         return layout_pm
 

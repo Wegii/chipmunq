@@ -32,15 +32,8 @@ class BackendChipletV2(BackendV2):
      - More transpiler info: https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.transpiler.Target
 
     Additions
-     - TODO: Add inter-qpu connections and different constraints to backend
-     - TODO: Add list or something to get the qubits that connect to other qpus
-     - TODO: Check this link out https://quantum.cloud.ibm.com/docs/en/guides/represent-quantum-computers
-     - TODO: Move to GenericBackendV2: https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.providers.fake_provider.GenericBackendV2
-     - TODO: Check https://quantum.cloud.ibm.com/docs/en/migration-guides/qiskit-2.0
+        - TODO: Add remote gates to give those higher error
 
-    TODO: check out implementation for chiplets
-    Adapted from https://quantum.cloud.ibm.com/docs/en/guides/custom-backend
-    TODO: they also have a fake Kookaburra backend
 
 
 

@@ -17,8 +17,8 @@ from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 
 # eccentric_bench
 from glue.eccentric_bench.backends import QubitTracking
-from glue.eccentric_bench.noise import get_noise_model
-from glue.eccentric_bench.decoders import decode
+#from glue.eccentric_bench.noise import get_noise_model
+#from glue.eccentric_bench.decoders import decode
 
 
 class QECCircuitStats():

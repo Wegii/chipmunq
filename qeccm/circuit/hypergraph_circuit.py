@@ -26,9 +26,8 @@ class PartitionedHyperGraph:
                 pygraph. 
     """
 
-    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes = None):
+    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes = None, hgc = None):
         
-
         #"""Generate hypernetx hypergraph given a partitioned kahypar hypergraph
 
         #:param partitioned_hgc: Hypergraph after partitioning. If None, assume that only one block exists
@@ -43,6 +42,10 @@ class PartitionedHyperGraph:
             # Assign each block all nodes
             for node in range(partitioned_hgc.numNodes()):
                 block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
+
+            # TODO: Add nodes connecting all blocks
+            block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(0)
+            block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(24)
         else:
             # Generate dictionary with one block
             block_to_nodes = {"b:" + str(0): []}
@@ -53,9 +56,47 @@ class PartitionedHyperGraph:
 
         # Construct hypergraph from partitioned hypergraph
         self._phg = hnx.Hypergraph(block_to_nodes)
-        self._btn = block_to_nodes
 
-    def draw_phg(self, filename: str = "") -> None:
+
+        # TODO: Construct collapsed hypergraph
+        import networkx as nx
+        # All blocks are collapsed to singular nodes, while edges between blocks are kept
+        (index_vector, edge_vector) = hgc
+
+        ch = nx.MultiGraph()
+        # Create a node for each block
+        for b in range(partitioned_hgc.numBlocks()):
+            ch.add_node(b)
+
+        # Iterate through all hyperedges
+        num_hyperedges = len(index_vector) - 1
+        for h in range(num_hyperedges):
+            # Get the nodes inside hyperedge h
+            start = index_vector[h]
+            end = index_vector[h + 1]
+            hyperedge_nodes = edge_vector[start:end]
+
+            # Determine the blocks these nodes belong to
+            blocks = set(partitioned_hgc.blockID(v) for v in hyperedge_nodes)
+
+            # If multiple blocks appear in one hyperedge, connect them
+            blocks = list(blocks)
+            for i in range(len(blocks)):
+                for j in range(i + 1, len(blocks)):
+                    ch.add_edge(blocks[i], blocks[j])
+
+        plt.figure(figsize=(6, 6))
+        nx.draw(ch, with_labels=True, node_size=600)
+        plt.savefig("data/backends/mapping/hx_contracted_graph_of_circuit.png", dpi=300)
+        plt.close()
+        
+        self._collapsed_phg = ch
+
+        self._btn = block_to_nodes
+        # Save kahypar hypergraph
+        self._kahypar_hgc = partitioned_hgc
+
+    def draw_phg(self, graph: hnx.Hypergraph, filename: str = "") -> None:
         """Draw partitioned hypergraph
 
         :param filename: Path to write figure to, defaults to ""
@@ -63,11 +104,19 @@ class PartitionedHyperGraph:
         """
 
         # TODO: Add some options (visualization) for plotting the graph more nicely
-        hnx.draw(self._phg)
+        hnx.draw(graph)
 
         if filename != "":
             plt.savefig(fname=filename)
         plt.close()
+
+    def contract_partitioning(self) -> None:
+        # Create a contracted hypergraph given the partitions
+
+        # Start with the hypergraph and all nodes
+
+        # Contract all nodes of one group
+        pass
         
 
 class HyperGraph:

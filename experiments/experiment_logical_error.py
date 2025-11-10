@@ -96,23 +96,38 @@ def plot_error_improvement(stats, filename):
                     sabre_diff_by_d[d][p] = error_rates['sabre'][p][d][0] - error_rates['none'][p][d][0]
 
     plt.figure(figsize=(8,6))
-
     # Plot error rate difference for each transpilation method and distance
-    for d in sorted(d_values):
+    base_palette = sns.color_palette("Set2", n_colors=len(d_values))
+    colors = {}
+    for c in range(len(d_values)):
+        colors[c] = base_palette[c]
+
+    for i, d in enumerate(sorted(d_values)):
         ps_custom = sorted(custom_diff_by_d[d].keys())
         ys_custom = [custom_diff_by_d[d][p] for p in ps_custom]
-        plt.plot(ps_custom, ys_custom, marker='o', label=f'custom, d={d}')
+        plt.plot(ps_custom,
+                 ys_custom,
+                 marker='o',
+                 color=colors[i],
+                 linewidth=2,
+                 label=f'({d}, custom)')
 
         ps_sabre = sorted(sabre_diff_by_d[d].keys())
         ys_sabre = [sabre_diff_by_d[d][p] for p in ps_sabre]
-        plt.plot(ps_sabre, ys_sabre, marker='x', label=f'sabre, d={d}')
+        plt.plot(ps_sabre,
+                 ys_sabre,
+                 marker='x',
+                 color=colors[i],
+                 linestyle='--',
+                 linewidth=2,
+                 label=f'({d}, sabre)')
 
     plt.xscale('log')
     #plt.yscale('log')
-    plt.xlabel("Physical Error Rate (p)")
-    plt.ylabel("Delta Logical Error Rate")
-    plt.title("Logical Error Rate Differences by d")
-    plt.legend()
+    plt.xlabel("Physical Error Rate")
+    plt.ylabel("Δ Logical Error Rate")
+    #plt.title("Logical Error Rate Differences by d")
+    # plt.legend()
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.savefig(filename, bbox_inches='tight')

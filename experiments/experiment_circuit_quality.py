@@ -6,8 +6,8 @@ import sys
 import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/"))
-sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/utils/"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 
 # Enable debug logging for Qiskit
 #import logging
@@ -159,16 +159,14 @@ if __name__ == "__main__":
     big_backend = BackendChipletV2((16, 16, 10, 10), n_inter)
 
     # Small backend
-    small_generic_patch_circuit = _get_circuit("", 2*2)
+    small_generic_patch_circuit = _get_circuit(type="generic", num_patches=2*2, num_qubits = 100)
     custom_small, sabre_small = _transpile(small_generic_patch_circuit, small_backend)
     custom_small_stats = QECCircuitStats(transpiled_circuit = custom_small, backend = small_backend)
     sabre_small_stats = QECCircuitStats(transpiled_circuit = sabre_small, backend = small_backend)
     #basic_small_stats = QECCircuitStats(transpiled_circuit = basic_small, backend = small_backend)
 
-
-    
     # Medium backend
-    medium_generic_patch_circuit = _get_circuit("", 8*8)
+    medium_generic_patch_circuit = _get_circuit(type="generic", num_patches=8*8, num_qubits = 100)
     custom_medium, sabre_medium = _transpile(medium_generic_patch_circuit, medium_backend)
     custom_medium_stats = QECCircuitStats(transpiled_circuit = custom_medium, backend = medium_backend)
     sabre_medium_stats = QECCircuitStats(transpiled_circuit = sabre_medium, backend = medium_backend)
@@ -176,7 +174,7 @@ if __name__ == "__main__":
 
     # Big backend
     """
-    big_generic_patch_circuit = _get_circuit("", 16*16)
+    big_generic_patch_circuit = _get_circuit(type="generic", num_patches=16*16, num_qubits = 100)
     custom_big, sabre_big = _transpile(big_generic_patch_circuit, big_backend)
     custom_big_stats = QECCircuitStats(transpiled_circuit = custom_big, backend = big_backend)
     sabre_big_stats = QECCircuitStats(transpiled_circuit = sabre_big, backend = big_backend)
@@ -213,5 +211,5 @@ if __name__ == "__main__":
     # SABRE: 330
 
     plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
-    #plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
+    plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
     

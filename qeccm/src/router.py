@@ -57,7 +57,9 @@ class BasicSwapRouter(GenericRouter):
         
         for node in dag.topological_op_nodes():               
             if len(node.qargs) == 2:
-                q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+                # q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+                q0 = current_layout[node.qargs[0]]
+                q1 = current_layout[node.qargs[1]]
                 
                 # Check distance in coupling map
                 if not self.coupling_map.distance(q0, q1) == 1:
@@ -66,24 +68,66 @@ class BasicSwapRouter(GenericRouter):
                     # TODO: this can be replaced with a easier calculation, by considering the grid layout of the
                     #       backend. Note: only works for grid layout then.
                     # TODO: remote gates need the shortest_undirected_path function again
+
+                    # TODO: Split the rout into two parts. Route from both the target and source
+                    #       have a look at the rust implementation of sabre, since there is a code snipplet that does
+                    #       this. This should halve the distance
                     
                     # Insert swaps along path except last edge
-                    for i in range(len(path) - 2):
-                        swap = SwapGate()
-                        new_dag.apply_operation_back(
-                            swap,
-                            qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
-                        )
-                    
-                    # Apply original gate
-                    new_dag.apply_operation_back(node.op, qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]])
+                    mid = len(path) // 2
 
-                    # SWAP backwards
-                    for i in reversed(range(len(path) - 2)):
-                        swap = SwapGate()
+                    # Route from start to middle
+                    for i in range(mid - 1):
+                        #swap = SwapGate()
+                        qubit_1 = current_layout[path[i]]
+                        qubit_2 = current_layout[path[i + 1]]
+                        
                         new_dag.apply_operation_back(
-                            swap,
-                            qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                        )
+                    # Route from end to middle
+                    for i in range(len(path) - 1, mid, -1):
+                        #swap = SwapGate()
+                        qubit_1 = current_layout[path[i]]
+                        qubit_2 = current_layout[path[i - 1]]
+                        new_dag.apply_operation_back(
+                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                        )
+
+                    # Apply original gate
+                    #new_dag.apply_operation_back(node.op, qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]])
+                    new_dag.apply_operation_back(node.op,
+                                                 qargs=[new_dag.qubits[path[mid - 1]], new_dag.qubits[path[mid]]])
+
+                    # Route backwards
+                    for i in reversed(range(mid - 1)):
+                        #swap = SwapGate()
+                        #new_dag.apply_operation_back(
+                        #    swap,
+                        #    qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                        #)
+                        qubit_1 = current_layout[path[i]]
+                        qubit_2 = current_layout[path[i + 1]]
+                        
+                        new_dag.apply_operation_back(
+                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                        )
+
+                    for i in reversed(range(len(path) - 1, mid, -1)):
+                        #swap = SwapGate()
+                        #new_dag.apply_operation_back(
+                        #    swap,
+                        #    qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                        #)
+                        #swap = SwapGate()
+                        qubit_1 = current_layout[path[i]]
+                        qubit_2 = current_layout[path[i - 1]]
+                        new_dag.apply_operation_back(
+                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
                         )
                     
                 else:
