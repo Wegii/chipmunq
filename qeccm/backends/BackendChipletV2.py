@@ -287,6 +287,8 @@ class BackendChipletV2(BackendV2):
             x_c = self.c1
             y_c = self.c2
             
+            # TODO: Add remote_gate attribute with some noise value
+
             # Iterate over each row
             for y in range(x_c):
                 # Iterate over each column
@@ -352,6 +354,28 @@ class BackendChipletV2(BackendV2):
         cl_idx = (np.floor(n/2) * m).astype(int)
 
         return cb_idx + offset, ct_idx + offset, cr_idx + offset, cl_idx + offset
+    
+    def get_inter_chiplet(self) -> dict:
+        """Generate dictionary containing inter_chiplet connections and their noise level
+
+        :return: _description_
+        :rtype: dict
+        """
+
+        # Get all ecr gates (inter-chiplet connections)
+        ecr_gate = self.target["ecr"] 
+
+        # ECR connectivity consists of the qubit-pairs listed in the keys
+        edges = list(ecr_gate.keys())
+
+        d = {}
+
+        for k, v in edges:
+            d[(int(k), int(v))] = 0.1
+
+        d = dict(d)
+        return d
+
 
     def get_num_chips(self) -> int:
         """Return number of chiplets depending on chiplet_topology
