@@ -141,7 +141,9 @@ def get_stim_circuits_with_detectors(
                         )
                 else:  # gates/measurements acting on qubits
                     stim_circuit.append(qiskit_to_stim_dict[inst.name], qubit_indices)
-                    stim_circuit.append("TICK")
+                    # Add barrier to two qubit gates, in order to not have stim combining these gates again
+                    #if inst.name in ["swap", "cx", "cy", "cz"]:
+                    #    stim_circuit.append("TICK")
             elif inst.name in stim_detector_gates:
                 if inst.name == "QUBIT_COORDS":
                     # NOTE: ignore these for now, since stimcircuit has issues converting this back
@@ -160,6 +162,87 @@ def get_stim_circuits_with_detectors(
                     stim_circuit.append("SHIFT_COORDS", [], inst.params[0]['shift_vector'])
             else:
                 raise Exception("Unexpected operations: " + str([inst, qargs, cargs]))
+
+
+        def split_fused_swaps(stim_circuit: StimCircuit) -> StimCircuit:
+            """ Convert fused SWAPs like `SWAP q0 q1 q2 q3` into separate SWAPs
+            
+            For a operation SWAP q0 q1 q2 q3, convert to:
+            SWAP q0 q1
+            TICK
+            SWAP q2 q3
+
+            Leaves all other instructions unchanged.
+
+            :param stim_circuit: _description_
+            :type stim_circuit: StimCircuit
+            :return: _description_
+            :rtype: StimCircuit
+            """
+            tq_gates = {"SWAP", "CX", "CZ", "CY"}
+
+            new = StimCircuit()
+            for inst in stim_circuit:
+                name = inst.name
+                # obtain copies (these are Stim target objects / args)
+                targets = inst.targets_copy()
+                args = inst.gate_args_copy()
+
+                # Quick path: non-SWAP instructions keep as-is
+                if name not in tq_gates:
+                    new.append(name, targets, args)
+                    continue
+
+                # For SWAP: collect only qubit target values (ignore measurement record targets)
+                qubit_vals = [t.value for t in targets if not t.is_measurement_record_target]
+                has_rec_targets = any(t.is_measurement_record_target for t in targets)
+
+                if has_rec_targets:
+                    # keep original (uncommon for SWAP but safe)
+                    new.append(name, targets, args)
+                    continue
+
+                # Emit SWAPs for each non-overlapping pair
+                for i in range(0, len(qubit_vals), 2):
+                    a = qubit_vals[i]
+                    b = qubit_vals[i + 1]
+                    # Append as a simple SWAP on two qubit indices
+                    new.append(name, [a, b])
+                    new.append("TICK")
+
+            return new
+
+        stim_circuit = split_fused_swaps(stim_circuit)
+
+
+        # Add ticks between gates if they act on the same qubit, since this is necessary for any noise models
+        # Ensure that Stim separates gates acting on the same qubit by inserting TICKs only when needed.
+        used_in_layer = set()
+        new_stim = StimCircuit()
+
+        for inst_line in stim_circuit:
+            name = inst_line.name
+            targets = inst_line.targets_copy()
+            args = inst_line.gate_args_copy()
+
+            # Extract actual qubit targets (ignore rec targets)
+            qubits = [t.value for t in targets if not t.is_measurement_record_target]
+
+            # Determine if a TICK is needed: gate touches a qubit already used this layer
+            if any(q in used_in_layer for q in qubits):
+                new_stim.append("TICK")
+                used_in_layer = set()
+
+            # Append the instruction
+            new_stim.append(name, targets, args)
+
+            # If the instruction itself is a TICK, it resets the layer
+            if name == "TICK":
+                used_in_layer = set()
+            else:
+                used_in_layer.update(qubits)
+
+        stim_circuit = new_stim
 
         stim_circuits.append(stim_circuit)
         stim_measurement_data.append(measurement_data)
