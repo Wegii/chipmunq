@@ -25,6 +25,11 @@ def test_chiplet_backend():
                   filename = "data/backends/torus/t_multi_chiplet_colored.png",
                   show_bb_node_color = True)
 
+    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 2, "nn", "rotated_grid")
+    plot_gate_map(backend = chiplet_backend,
+                  filename = "data/backends/grid/t_multi_chiplet_rotated.png",
+                  show_bb_node_color = True)
+
 
 if __name__ == "__main__":
 

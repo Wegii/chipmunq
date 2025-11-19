@@ -35,13 +35,11 @@ class BackendChipletV2(BackendV2):
         - TODO: Add remote gates to give those higher error
 
 
-
-
     Args:
         BackendV2 (_type_): _description_
     """
 
-    def __init__(self, size, n_inter, connectivity: str = "nn") -> None:
+    def __init__(self, size, n_inter, connectivity: str = "nn", topology: str = "grid") -> None:
         """Instantiate new multi-chip backend.
 
         :param size: _description_
@@ -65,7 +63,8 @@ class BackendChipletV2(BackendV2):
 
         # TODO: Add linear,
         # TODO: Add heavy hex
-        self.topology = "grid"
+        # self.topology = "rotated_grid"
+        self.topology = topology
 
         # Different variants for connecting and placing chiplets:
         # - line: simple line (Peano Curve for placement)
@@ -162,14 +161,43 @@ class BackendChipletV2(BackendV2):
                             if nb != node and not G.has_edge(node, nb):
                                 G.add_edge(node, nb, None)
                 
-                
+        elif self.topology == "rotated_grid":
+            if self.connectivity == "nn":
+                # Reference: https://blog.google/technology/research/google-willow-quantum-chip/
+                # Generate simple grid graph with edge to nearest neighbour
+
+                G = rx.PyGraph(multigraph=False)
+                rows = self.n
+                cols = self.m
+
+                # Add nodes
+                for r in range(rows):
+                    for c in range(cols):
+                        idx = r * cols + c
+                        G.add_node(r*cols + c)
+
+                # Create vertices
+                for r in range(rows-1):
+                    for c in range(cols):
+                        a = r*cols + c
+                        b = a+cols + 1
+
+                        if r%2 != 1:
+                            b -= 1
+                            
+                        # Connection to top left node. Not set for left most node in this row
+                        if r%2 == 1 or (c >= 1):
+                            G.add_edge(a, b-1, None)
+
+                        # Connection to top right node
+                        if r%2 != 1 or c < cols-1:
+                            G.add_edge(a, b, None)
 
         elif self.topology == "heavy-hex":
             distance = 3
             G = rx.generators.directed_heavy_hex_graph(distance, bidirectional=False)
         elif self.topology == "line":
             raise NotImplemented
-
 
         # Single-qubit gates
         # Generate instruction properties for single qubit gates and a measurement, delay,

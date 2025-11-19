@@ -234,6 +234,21 @@ def generate_coordinates(backend):
         #print(len(y_range))
         
         coordinates = [(x, y) for x in x_range for y in y_range]
+    elif backend.topology == "rotated_grid":
+        x_range = range(-backend.n//2, backend.n//2)
+        y_range = range(-backend.m//2, backend.m//2)
+        #print(len(x_range))
+        #print(len(y_range))
+        
+        coordinates = []
+        for c_id, x in enumerate(x_range):
+            for row_idx, y in enumerate(y_range):
+                y_shifted = y + 0.5 if (c_id % 2 == 1) else y
+                coordinates.append((x, y_shifted))
+
+        #coordinates = [(x, y) for x in x_range for y in y_range]
+        #(ax, ay) = coordinates[1]
+        #coordinates[1] = (ax, ay+0.1)
     else:
         return None
     
