@@ -370,6 +370,9 @@ class BackendChipletV2(BackendV2):
 
         d = {}
 
+        # TODO: Add a noise level for the backend in general
+        # TODO: Let the connections vary from 1 to 9 * noise_level. Thus, the worst inter_chiplet connection is 9 times
+        #       worse than the best
         for k, v in edges:
             d[(int(k), int(v))] = 0.1
 

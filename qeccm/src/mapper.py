@@ -164,6 +164,87 @@ class TrivialMapper(GenericMapper):
         :rtype: Layout
         """
 
+        print("Generating Layout")
+
+
+        """
+        print("Manualmapping")
+
+        vq_to_pq = {
+            0: 0,
+            1: 1,
+            2: 2,
+            3: 25,
+            4: 26,
+
+            5: 5,
+            6: 6,
+            7: 7,
+            8: 30,
+            9: 31,
+
+            10: 10,
+            11: 11,
+            12: 12,
+            13: 35,
+            14: 36,
+
+            15: 15,
+            16: 16,
+            17: 17,
+            18: 40,
+            19: 41,
+
+            20: 20,
+            21: 21,
+            22: 22,
+            23: 45,
+            24: 46,
+        }
+        vq_to_pq = {
+            0: 0,
+            1: 1,
+            2: 2,
+            3: 3,
+            4: 4,
+
+            5: 5,
+            6: 6,
+            7: 7,
+            8: 8,
+            9: 9,
+
+            10: 10,
+            11: 11,
+            12: 12,
+            13: 13,
+            14: 14,
+
+            15: 15,
+            16: 16,
+            17: 17,
+            18: 18,
+            19: 19,
+
+            20: 20,
+            21: 21,
+            22: 22,
+            23: 23,
+            24: 25,
+        }
+        layout = Layout()
+
+        # Add all qubit registers first (optional but consistent with Qiskit behavior)
+        for qreg in dag.qregs.values():
+            layout.add_register(qreg)
+
+        # Now add virtual → physical mapping using global qubit indices
+        for i, vq in enumerate(dag.qubits):
+            if i in vq_to_pq:
+                layout.add(vq, vq_to_pq[i])
+        """
+
+        
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
 
@@ -175,9 +256,9 @@ class TrivialMapper(GenericMapper):
                 if reg._index in vq_to_pq:
                     # Get physical qubit
                     physical_qubit = vq_to_pq[reg._index]
-
                     # Map mapping from virtual qubit to physical qubit
                     layout.add(reg, physical_qubit)
+        
 
         # Virtual to physical qubit mapping
         self.property_set["layout"] = layout
@@ -214,7 +295,7 @@ class TrivialMapper(GenericMapper):
                 raise ValueError(f"Coordinates {x} are out of bounds for grid {w}x{h}")
             
             # Row-major order: row * width + column
-            idx = x1 * w + x2
+            idx = (x1+1) * w + x2
             return idx
             
         # Dictionary with virtual_qubit to physical_qubit mapping
@@ -225,30 +306,120 @@ class TrivialMapper(GenericMapper):
 
             if qpu_partitions.placed_partitions:
                 # Physical qubits for this QPU
-                nodes_on_qpu = self.backend.get_chiplet_at(dimension_to_linear_index(qpu, self.backend.n,
-                                                                                     self.backend.m))
+                nodes_on_qpu = self.backend.get_chiplet_at(dimension_to_linear_index(qpu, self.backend.c1,
+                                                                                     self.backend.c2))
 
                 # Iterate over all partitions that are placed on this QPU
                 for p in qpu_partitions.placed_partitions:
                     partition_id, local_x, local_y, patch_width, patch_height = p
                     # Virtual qubits for this partition
                     nodes_of_partition = partitions[partition_id]
+                    print(f"Trying to place nodes {nodes_of_partition}")
+                    #print(nodes_of_partition)
                     # Calculate offset given the local coordinates
                     offset = local_x * patch_width + local_y
-                    
-                    # Iterate over all virtual qubits of this partition and assign physical qubits to it in a linear
-                    # fashion
-                    # Iterator index for the virtual qubits
-                    index = 0
-                    # Iterator index for the physical qubits
-                    placement_idx = offset
 
-                    for node in nodes_of_partition:
-                        placement[node] = nodes_on_qpu[placement_idx]
-                        index += 1
-                        placement_idx += 1
-                        if index % patch_width == 0:
-                            placement_idx += 7
+                    rotated = True
+                    if not rotated:                    
+                        # Iterate over all virtual qubits of this partition and assign physical qubits to it in a linear
+                        # fashion
+                        # Iterator index for the virtual qubits
+                        index = 0
+                        # Iterator index for the physical qubits
+                        placement_idx = offset
+
+                        for node in nodes_of_partition:
+                            #print(placement_idx)
+                            #print(nodes_on_qpu[placement_idx])
+                            placement[node] = nodes_on_qpu[placement_idx]
+                            #print(placement_idx)
+                            index += 1
+                            placement_idx += 1
+                            if index % patch_width == 0:
+                                # Jump to the next row. We have to jump chiplet_width - patch_width
+                                placement_idx += (self.backend.m - patch_width)
+
+                    else:
+                        # Rotated surface code has a different way of mapping
+                        # Iterator index for the virtual qubits
+                        index = 1
+                        # Iterator index for the physical qubits
+                        placement_idx = offset
+                        row_shift = 0
+
+
+                        """
+                        # The mapping on the backend is performed from the bottom to the top, while the codes are
+                        # usually constructed from the top to the bottom. Thus, reverse the node placement.
+                        for node in reversed(nodes_of_partition):
+                            #print(placement_idx)
+                            #print(nodes_on_qpu[placement_idx])
+                            #print(placement_idx)
+                            index += 1
+                            placement_idx += 1
+                            if index % patch_width == 0 or index == 2:
+                                # Jump to the next row. We have to jump chiplet_width - patch_width
+                                placement_idx += (self.backend.m - patch_width)
+                                
+                                # TODO: Fix this also for higher code distances. The idea stays the same
+                                row_shift += 1
+                                if row_shift == 5:
+                                    placement_idx += 1
+                                if row_shift == 6:
+                                    placement_idx -= 1
+
+                            # Inset last node by one
+                            if index == len(nodes_of_partition)+1:
+                                placement_idx += 1
+
+                            placement[node] = nodes_on_qpu[placement_idx]
+                        """
+
+                        # TODO new placement from left to right
+                        
+                        placement_idx = offset + self.backend.n
+
+                        # Placement pattern of the columns for distance 3. This would look similar for distance 5, 7
+                        # etc.
+                        print("ATTENTION: UTILIZING PLACEMENT FOR DISTANCE 3 PATCHES")
+                        column_patterns = [
+                            [3, 1, -1],
+                            [4, 2, 0],
+                            [3, 1, -1],
+                            [2, 0, -2],
+                            [3, 1, -1]
+                        ]
+
+                        start_row = local_x + 2
+                        col = local_y
+                        # place first node
+                        placement[nodes_of_partition[0]] = nodes_on_qpu[start_row * self.backend.m + col]
+                        node_index = 1
+
+                        # place the rest in groups of 3
+                        pattern_index = 0
+
+                        while node_index < len(nodes_of_partition):
+                            offsets = column_patterns[pattern_index]
+
+                            for off in offsets:
+                                if node_index >= len(nodes_of_partition):
+                                    break
+
+                                row = start_row + off
+
+                                placement[nodes_of_partition[node_index]] = nodes_on_qpu[row * self.backend.n + col]
+                                node_index += 1
+
+                            if pattern_index%2 == 0:
+                                col += 1
+                            print(col)
+                            pattern_index = (pattern_index + 1) % len(column_patterns)
+
+                        # Place last node
+                        placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m + 3]
+                        
+
                         
         return placement
 
@@ -363,7 +534,13 @@ class TrivialMapper(GenericMapper):
         # full, find the next QPU to fill.
         for node in bfs_order:
             # TODO: calculate width and height of this node.
-            pw = ph = 5
+            print("ATTENTION: PATCH WIDTH AND HEIGHT ARE CURRENTLY SET MANUALLY!!!")
+            # For unrotated surface code d=3
+            pw = 5
+            ph = 5
+            # For rotate surface code d=3
+            pw = 3
+            ph = 7
             start_idx = current_block_idx
 
             # Iteratively try to find a QPU to place this partition

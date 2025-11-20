@@ -105,7 +105,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #layout_pm = PassManager([partition_op, mapping_op ] + extension_op + 
         #                        [apply_mapping_op] )
         
-        layout_pm = PassManager([partition_op, mapping_op ])# + extension_op)
+        layout_pm = PassManager([partition_op, mapping_op] + extension_op)
 
         return layout_pm
 
@@ -125,10 +125,12 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #    heuristic='decay',
         #    seed=42
         #    )
-        #routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
+        
+        print("ATTENTION: CURRENTLS SELECT BASIC SWAP FROM QISKIT")
+        routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
         
         # Basic implementation
-        routing_op = BasicSwapRouter(backend)
+        #routing_op = BasicSwapRouter(backend)
 
         # Parallel SWAPRouter
         #routing_op = ParallelSwapRouter(backend)

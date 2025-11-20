@@ -82,11 +82,10 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             # Explicit Partitioning not needed 
             (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
             num_vertices = len(index_vector)
-
-            # partition_to_qpu = {}
-            # partition_to_qpu[0] = 0
             
-            self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(num_nodes = num_vertices)
+            self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
+                num_nodes = num_vertices,
+                hgc = self.property_set['hyper_dag_kahypar'])
             # self.property_set["partition_to_qpu"] = partition_to_qpu
 
         # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without
@@ -109,6 +108,8 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
         num_vertices = len(index_vector)
         num_hyperedges = len(index_vector) - 1
+
+        print(f"{num_vertices} during partitioning" )
 
         # For now, all hyperedges are assumed to have the same weight
         hyperedge_weights = [1 for i in range(0, num_hyperedges)]
@@ -278,7 +279,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                 k = self.backend.get_num_chips()
         else:
             pass
-
+        
+        k = 1 # 3
+        print("!!!Warning: Using hardcoded value!!!")
         print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet
         partition_sizes = [num_qubits_chiplet for c in range(k)]

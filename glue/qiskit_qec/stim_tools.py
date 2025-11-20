@@ -147,7 +147,7 @@ def get_stim_circuits_with_detectors(
             elif inst.name in stim_detector_gates:
                 if inst.name == "QUBIT_COORDS":
                     # NOTE: ignore these for now, since stimcircuit has issues converting this back
-                    #stim_circuit.append("QUBIT_COORDS", [inst.params[0]['index']], inst.params[0]['coords'])
+                    stim_circuit.append("QUBIT_COORDS", [inst.params[0]['index']], inst.params[0]['coords'])
                     #stim_circuit.append("TICK")
 
                     pass

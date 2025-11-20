@@ -210,6 +210,6 @@ if __name__ == "__main__":
     #   Random: 12107 -> Much much worse
     # SABRE: 330
 
-    plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
-    plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
+    # plot_gate_statistics_bar_chart(custom_gates, sabre_gates)
+    # plot_depth_statistics_bar_chart(custom_depth, sabre_depth)
     

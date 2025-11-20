@@ -14,6 +14,9 @@ from qiskit.transpiler.basepasses import AnalysisPass
 # Hashmap
 from collections import defaultdict
 
+import networkx as nx
+
+
 
 class PartitionedHyperGraph:
     """Partitioned Hypergraph after partitioning a HyperGraph object
@@ -40,50 +43,57 @@ class PartitionedHyperGraph:
             block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
             
             # Assign each block all nodes
+            # TODO: It is not correct to iterate over numNodes, since it is possible that a partition contains 
+            #       the nodes [0, 1, 5, 6]. This approach adds [0, 1, 2, 3]
             for node in range(partitioned_hgc.numNodes()):
                 block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
 
             # TODO: Add nodes connecting all blocks
-            block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(0)
-            block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(24)
+
+            # TODO: Construct collapsed hypergraph
+            # All blocks are collapsed to singular nodes, while edges between blocks are kept
+            (index_vector, edge_vector) = hgc
+
+            ch = nx.MultiGraph()
+            # Create a node for each block
+            for b in range(partitioned_hgc.numBlocks()):
+                ch.add_node(b)
+
+            # Iterate through all hyperedges
+            num_hyperedges = len(index_vector) - 1
+            for h in range(num_hyperedges):
+                # Get the nodes inside hyperedge h
+                start = index_vector[h]
+                end = index_vector[h + 1]
+                hyperedge_nodes = edge_vector[start:end]
+
+                # Determine the blocks these nodes belong to
+                blocks = set(partitioned_hgc.blockID(v) for v in hyperedge_nodes)
+
+                # If multiple blocks appear in one hyperedge, connect them
+                blocks = list(blocks)
+                for i in range(len(blocks)):
+                    for j in range(i + 1, len(blocks)):
+                        ch.add_edge(blocks[i], blocks[j])
         else:
+            # Implementation in case only one partition is available
+
             # Generate dictionary with one block
             block_to_nodes = {"b:" + str(0): []}
-            
+
+            (index_vector, edge_vector) = hgc
+            all_nodes = set(edge_vector)
+
             # Assign all nodes to this block
-            for node in range(num_nodes):
+            for node in all_nodes:
                 block_to_nodes["b:" + str(0)].append(node)
+
+            # Create a node for this block
+            ch = nx.MultiGraph()
+            ch.add_node(0)
 
         # Construct hypergraph from partitioned hypergraph
         self._phg = hnx.Hypergraph(block_to_nodes)
-
-
-        # TODO: Construct collapsed hypergraph
-        import networkx as nx
-        # All blocks are collapsed to singular nodes, while edges between blocks are kept
-        (index_vector, edge_vector) = hgc
-
-        ch = nx.MultiGraph()
-        # Create a node for each block
-        for b in range(partitioned_hgc.numBlocks()):
-            ch.add_node(b)
-
-        # Iterate through all hyperedges
-        num_hyperedges = len(index_vector) - 1
-        for h in range(num_hyperedges):
-            # Get the nodes inside hyperedge h
-            start = index_vector[h]
-            end = index_vector[h + 1]
-            hyperedge_nodes = edge_vector[start:end]
-
-            # Determine the blocks these nodes belong to
-            blocks = set(partitioned_hgc.blockID(v) for v in hyperedge_nodes)
-
-            # If multiple blocks appear in one hyperedge, connect them
-            blocks = list(blocks)
-            for i in range(len(blocks)):
-                for j in range(i + 1, len(blocks)):
-                    ch.add_edge(blocks[i], blocks[j])
 
         plt.figure(figsize=(6, 6))
         nx.draw(ch, with_labels=True, node_size=600)
@@ -95,6 +105,9 @@ class PartitionedHyperGraph:
         self._btn = block_to_nodes
         # Save kahypar hypergraph
         self._kahypar_hgc = partitioned_hgc
+
+        print("Found partitions:")
+        print(block_to_nodes)
 
     def draw_phg(self, graph: hnx.Hypergraph, filename: str = "") -> None:
         """Draw partitioned hypergraph
@@ -264,6 +277,7 @@ class HypergraphCircuit(AnalysisPass):
         """
         edge_vector = []
         num_qubits = len(dag.qubits)
+        print(num_qubits)
         connectivity = [set() for _ in range(num_qubits)]
 
         # Build connectivity map from all 2-qubit gates
@@ -279,6 +293,10 @@ class HypergraphCircuit(AnalysisPass):
         edge_vector = []
         for i, connected in enumerate(connectivity):
             edge = sorted([i] + list(connected))
+
+            # Do not add a edge if the vertice only interacts with itself
+            if len(edge) == 1:
+                continue
 
             edge_vector.extend(edge)
             idx_vector.append(pos)

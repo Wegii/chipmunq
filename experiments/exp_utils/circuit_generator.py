@@ -31,7 +31,7 @@ from tqec.computation.cube import CubeKind, Port, YHalfCube
 from tqec.computation.pipe import PipeKind
 from tqec.utils.position import FloatPosition3D, Position3D
 from tqec.utils.scale import round_or_fail
-from tqec.gallery import cnot, three_cnots
+from tqec.gallery import cnot, three_cnots, memory
 from tqec.gallery.steane_encoding import steane_encoding
 from experiments.exp_utils.circuit_utils import stim_to_qiskit
 
@@ -138,12 +138,18 @@ class QECMemory():
             exit(1)
 
         # Generate code
-        cycles = 2#d
+        cycles = d
 
         if codename == "surface":
             stim_circuit = stim.Circuit.generated(
                 "surface_code:unrotated_memory_z",
                 #"surface_code:rotated_memory_z",
+                rounds=cycles,
+                distance=d
+                )
+        if codename == "rotated_surface":
+            stim_circuit = stim.Circuit.generated(
+                "surface_code:rotated_memory_x",
                 rounds=cycles,
                 distance=d
                 )
@@ -187,11 +193,6 @@ class QECMemory():
         return qecc_mem_transpiled
 
 
-class QECStability:
-    pass
-    # Construct stability circuits
-
-
 class QECCircuit:
     """ Logical circuits using lattice surgery
     
@@ -208,6 +209,26 @@ class QECCircuit:
     """
     def __init__(self):
         pass
+
+    def single_memory_patch(self, distance_scale: int = 1):
+        """Generate single logical memory 
+
+        Code adapted from: https://tqec.github.io/tqec/gallery/memory.html
+
+        :param distance_scale: Scale of surface code patch, defaults to 1
+        :type distance_scale: int, optional
+        """
+
+        # TODO: add option for manhattan radius
+
+        graph = memory(Basis.Z)
+        compiled_graph = compile_block_graph(graph)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+            manhattan_radius=3
+        )
+
+        return stim_to_qiskit(stim_circuit), stim_circuit
 
     def single_cnot(self, distance_scale: int = 1):
         """Generate single logical CNOT with lattice surgery.

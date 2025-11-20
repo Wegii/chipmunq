@@ -55,11 +55,11 @@ class BasicSwapRouter(GenericRouter):
         for creg in dag.cregs.values():
             new_dag.add_creg(creg)
         
-        for node in dag.topological_op_nodes():               
+        for node in dag.topological_op_nodes():
             if len(node.qargs) == 2:
-                # q0, q1 = node.qargs[0]._index, node.qargs[1]._index
-                q0 = current_layout[node.qargs[0]]
-                q1 = current_layout[node.qargs[1]]
+                q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+                #q0 = node.qargs[0]#current_layout[node.qargs[0]]
+                #q1 = node.qargs[1]#current_layout[node.qargs[1]]
                 
                 # Check distance in coupling map
                 if not self.coupling_map.distance(q0, q1) == 1:
@@ -78,22 +78,22 @@ class BasicSwapRouter(GenericRouter):
 
                     # Route from start to middle
                     for i in range(mid - 1):
-                        #swap = SwapGate()
-                        qubit_1 = current_layout[path[i]]
-                        qubit_2 = current_layout[path[i + 1]]
+                        swap = SwapGate()
+                        qubit_1 = path[i]#current_layout[path[i]]
+                        qubit_2 = path[i+1]#current_layout[path[i + 1]]
                         
                         new_dag.apply_operation_back(
-                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
-                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                            swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            #SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
                         )
                     # Route from end to middle
                     for i in range(len(path) - 1, mid, -1):
-                        #swap = SwapGate()
-                        qubit_1 = current_layout[path[i]]
-                        qubit_2 = current_layout[path[i - 1]]
+                        swap = SwapGate()
+                        qubit_1 = path[i]#current_layout[path[i]]
+                        qubit_2 = path[i-1]#current_layout[path[i - 1]]
                         new_dag.apply_operation_back(
-                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
-                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                            swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                            #SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
                         )
 
                     # Apply original gate
@@ -103,17 +103,17 @@ class BasicSwapRouter(GenericRouter):
 
                     # Route backwards
                     for i in reversed(range(mid - 1)):
-                        #swap = SwapGate()
+                        swap = SwapGate()
                         #new_dag.apply_operation_back(
                         #    swap,
                         #    qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
                         #)
-                        qubit_1 = current_layout[path[i]]
-                        qubit_2 = current_layout[path[i + 1]]
+                        qubit_1 = path[i]#current_layout[path[i]]
+                        qubit_2 = path[i+1]#current_layout[path[i + 1]]
                         
                         new_dag.apply_operation_back(
-                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
-                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                            swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            #SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
                         )
 
                     for i in reversed(range(len(path) - 1, mid, -1)):
@@ -122,12 +122,12 @@ class BasicSwapRouter(GenericRouter):
                         #    swap,
                         #    qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
                         #)
-                        #swap = SwapGate()
-                        qubit_1 = current_layout[path[i]]
-                        qubit_2 = current_layout[path[i - 1]]
+                        swap = SwapGate()
+                        qubit_1 = path[i]#current_layout[path[i]]
+                        qubit_2 = path[i-1]#current_layout[path[i - 1]]
                         new_dag.apply_operation_back(
-                            #swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
-                            SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
+                            swap, qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                            #SwapGate(), (qubit_1, qubit_2), cargs=(), check=False
                         )
                     
                 else:
@@ -142,6 +142,16 @@ class BasicSwapRouter(GenericRouter):
 
         return new_dag
     
+class CostRouter(GenericRouter):
+
+    def __init__(self, backend):
+        super().__init__(backend)
+
+    # TODO: Implement routing given a cost metric:
+    #           - Path length
+    #           - Error of a interconnection
+    #           - How often a certain interconnection has been used (in order to not reduce code distance/circuit depth)
+
 class AcceleratedBasicSwapRouter(GenericRouter):
     """ Accelerated version of qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
 
@@ -178,8 +188,7 @@ class AcceleratedBasicSwapRouter(GenericRouter):
         # This pass must set the following property: self.property_set["final_layout"]
         self.property_set["final_layout"] = current_layout
 
-        return new_dag
-    
+        return new_dag   
 
 class ParallelSwapRouter(GenericRouter):
     """ Parallel implementation of BasicSwapRouter"""
@@ -392,32 +401,3 @@ class ParallelSwapRouter(GenericRouter):
         routed_remote_dag_instr = []
 
         return routed_remote_dag_instr
-
-
-class SABRERouter(GenericRouter):
-    """ Wrapper around qiskit.transpiler.passes.SabreSwap"""
-
-    def __init__(self, coupling_map):
-        super().__init__(coupling_map)
-
-    def run(self, dag):
-        # TODO: run SABRE swap algorithm
-
-        # The SABRE algorithm can not perform global and local routing separately.
-        #self._global_routing()
-        self._local_routing()
-
-    def _local_routing(self):
-        # Intra
-        # Local routing here also performs global routing.
-        pass
-
-    def _global_routing(self):
-        # Inter
-        # This is not implemented here, since SABRE is not capable of this
-        pass
-
-
-
-
-    

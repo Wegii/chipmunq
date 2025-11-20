@@ -32,6 +32,7 @@ def custom_partitioned_transpilation(circuit: QuantumCircuit, backend: BackendCh
     # Construct pass manager with all passes
     staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=partitioning_pm,
                                   routing=routing_pm)
+    #staged_pm = StagedPassManager(stages=["init", "layout"], init=init_pm, layout=partitioning_pm)
     # Run passes
     routed_circuit = staged_pm.run(circuit)
 

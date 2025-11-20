@@ -117,6 +117,24 @@ class StimCodeCircuit(CodeCircuit):
             "SWAP": SwapGate(),
         }
 
+        def _is_qubit_used_in_stim(stim_circ: StimCircuit, qindex: int):
+            """Return True iff qubit index appears as a qubit target
+            anywhere in the (possibly nested) stim circuit, excluding
+            QUBIT_COORDS instructions themselves.
+            """
+            for instr in stim_circ:
+                #if isinstance(instr, CircuitRepeatBlock):
+                #    if _is_qubit_used_in_stim(instr.body_copy(), qindex):
+                #        return True
+                #print(instr)
+                if isinstance(instr, CircuitInstruction):
+                    if instr.name == "QUBIT_COORDS" or instr.name == "DETECTOR":
+                        continue
+                    for t in instr.targets_copy():
+                        if getattr(t, "is_qubit_target", False) and t.value == qindex:
+                            return True
+            return False
+
         def _helper(stim_circuit: StimCircuit, reps: int):
             nonlocal rep_block_count
             nonlocal block_count
@@ -197,10 +215,23 @@ class StimCodeCircuit(CodeCircuit):
                             qubit_index = [t.value for t in instruction.targets_copy()][0]
 
                             coords = instruction.gate_args_copy()
+
+                            # Iterate over stim_circuit and check if this qubit is actually used somewhere
+                            # If it is not used, do not add this to the register
+                            if _is_qubit_used_in_stim(self.decomp_stim_circuit, qubit_index):
+                                qcoord_instr = QubitCoords(coords, qubit_index)
+                                qc_reg = self.qc.qregs[0]
+                                self.qc.append(qcoord_instr, qargs=[qc_reg[qubit_index]])
+                                #print(f"adding {qubit_index}")
+                            else:
+                                # skip adding coordinates for completely unused qubits
+                                #print(f"Not adding {qubit_index}")
+                                pass
+                            
                         
-                            qcoord_instr = QubitCoords(coords, qubit_index)
-                            qc_reg = self.qc.qregs[0]
-                            self.qc.append(qcoord_instr, qargs=[qc_reg[qubit_index]])
+                            #qcoord_instr = QubitCoords(coords, qubit_index)
+                            #qc_reg = self.qc.qregs[0]
+                            #self.qc.append(qcoord_instr, qargs=[qc_reg[qubit_index]])
 
                         elif inst_name == "DETECTOR":
                             # Two options:
@@ -266,6 +297,8 @@ class StimCodeCircuit(CodeCircuit):
             self.d = 0
         self.n = stim_circuit.num_qubits
         # the number of rounds is not necessarily well-defined (Floquet codes etc.)
+
+
 
     def decompose_stim_circuit(self, stim_circuit):
         """
