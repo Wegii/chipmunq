@@ -48,7 +48,7 @@ def _get_tqec_memory_rotated():
     :rtype: _type_
     """
     circuit_generator = QECCircuit()
-    _, stim_circuit = circuit_generator.single_memory_patch(distance_scale = 1)
+    _, stim_circuit = circuit_generator.single_memory_patch(distance_scale = 2)
   
     return stim_circuit
 
@@ -56,7 +56,7 @@ def _get_tqec_memory_rotated():
 def simulate_simple_rotated_memory_patch_from_tqec() -> None:
     """Try to compile one single patch of rotated surface code to the backend without deforming it"""
 
-    backend = BackendChipletV2((1, 2, 10, 10), 5, "nn", "rotated_grid")
+    backend = BackendChipletV2((1, 2, 12, 12), 5, "nn", "rotated_grid")
     circuit = StimCodeCircuit(_get_tqec_memory_rotated()).qc
     with open("circuit_rotated.qc", "w") as f:
        print(circuit, file=f)

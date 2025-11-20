@@ -340,64 +340,54 @@ class TrivialMapper(GenericMapper):
                                 placement_idx += (self.backend.m - patch_width)
 
                     else:
-                        # Rotated surface code has a different way of mapping
-                        # Iterator index for the virtual qubits
-                        index = 1
-                        # Iterator index for the physical qubits
-                        placement_idx = offset
-                        row_shift = 0
-
-
-                        """
-                        # The mapping on the backend is performed from the bottom to the top, while the codes are
-                        # usually constructed from the top to the bottom. Thus, reverse the node placement.
-                        for node in reversed(nodes_of_partition):
-                            #print(placement_idx)
-                            #print(nodes_on_qpu[placement_idx])
-                            #print(placement_idx)
-                            index += 1
-                            placement_idx += 1
-                            if index % patch_width == 0 or index == 2:
-                                # Jump to the next row. We have to jump chiplet_width - patch_width
-                                placement_idx += (self.backend.m - patch_width)
-                                
-                                # TODO: Fix this also for higher code distances. The idea stays the same
-                                row_shift += 1
-                                if row_shift == 5:
-                                    placement_idx += 1
-                                if row_shift == 6:
-                                    placement_idx -= 1
-
-                            # Inset last node by one
-                            if index == len(nodes_of_partition)+1:
-                                placement_idx += 1
-
-                            placement[node] = nodes_on_qpu[placement_idx]
-                        """
-
-                        # TODO new placement from left to right
+                        # TODO: specify distance of code
+                        distance = 5#3
                         
                         placement_idx = offset + self.backend.n
 
-                        # Placement pattern of the columns for distance 3. This would look similar for distance 5, 7
-                        # etc.
+                        # Placement patterns of the qubits of a rotated surface code patch. The patch is mapped to
+                        # the physical qubits from the left top to the bottom right
                         print("ATTENTION: UTILIZING PLACEMENT FOR DISTANCE 3 PATCHES")
-                        column_patterns = [
+                        d3_column_pattern = [
                             [3, 1, -1],
                             [4, 2, 0],
                             [3, 1, -1],
                             [2, 0, -2],
                             [3, 1, -1]
                         ]
-
-                        start_row = local_x + 2
-                        col = local_y
-                        # place first node
-                        placement[nodes_of_partition[0]] = nodes_on_qpu[start_row * self.backend.m + col]
-                        node_index = 1
+                        d5_column_pattern = [
+                            [7, 5, 3, 1, -1],
+                            [8, 6, 4, 2, 0],
+                            [7, 5, 3, 1, -1],
+                            [6, 4, 2, 0, -2],
+                            [7, 5, 3, 1, -1],
+                            [8, 6, 4, 2, 0],
+                            [7, 5, 3, 1, -1],
+                            [6, 4, 2, 0, -2],
+                            [7, 5, 3, 1, -1],
+                        ]
+                        
+                        if distance == 3:
+                            start_row = local_x + 2
+                            col = local_y
+                            # TODO: Adjust for higher code distance: d=5 -> 2 nodes to place, d=7 -> 3 nodes to place
+                            # Placement of first few nodes
+                            placement[nodes_of_partition[0]] = nodes_on_qpu[start_row * self.backend.m + col]
+                            node_index = 1
+                        elif distance == 5:
+                            start_row = local_x + 2
+                            col = local_y
+                            # TODO: Adjust for higher code distance: d=5 -> 2 nodes to place, d=7 -> 3 nodes to place
+                            # Placement of first few nodes
+                            placement[nodes_of_partition[0]] = nodes_on_qpu[(start_row+4) * self.backend.m + col]
+                            placement[nodes_of_partition[1]] = nodes_on_qpu[start_row * self.backend.m + col]
+                            node_index = 2
 
                         # place the rest in groups of 3
                         pattern_index = 0
+
+                        if distance == 3: column_patterns = d3_column_pattern
+                        elif distance == 5: column_patterns = d5_column_pattern
 
                         while node_index < len(nodes_of_partition):
                             offsets = column_patterns[pattern_index]
@@ -416,8 +406,14 @@ class TrivialMapper(GenericMapper):
                             print(col)
                             pattern_index = (pattern_index + 1) % len(column_patterns)
 
-                        # Place last node
-                        placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m + 3]
+                        # Placement of last few nodes
+                        # TODO: Adjust for higher code distance: d=5 -> 2 nodes to place, d=7 -> 3 nodes to place
+                        if distance == 3:
+                            placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m + 3]
+                        elif distance == 5:
+                            placement[nodes_of_partition[-2]] = nodes_on_qpu[(start_row + 6) * self.backend.m + 5]
+                            placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m + 5]
+
                         
 
                         
