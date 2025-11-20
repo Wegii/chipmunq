@@ -237,6 +237,7 @@ def generate_coordinates(backend):
     elif backend.topology == "rotated_grid":
         x_range = range(-backend.n//2, backend.n//2)
         y_range = range(-backend.m//2, backend.m//2)
+        x_range = [x/2 for x in x_range]
         #print(len(x_range))
         #print(len(y_range))
         
