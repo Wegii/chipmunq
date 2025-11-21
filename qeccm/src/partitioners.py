@@ -106,10 +106,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         # Get vertices and edges in KaHyPar specific format
         (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
-        num_vertices = len(index_vector)
+        
+        num_vertices = max(max(edge_vector) + 1, len(set(edge_vector))-1)
         num_hyperedges = len(index_vector) - 1
-
-        print(f"{num_vertices} during partitioning" )
 
         # For now, all hyperedges are assumed to have the same weight
         hyperedge_weights = [1 for i in range(0, num_hyperedges)]
@@ -135,6 +134,8 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         # Partition hypergraph
         kahypar.partition(kahypar_hg, self.khp_context)
+
+        print("Partitioning succeeded")
 
         return kahypar_hg
 
@@ -280,7 +281,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         else:
             pass
         
-        k = 1 # 3
+        k = 4 # 3
         print("!!!Warning: Using hardcoded value!!!")
         print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet

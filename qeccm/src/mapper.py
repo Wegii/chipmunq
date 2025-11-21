@@ -291,11 +291,11 @@ class TrivialMapper(GenericMapper):
             
         def dimension_to_linear_index(x, w, h):
             x1, x2 = x  # unpack coordinates
-            if not (0 <= x1 < w) or not (0 <= x2 < h):
-                raise ValueError(f"Coordinates {x} are out of bounds for grid {w}x{h}")
+            #if not (0 <= x1 < w) or not (0 <= x2 < h):
+            #    raise ValueError(f"Coordinates {x} are out of bounds for grid {w}x{h}")
             
             # Row-major order: row * width + column
-            idx = (x1+1) * w + x2
+            idx = x1 * w + x2
             return idx
             
         # Dictionary with virtual_qubit to physical_qubit mapping
@@ -315,9 +315,11 @@ class TrivialMapper(GenericMapper):
                     # Virtual qubits for this partition
                     nodes_of_partition = partitions[partition_id]
                     print(f"Trying to place nodes {nodes_of_partition}")
-                    #print(nodes_of_partition)
-                    # Calculate offset given the local coordinates
-                    offset = local_x * patch_width + local_y
+                    
+                    print(local_x)
+                    print(local_y)
+                        
+
 
                     rotated = True
                     if not rotated:                    
@@ -342,12 +344,15 @@ class TrivialMapper(GenericMapper):
                     else:
                         # TODO: specify distance of code
                         distance = 5#3
-                        
-                        placement_idx = offset + self.backend.n
+                        # Added 1 to patche width and height, in order to have interaction space around them
+                        patch_width -= 1
+                        patch_height -= 1
+
+                        placement_idx = self.backend.n
 
                         # Placement patterns of the qubits of a rotated surface code patch. The patch is mapped to
                         # the physical qubits from the left top to the bottom right
-                        print("ATTENTION: UTILIZING PLACEMENT FOR DISTANCE 3 PATCHES")
+                        print("ATTENTION: UTILIZING PLACEMENT FOR DISTANCE 5 PATCHES")
                         d3_column_pattern = [
                             [3, 1, -1],
                             [4, 2, 0],
@@ -368,15 +373,15 @@ class TrivialMapper(GenericMapper):
                         ]
                         
                         if distance == 3:
-                            start_row = local_x + 2
-                            col = local_y
+                            start_row = local_y + 2
+                            col = local_x
                             # TODO: Adjust for higher code distance: d=5 -> 2 nodes to place, d=7 -> 3 nodes to place
                             # Placement of first few nodes
                             placement[nodes_of_partition[0]] = nodes_on_qpu[start_row * self.backend.m + col]
                             node_index = 1
                         elif distance == 5:
-                            start_row = local_x + 2
-                            col = local_y
+                            start_row = local_y + 2
+                            col = local_x 
                             # TODO: Adjust for higher code distance: d=5 -> 2 nodes to place, d=7 -> 3 nodes to place
                             # Placement of first few nodes
                             placement[nodes_of_partition[0]] = nodes_on_qpu[(start_row+4) * self.backend.m + col]
@@ -398,21 +403,24 @@ class TrivialMapper(GenericMapper):
 
                                 row = start_row + off
 
-                                placement[nodes_of_partition[node_index]] = nodes_on_qpu[row * self.backend.n + col]
+                                placement[nodes_of_partition[node_index]] = nodes_on_qpu[row * self.backend.m + col]
                                 node_index += 1
 
                             if pattern_index%2 == 0:
                                 col += 1
-                            print(col)
+                            #print(col)
                             pattern_index = (pattern_index + 1) % len(column_patterns)
 
                         # Placement of last few nodes
                         # TODO: Adjust for higher code distance: d=5 -> 2 nodes to place, d=7 -> 3 nodes to place
                         if distance == 3:
-                            placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m + 3]
+                            placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m +
+                                                                             local_x + 3]
                         elif distance == 5:
-                            placement[nodes_of_partition[-2]] = nodes_on_qpu[(start_row + 6) * self.backend.m + 5]
-                            placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m + 5]
+                            placement[nodes_of_partition[-2]] = nodes_on_qpu[(start_row + 6) * self.backend.m +
+                                                                             local_x + 5]
+                            placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m +
+                                                                             local_x + 5]
 
                         
 
@@ -449,14 +457,14 @@ class TrivialMapper(GenericMapper):
         # TODO: This should also work for more complicated QPU layouts (other than 2D)
         placement, blocks = self.bfs_capacitated_grid_placement(
             G = partitioned_hg._collapsed_phg,
-            width = self.backend.c1,
-            height = self.backend.c2,
+            width = self.backend.c2,
+            height = self.backend.c1,
             partition_size = partition_size
         )
 
         # Plot the assignment of partitions to QPU
-        self.plot_block_counts(width = self.backend.c1,
-                               height = self.backend.c2,
+        self.plot_block_counts(width = self.backend.c2,
+                               height = self.backend.c1,
                                block_assignments = blocks,
                                filename="tests/data/figures/partition_to_qpu.png")
 
@@ -518,7 +526,7 @@ class TrivialMapper(GenericMapper):
 
         # Initialize all QPUs with their widht and height, as well as coordinates. The widht and height are used for
         # calculating which partitions (given their width and height) can be placed on this QPU.
-        qpu_blocks = {(x, y): QPUBlock(self.backend.n, self.backend.m, (x, y))
+        qpu_blocks = {(x, y): QPUBlock(self.backend.m, self.backend.n, (x, y))
               for x, y in product(range(width), range(height))}
         
         # Start with the first block
@@ -537,6 +545,9 @@ class TrivialMapper(GenericMapper):
             # For rotate surface code d=3
             pw = 3
             ph = 7
+            # for rotated surface code d=5
+            pw = 6
+            ph = 6*2 - 1
             start_idx = current_block_idx
 
             # Iteratively try to find a QPU to place this partition
@@ -621,16 +632,12 @@ class QPUBlock:
         self.height = height
         self.coord = block_coord  
 
+        print(f"block has width {width} and height {height}")
+
         # free rectangles inside block
         self.free_rects = [(0, 0, width, height)]  
         # list of (partition_id, x, y, w, h)
         self.placed_partitions = []  
-
-    def can_place_partition(self, pw, ph):
-        for fx, fy, fw, fh in self.free_rects:
-            if pw <= fw and ph <= fh:
-                return True
-        return False
 
     def place_partition(self, partition_id, pw, ph):
         for i, (fx, fy, fw, fh) in enumerate(self.free_rects):

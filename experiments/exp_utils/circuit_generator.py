@@ -10,6 +10,7 @@ import logging
 import qiskit
 import numpy as np
 
+from itertools import product
 
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
@@ -29,6 +30,7 @@ from tqec.utils.enums import Basis
 from tqec.computation.block_graph import BlockGraph, BlockKind, block_kind_from_str
 from tqec.computation.cube import CubeKind, Port, YHalfCube
 from tqec.computation.pipe import PipeKind
+from tqec.computation.cube import ZXCube
 from tqec.utils.position import FloatPosition3D, Position3D
 from tqec.utils.scale import round_or_fail
 from tqec.gallery import cnot, three_cnots, memory
@@ -229,6 +231,54 @@ class QECCircuit:
         )
 
         return stim_to_qiskit(stim_circuit), stim_circuit
+    
+    def multiple_memory_patch(self, num_x1, num_x2: int = 0, distance_scale: int = 1):
+        
+
+        g = BlockGraph("Move Rotation")
+
+        if num_x2 == 0:
+            # One line of memory patches
+            for x1 in range(num_x1):
+                nodes = [
+                    (Position3D(x1, 0, 0), "P", "In"),
+                    (Position3D(x1, 0, 1), "ZXZ", ""),
+                    (Position3D(x1, 0, 2), "P", "Out"),
+                ]
+                for pos, kind, label in nodes:
+                    g.add_cube(pos, kind, label)
+
+                pipes = [(0, 1), (1, 2)]#, (2, 3), (3, 4)]
+                for p0, p1 in pipes:
+                    g.add_pipe(nodes[p0][0], nodes[p1][0])
+
+                g.fill_ports({"In": ZXCube.from_str("ZXZ"), "Out": ZXCube.from_str("ZXZ")})
+        else:
+            # 2d grid of memory patches
+            for x1, x2 in product(range(num_x1), range(num_x2)):
+                
+                nodes = [
+                    (Position3D(x1, x2, 0), "P", "In"),
+                    (Position3D(x1, x2, 1), "ZXZ", ""),
+                    (Position3D(x1, x2, 2), "P", "Out"),
+                ]
+                for pos, kind, label in nodes:
+                    g.add_cube(pos, kind, label)
+
+                pipes = [(0, 1), (1, 2)]#, (2, 3), (3, 4)]
+                for p0, p1 in pipes:
+                    g.add_pipe(nodes[p0][0], nodes[p1][0])
+
+                g.fill_ports({"In": ZXCube.from_str("ZXZ"), "Out": ZXCube.from_str("ZXZ")})
+
+
+        compiled_graph = compile_block_graph(g)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+            manhattan_radius=3
+        )
+
+        return stim_circuit
 
     def single_cnot(self, distance_scale: int = 1):
         """Generate single logical CNOT with lattice surgery.
@@ -298,6 +348,7 @@ class QECCircuit:
         def steane_circuit_qiskit():
             """Function to generate the Steane code encoding circuit. """
 
+            """
             qc = QuantumCircuit(10)
 
             qc.h(0)
@@ -320,6 +371,11 @@ class QECCircuit:
             qc.cx(2, 7)
             qc.cx(2, 9)
             qc.h(2)
+            """
+            qc = QuantumCircuit(2)
+
+            qc.h(0)
+            qc.h(1)
             
 
             return qc

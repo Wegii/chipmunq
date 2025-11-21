@@ -16,6 +16,9 @@ from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 
 from tqec.utils.noise_model import NoiseModel
+from tqec.computation.block_graph import BlockGraph
+from tqec.utils.enums import Basis
+from tqec.utils.position import Position3D
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -53,26 +56,148 @@ def _get_tqec_memory_rotated():
     return stim_circuit
 
 
+def _get_tqec_multiple_memory_rotated():
+    circuit_generator = QECCircuit()
+    stim_circuit = circuit_generator.multiple_memory_patch(num_x1=2, num_x2=2, distance_scale = 2)
+
+    with open("stim_circuit_rotated_multiple.stim", "w") as f:
+        print(stim_circuit, file=f)
+  
+    return stim_circuit
+
+
+def simulate_multi_rotated_memory_patch_from_tqec() -> None:
+    """Try to compile one single patch of rotated surface code to the backend without deforming it"""
+
+    backend = BackendChipletV2((1, 2, 12, 15), 5, "nn", "rotated_grid")
+    circuit = StimCodeCircuit(_get_tqec_multiple_memory_rotated()).qc
+    with open("multi_circuit_rotated.qc", "w") as f:
+       print(circuit, file=f)
+    
+    _, custom_circuit, _, _ = transpile_stim_circuit(_get_tqec_multiple_memory_rotated(), backend)
+
+
+    custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
+    normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(stim_circuit = 
+                                                                          _get_tqec_multiple_memory_rotated()).qc)[0][0]
+    
+    with open("stim_circuit_rotated_multi_compiled.stim", "w") as f:
+        print(custom_circuit_stim, file=f)
+
+    plot_circuit_layout(custom_circuit,
+                        backend,
+                        filename="data/backends/mapping/mapped_circuit_on_backend.png")
+    
+    
+    # Code distance to consider
+    ks = [2]
+
+    circuits = {
+        # TODO: add observable to measure
+        k: (
+            #_transpile_to_tqec(lattice_surgery_circuit.single_cnot(distance_scale = k)[1], backend)#[1]
+            [custom_circuit_stim, normal_circuit_stim]
+        )
+        for k in ks
+    }
+
+    # Noise level
+    ps = list(np.logspace(-4, -1, 10))
+    # TODO: Change to noise model that takes remote gates into consideration
+    tqec_noise_model = NoiseModel.si1000
+
+    # Transpilation
+    ts = ["default", "deformed"]
+    ts = ["default", "compiled"]
+
+    def _get_sinter_task():
+        # Construct sinter task for multiple code distances and noise levels
+        yield from (
+            sinter.Task(
+                circuit=circuit,
+                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": t},
+            )
+            for circuit, k, p, t in (
+                (tqec_noise_model(p).noisy_circuit(circuit[0 if t == "compiled" else 1]), k, p, t)
+                
+                for k, circuit in circuits.items()
+                for p in ps
+                for t in ts
+            )
+        )
+
+    stats = run_sinter_simulation(_get_sinter_task, ks, ps)
+    plot_sinter_stats(stats,
+                    filename = f"experiments/evaluation/mapped_multi_patch_rotated.png",
+                    with_transpilation = True)
+    
+    
+
+
 def simulate_simple_rotated_memory_patch_from_tqec() -> None:
     """Try to compile one single patch of rotated surface code to the backend without deforming it"""
 
     backend = BackendChipletV2((1, 2, 12, 12), 5, "nn", "rotated_grid")
     circuit = StimCodeCircuit(_get_tqec_memory_rotated()).qc
-    with open("circuit_rotated.qc", "w") as f:
-       print(circuit, file=f)
+    #with open("circuit_rotated.qc", "w") as f:
+    #   print(circuit, file=f)
 
     _, custom_circuit, _, _ = transpile_stim_circuit(_get_tqec_memory_rotated(), backend)
 
     custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
     normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(stim_circuit = 
-                                                                           _get_tqec_memory_rotated()).qc)[0][0]
+                                                                          _get_tqec_memory_rotated()).qc)[0][0]
     
-    with open("stim_circuit_rotated.stim", "w") as f:
+    with open("stim_circuit_rotated_compiled.stim", "w") as f:
        print(custom_circuit_stim, file=f)
 
     plot_circuit_layout(custom_circuit,
                         backend,
                         filename="data/backends/mapping/mapped_circuit_on_backend.png")
+
+    """
+    # Code distance to consider
+    ks = [1, 2]
+
+    circuits = {
+        # TODO: add observable to measure
+        k: (
+            #_transpile_to_tqec(lattice_surgery_circuit.single_cnot(distance_scale = k)[1], backend)#[1]
+            [custom_circuit_stim, normal_circuit_stim]
+        )
+        for k in ks
+    }
+
+    # Noise level
+    ps = list(np.logspace(-4, -1, 10))
+    # TODO: Change to noise model that takes remote gates into consideration
+    tqec_noise_model = NoiseModel.si1000
+
+    # Transpilation
+    ts = ["default", "deformed"]
+    ts = ["default", "compiled"]
+
+    def _get_sinter_task():
+        # Construct sinter task for multiple code distances and noise levels
+        yield from (
+            sinter.Task(
+                circuit=circuit,
+                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": t},
+            )
+            for circuit, k, p, t in (
+                (tqec_noise_model(p).noisy_circuit(circuit[0 if t == "compiled" else 1]), k, p, t)
+                
+                for k, circuit in circuits.items()
+                for p in ps
+                for t in ts
+            )
+        )
+
+    stats = run_sinter_simulation(_get_sinter_task, ks, ps)
+    plot_sinter_stats(stats,
+                    filename = f"experiments/evaluation/mapped_single_patch_rotated.png",
+                    with_transpilation = True)
+    """
 
 
 def simulate_simple_rotated_memory_patch_from_stim() -> None:
@@ -183,4 +308,6 @@ if __name__ == "__main__":
     
     # simulate_simple_rotated_memory_patch_from_stim()
 
-    simulate_simple_rotated_memory_patch_from_tqec()
+    # simulate_simple_rotated_memory_patch_from_tqec()
+
+    simulate_multi_rotated_memory_patch_from_tqec()

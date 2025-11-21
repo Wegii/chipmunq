@@ -43,17 +43,16 @@ class PartitionedHyperGraph:
             block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
             
             # Assign each block all nodes
-            # TODO: It is not correct to iterate over numNodes, since it is possible that a partition contains 
-            #       the nodes [0, 1, 5, 6]. This approach adds [0, 1, 2, 3]
-            for node in range(partitioned_hgc.numNodes()):
-                block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
-
-            # TODO: Add nodes connecting all blocks
-
-            # TODO: Construct collapsed hypergraph
-            # All blocks are collapsed to singular nodes, while edges between blocks are kept
             (index_vector, edge_vector) = hgc
-
+            available_nodes = set(edge_vector)
+            for node in range(partitioned_hgc.numNodes()):
+                # Note: kahypar might assign more nodes to a block, than we actually want to consider. Thus, filter
+                # out nodes that do not belong to the hypergraph at all
+                if node in available_nodes:
+                    block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
+                
+            # Construct collapsed hypergraph
+            # All blocks are collapsed to singular nodes, while edges between blocks are kept
             ch = nx.MultiGraph()
             # Create a node for each block
             for b in range(partitioned_hgc.numBlocks()):
@@ -295,14 +294,15 @@ class HypergraphCircuit(AnalysisPass):
             edge = sorted([i] + list(connected))
 
             # Do not add a edge if the vertice only interacts with itself
-            if len(edge) == 1:
-                continue
-
-            edge_vector.extend(edge)
-            idx_vector.append(pos)
-            pos += len(edge)
+            if len(edge) > 1:
+                edge_vector.extend(edge)
+                idx_vector.append(pos)
+                pos += len(edge)
 
         self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
+
+        #print(idx_vector)
+        #print(edge_vector)
 
     def multigraph_to_singular(self):
         # Remove all duplicate edges added due to multigraph setting
