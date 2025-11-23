@@ -141,7 +141,7 @@ class TrivialMapper(GenericMapper):
         partitioned_hgc = self.property_set["partitioned_hyper_dag"]
 
         # 1. Map partitions to QPUs
-        partition_to_qpu, utilized_qpus = self.assign_partition_to_qpu(partitioned_hgc)
+        partition_to_qpu, utilized_qpus = self.assign_partition_to_qpu(partitioned_hgc, dag)
 
         # 2. Map each partition onto the assigned QPU
         vq_to_pq_mapping = self.map_partition_on_qpu(partitioned_hgc, partition_to_qpu, utilized_qpus)
@@ -362,27 +362,50 @@ class TrivialMapper(GenericMapper):
                         i = 0
                         col = local_x
                         col_iter = 0
-                        while index < len(nodes_of_partition):
-                            #print((row-i)*self.backend.m)
-                            placement[nodes_of_partition[index]] = nodes_on_qpu[(row-i)*self.backend.m + col]
-                            i += 2
-                            index += 1
+                        
+                        if patch_width == 1:
+                            # Place vertical patch
+                            while index < len(nodes_of_partition):
+                                #print((row-i)*self.backend.m)
+                                placement[nodes_of_partition[index]] = nodes_on_qpu[(row-i)*self.backend.m + col]
+                                i += 2
+                                index += 1
+                        elif patch_height == 1 and patch_width > 1:
+                            # Place horizontal patch
 
-                            if i == column_length or (i == (column_length-2) and col_iter % 2 != 0):
+                            row = 1#local_y
+                            col = 1#local_x
+                            while index < len(nodes_of_partition):
+                                #print((row-i)*self.backend.m)
+                                # TODO: Fix this
+                                placement[nodes_of_partition[index]] = nodes_on_qpu[(row)*self.backend.m + col]
+                                index += 1
+                                col += 1
+                        
+                        else:
+                            # Place full block
+                            while index < len(nodes_of_partition):
+                                #print((row-i)*self.backend.m)
+                                placement[nodes_of_partition[index]] = nodes_on_qpu[(row-i)*self.backend.m + col]
+                                i += 2
+                                index += 1
 
-                                if col_iter % 2 != 0:
-                                    row = start_row
-                                    col += 1
-                                else:
-                                    row = start_row - 1
+                                if i == column_length or (i == (column_length-2) and col_iter % 2 != 0):
 
-                                col_iter += 1
-                                i = 0
+                                    if col_iter % 2 != 0:
+                                        row = start_row
+                                        col += 1
+                                    else:
+                                        row = start_row - 1
+
+                                    col_iter += 1
+                                    i = 0
 
         return placement
 
     def assign_partition_to_qpu(self,
-                                partitioned_hg: PartitionedHyperGraph
+                                partitioned_hg: PartitionedHyperGraph,
+                                dag: DAGCircuit
                                 ) -> dict:
         """Assign each partition to a QPU, based on the interactions with the other partitions.
         
@@ -402,19 +425,42 @@ class TrivialMapper(GenericMapper):
         :rtype: List[int]
         """
 
-        # Calculate size of patches (simply number of nodes in this partition)
-        partition_size = {}
-        for partition_key, nodes in partitioned_hg._btn.items():
-            partition_size[partition_key] = len(nodes) #math.sqrt(len(nodes))
+        placement, blocks = self.placement_aware_assignment(partitioned_hg,
+                                                            dag,
+                                                            width = self.backend.c2,
+                                                            height = self.backend.c1
+                                                            )
+        
+        """
+        print(partition_0)
+        print(partition_1)
+        print(partitions[1])
+        for node in dag.two_qubit_ops():
+            q_indices = [q._index for q in node.qargs]
+            q0, q1 = q_indices
+
+            # Record direct interactions between adjacent partitions
+            if (q0 in partition_1 or q0 in partition_0) and (q1 in partition_1 or q0 in partition_0):
+                ch.add_node(q0)
+                ch.add_node(q1)
+                ch.add_edge(q0, q1)
+
+        pos = nx.spring_layout(ch, seed=412)
+        plt.figure(figsize=(6, 6))
+        nx.draw(ch, pos = pos, with_labels=True, node_size=600)
+        plt.savefig("data/backends/mapping/mapping_hx_graph_of_ineracting_nodes.png", dpi=300)
+        plt.close()
+        """
+        
 
         # Assign every node, depending on it's dependency, to a 2D grid of QPUs
         # TODO: This should also work for more complicated QPU layouts (other than 2D)
-        placement, blocks = self.bfs_capacitated_grid_placement(
-            G = partitioned_hg._collapsed_phg,
-            width = self.backend.c2,
-            height = self.backend.c1,
-            partition_size = partition_size
-        )
+        #placement, blocks = self.bfs_capacitated_grid_placement(
+        #    G = partitioned_hg._collapsed_phg,
+        #    width = self.backend.c2,
+        #    height = self.backend.c1,
+        #    partition_size = partition_size
+        #)
 
         # Plot the assignment of partitions to QPU
         #self.plot_block_counts(width = self.backend.c2,
@@ -423,6 +469,102 @@ class TrivialMapper(GenericMapper):
         #                       filename="tests/data/figures/partition_to_qpu.png")
 
         return placement, blocks
+    
+    def placement_aware_assignment(self,
+                                   partitioned_hg: PartitionedHyperGraph,
+                                   dag: DAGCircuit,
+                                   width: int,
+                                   height: int) -> tuple[dict, dict]: 
+        
+
+        # IDEA:
+        # - BFS throught the contracted nodes
+        # - Place first node
+        # - Place the next node. If it is connected to the first node, calculate where to place. Options of placement
+        #   are: left, right, bottom, top
+        # - If placed at bottom or top, place from left to right
+        # - If placed at left or right, place from right to left
+
+        # Placement:
+        # Place blocks in the middle if possible. If a node needs to be place below it, do so. If not possible on chip,
+        # place at the top of the chiplet below. Same idea for placing to the left/right
+        
+        partition_size = {}
+        for partition_key, nodes in partitioned_hg._btn.items():
+            partition_size[partition_key] = len(nodes) #math.sqrt(len(nodes))
+
+        partitions = {}
+        for partition_key, nodes in partitioned_hg._btn.items():
+            partition_size[partition_key] = int(math.ceil(math.sqrt(len(nodes))))
+            partitions[int(partition_key[2:])] = nodes
+
+
+
+        # Initialize all QPUs with their widht and height, as well as coordinates. The widht and height are used for
+        # calculating which partitions (given their width and height) can be placed on this QPU.
+        qpu_blocks = {(x, y): QPUBlock(self.backend.m, self.backend.n, (x, y))
+              for x, y in product(range(width), range(height))}
+        
+        print(qpu_blocks)
+        block_coords_list = list(qpu_blocks.keys())
+        current_block_idx = 0
+        placement = {}
+
+        block_coord = block_coords_list[current_block_idx]
+        block = qpu_blocks[block_coord]
+
+        
+        # Try to place the partition
+        pw = 6
+        ph = 6*2 - 1
+        """
+        pos = block.place_partition(0, pw, ph)
+
+        placement[0] = pos
+
+        pos = block.place_relative(3, 6, 1, 0, "above")
+
+        if pos == None:
+            # block = block below the current one
+            pass
+        print(pos)
+        """
+
+        # Manual placement
+        pos = qpu_blocks[(0, 0)].place_partition(0, pw, ph)
+        placement[0] = pos
+        pos = qpu_blocks[(1, 0)].place_partition(1, pw, ph)
+        placement[1] = pos
+        pos = qpu_blocks[(1, 1)].place_partition(2, pw, ph)
+        placement[2] = pos
+
+        pos = qpu_blocks[(0, 0)].place_relative(3, 6, 1, 0, "above")
+        placement[3] = pos
+        pos = qpu_blocks[(1, 0)].place_relative(4, 1, 6, 1, "right")
+        placement[4] = pos
+
+        
+
+        #placement[0] = pos
+
+        #if pos is not None:
+        #    # Partition fits
+        #    placement[node] = pos
+         
+    
+        partition_0 = partitions[0]
+        partition_1 = partitions[3]
+        if min(partition_1) > min(partition_0) and max(partition_1) < max(partition_0):
+            #Place at the bottom
+            pass
+        else:
+            # place to the right
+            pass
+
+
+        
+        
+        return placement, qpu_blocks
 
     def bfs_capacitated_grid_placement(self,
                                        G: nx.Graph,
@@ -483,13 +625,20 @@ class TrivialMapper(GenericMapper):
         qpu_blocks = {(x, y): QPUBlock(self.backend.m, self.backend.n, (x, y))
               for x, y in product(range(width), range(height))}
         
+        
         # Start with the first block
         block_coords_list = list(qpu_blocks.keys())
         current_block_idx = 0
         placement = {}
 
-        print(bfs_order)
-    
+        #print(bfs_order)
+        partitioned_hgc = self.property_set["partitioned_hyper_dag"]
+
+        partitions = {}
+        for partition_key, nodes in partitioned_hgc._btn.items():
+            partition_size[partition_key] = int(math.ceil(math.sqrt(len(nodes))))
+            partitions[int(partition_key[2:])] = nodes
+
         # Iterate over all partitions, given the order, and place them greedily on the current block. If the QPU is
         # full, find the next QPU to fill.
         for node in bfs_order:
@@ -502,8 +651,14 @@ class TrivialMapper(GenericMapper):
             pw = 3
             ph = 7
             # for rotated surface code d=5
-            pw = 6
-            ph = 6*2 - 1
+            if len(partitions[node]) > 40:
+                pw = 6
+                ph = 6*2 - 1
+            else:
+                pw = 1
+                ph = 9
+
+            
             start_idx = current_block_idx
 
             # Iteratively try to find a QPU to place this partition
@@ -568,22 +723,9 @@ class TrivialMapper(GenericMapper):
     
 
 class QPUBlock:
-    """Class representing a QPU chiplet  
-
-    Has list of all partitions on this QPU. The list additionally also has the location (x, y) where this partition can
-    be placed on this QPU
-    """
+    """Class representing a QPU chiplet"""
 
     def __init__(self, width: int, height: int, block_coord: tuple):
-        """_summary_
-
-        :param width: _description_
-        :type width: int
-        :param height: _description_
-        :type height: int
-        :param block_coord: (x, y) position of the block in the grid
-        :type block_coord: tuple
-        """
         self.width = width
         self.height = height
         self.coord = block_coord  
@@ -595,23 +737,127 @@ class QPUBlock:
         # list of (partition_id, x, y, w, h)
         self.placed_partitions = []  
 
+    # ----------------------------------------------------------
+    # Helper: check overlap
+    # ----------------------------------------------------------
+    def _overlaps(self, x, y, w, h):
+        for pid, px, py, pw, ph in self.placed_partitions:
+            if not (x + w <= px or px + pw <= x or y + h <= py or py + ph <= y):
+                return True
+        return False
+
+    # ----------------------------------------------------------
+    # Helper: find a free rect containing a region (x,y,w,h)
+    # ----------------------------------------------------------
+    def _find_covering_free_rect(self, x, y, w, h):
+        for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
+            if (x >= fx and y >= fy and 
+                x + w <= fx + fw and 
+                y + h <= fy + fh):
+                return i, (fx, fy, fw, fh)
+        return None, None
+
+    # ----------------------------------------------------------
+    # Helper: split free rectangle after placing something 
+    # at (x, y, w, h)
+    # ----------------------------------------------------------
+    def _split_free_rect(self, index, fx, fy, fw, fh, x, y, w, h):
+        """Perform guillotine-style split like place_partition"""
+        del self.free_rects[index]
+
+        # right side
+        if fx + fw > x + w:
+            self.free_rects.append((x + w, fy, (fx + fw) - (x + w), h))
+
+        # bottom side
+        if fy + fh > y + h:
+            self.free_rects.append((fx, y + h, fw, (fy + fh) - (y + h)))
+
+        # bottom-right corner (optional, but consistent with your code)
+        if fx + fw > x + w and fy + fh > y + h:
+            self.free_rects.append((x + w, y + h,
+                                    (fx + fw) - (x + w),
+                                    (fy + fh) - (y + h)))
+
+    # ----------------------------------------------------------
+    # Original free-rect placement
+    # ----------------------------------------------------------
     def place_partition(self, partition_id, pw, ph):
         for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
             if pw <= fw and ph <= fh:
-                # Place partition at top-left of free rectangle
-                x, y = fx, fy
+
+                # --- NEW: fixed placement rule ---
+                x = fx + 1                                        # place near left edge
+                y = (self.height - ph) // 2                       # center vertically in the WHOLE block
+
+                # Store placement
                 self.placed_partitions.append((partition_id, x, y, pw, ph))
-                
-                # Remove used rectangle
-                self.free_rects.pop(i)
-                
-                # Add remaining free rectangles (guillotine split)
-                if fw - pw > 0:
-                    self.free_rects.append((fx + pw, fy, fw - pw, ph))
-                if fh - ph > 0:
-                    self.free_rects.append((fx, fy + ph, fw, fh - ph))
-                if fw - pw > 0 and fh - ph > 0:
-                    self.free_rects.append((fx + pw, fy + ph, fw - pw, fh - ph))
-                
-                return (self.coord[0] + x, self.coord[1] + y)  # global coordinates
-        return None  # cannot fit
+
+                # remove and split the free rect
+                del self.free_rects[i]
+
+                # left side: space between fx and x
+                if x > fx:
+                    self.free_rects.append((fx, fy, x - fx, fh))
+
+                # right side: remaining width
+                if x + pw < fx + fw:
+                    self.free_rects.append((x + pw, fy, (fx + fw) - (x + pw), fh))
+
+                # top side (above the partition)
+                if y > fy:
+                    self.free_rects.append((x, fy, pw, y - fy))
+
+                # bottom side (below the partition)
+                if y + ph < fy + fh:
+                    self.free_rects.append((x, y + ph, pw, (fy + fh) - (y + ph)))
+
+                return (self.coord[0] + x, self.coord[1] + y)
+
+        return None
+
+    # ----------------------------------------------------------
+    # NEW: Relative placement with free-rect splitting
+    # ----------------------------------------------------------
+    def place_relative(self, partition_id, pw, ph, anchor_id, direction):
+        anchor = next((p for p in self.placed_partitions if p[0] == anchor_id), None)
+        print(anchor)
+        if anchor is None:
+            raise ValueError(f"Anchor partition {anchor_id} not found.")
+
+        _, ax, ay, aw, ah = anchor
+
+        # Determine relative coordinate
+        if direction == "right":
+            x, y = ax + aw, ay
+        elif direction == "left":
+            x, y = ax - pw, ay
+        elif direction == "below":
+            x, y = ax, ay + ah
+        elif direction == "above":
+            x, y = ax, ay - ph
+        else:
+            raise ValueError("Direction must be one of: right/left/above/below")
+
+        # Bounds check
+        if x < 0 or y < 0 or x + pw > self.width or y + ph > self.height:
+            return None
+
+        # Overlap check
+        if self._overlaps(x, y, pw, ph):
+            return None
+
+        # Find free rect that fully contains this placement
+        idx, rect = self._find_covering_free_rect(x, y, pw, ph)
+        if idx is None:
+            return None  # no free space matching this location
+
+        fx, fy, fw, fh = rect
+
+        # Place partition
+        self.placed_partitions.append((partition_id, x, y, pw, ph))
+
+        # Split the free rectangle **just like place_partition**
+        self._split_free_rect(idx, fx, fy, fw, fh, x, y, pw, ph)
+
+        return (self.coord[0] + x, self.coord[1] + y)

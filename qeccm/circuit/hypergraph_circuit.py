@@ -29,7 +29,12 @@ class PartitionedHyperGraph:
                 pygraph. 
     """
 
-    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes = None, hgc = None, partitions = None):
+    def __init__(self,
+                 partitioned_hgc: kahypar.Hypergraph = None,
+                 num_nodes = None,
+                 hgc = None,
+                 partitions = None,
+                 dag = None):
         
         #"""Generate hypernetx hypergraph given a partitioned kahypar hypergraph
 
@@ -89,28 +94,34 @@ class PartitionedHyperGraph:
                 for b in range(len(partitions)):
                     ch.add_node(b)
 
-                # Iterate through all hyperedges
-                num_hyperedges = len(index_vector) - 1
-                for h in range(num_hyperedges):
-                    # Get the nodes inside hyperedge h
-                    start = index_vector[h]
-                    end = index_vector[h + 1]
-                    hyperedge_nodes = edge_vector[start:end]
+                interactions = {i: set() for i in range(len(partitions))}
 
-                    # Determine the blocks these nodes belong to
-                    def find_sublist_index(lst_of_lsts, value):
-                        for index, sublist in enumerate(lst_of_lsts):
-                            if value in sublist:
-                                return index
-                        print(f"unable to find {value}")
-                        return -1
-                    blocks = set(find_sublist_index(partitions, v) for v in hyperedge_nodes)
+                # Precompute qubit to partition mapping
+                qubit_to_partition = {}
+                for p_index, part in enumerate(partitions):
+                    for qubit in part:
+                        qubit_to_partition[qubit] = p_index
 
-                    # If multiple blocks appear in one hyperedge, connect them
-                    blocks = list(blocks)
-                    for i in range(len(blocks)):
-                        for j in range(i + 1, len(blocks)):
-                            ch.add_edge(blocks[i], blocks[j])
+
+                # Iterate over all 2-qubit gates in the DAG
+                for node in dag.two_qubit_ops():
+                    q_indices = [q._index for q in node.qargs]
+                    q0, q1 = q_indices
+
+                    # Find the partitions these qubits belong to
+                    p0 = qubit_to_partition[q0]
+                    p1 = qubit_to_partition[q1]
+
+                    # Record direct interactions between adjacent partitions
+                    if p0 != p1:
+                        interactions[p0].add(p1)
+                        interactions[p1].add(p0)
+
+                interactions = {k: sorted(v) for k, v in interactions.items()}
+
+                for p, others in interactions.items():
+                    for q in others:
+                        ch.add_edge(p, q)
 
             else:
                 # Implementation in case only one partition is available
@@ -130,7 +141,7 @@ class PartitionedHyperGraph:
                 ch.add_node(0)
 
         # Construct hypergraph from partitioned hypergraph
-        print(block_to_nodes)
+        #print(block_to_nodes)
         self._phg = hnx.Hypergraph(block_to_nodes)
 
         plt.figure(figsize=(6, 6))
@@ -144,8 +155,8 @@ class PartitionedHyperGraph:
         # Save kahypar hypergraph
         self._kahypar_hgc = partitioned_hgc
 
-        print("Found partitions:")
-        print(block_to_nodes)
+        #print("Found partitions:")
+        #print(block_to_nodes)
 
     def draw_phg(self, graph: hnx.Hypergraph, filename: str = "") -> None:
         """Draw partitioned hypergraph
@@ -315,7 +326,7 @@ class HypergraphCircuit(AnalysisPass):
         """
         edge_vector = []
         num_qubits = len(dag.qubits)
-        print(num_qubits)
+        #print(num_qubits)
         connectivity = [set() for _ in range(num_qubits)]
 
         # Build connectivity map from all 2-qubit gates
@@ -337,8 +348,8 @@ class HypergraphCircuit(AnalysisPass):
                 edge_vector.extend(edge)
                 idx_vector.append(pos)
                 pos += len(edge)
-            else:
-                print(i)
+            #else:
+                #print(i)
 
         self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
 

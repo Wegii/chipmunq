@@ -67,12 +67,13 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         :rtype: _type_
         """
 
-        # Utilize defined partitions
+        # Utilize pre-defined partitions
         if self.partitions != None:
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
                     partitioned_hgc = None,
                     hgc = self.property_set['hyper_dag_kahypar'],
-                    partitions = self.partitions)
+                    partitions = self.partitions,
+                    dag = dag)
 
         else:
 

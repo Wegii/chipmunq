@@ -301,34 +301,45 @@ class BackendChipletV2(BackendV2):
                     # Calculate offset_indices for multiple connections between chiplets
                     nu = int(np.ceil((self.n_inter)/2))
                     nl = int(np.floor((self.n_inter)/2))
-                    offset_indices = list(range(-nl, nu))
+                    offset_indices = list(range(-nl, nu, 1))
 
                     # Connect to right
                     if x < y_c - 1:
+                        offset_indices_right = list(range(-self.n_inter+1, self.n_inter, 2))#[-5, -3, -1, 1, ]#range(-7, 7)#[-7,-5,-3,-1,1,3,5,7]#1, 3, 5, 7]
+                        
                         right_idx = idx + self.n*self.m 
                         cb_r, ct_r, cr_r, cl_r = self.get_edge_coordinates(self.n, self.m, right_idx)
 
-                        for oi in offset_indices:
+                        for oi in offset_indices_right:
                             edge = (cr_idx + (oi*self.m), cl_r + (oi*self.m))
-                            #print(edge)
-                            #print("right")
+
                             cx_props[edge] = InstructionProperties(
                                 error=rng.uniform(7e-4, 5e-3),
                                 duration=rng.uniform(1e-8, 9e-7),
                             )
 
-
                     # Connect to bottom
                     if y < x_c - 1:
                         bottom_idx = idx + y_c*self.n*self.m
                         cb_b, ct_b, cr_b, cl_b = self.get_edge_coordinates(self.n, self.m, bottom_idx)
-
+                        # First row
                         for oi in offset_indices:
                             edge = (cb_idx + oi, ct_b + oi)
                             cx_props[edge] = InstructionProperties(
                                 error=rng.uniform(7e-4, 5e-3),
                                 duration=rng.uniform(1e-8, 9e-7),
                             )
+                        """
+                        # Second row
+                        ct_b -= self.m
+                        cb_idx += self.m
+                        for oi in offset_indices:
+                            edge = (cb_idx + oi, ct_b + oi)
+                            cx_props[edge] = InstructionProperties(
+                                error=rng.uniform(7e-4, 5e-3),
+                                duration=rng.uniform(1e-8, 9e-7),
+                            )
+                        """
 
 
         if self.remote_gate_type == "ecr":

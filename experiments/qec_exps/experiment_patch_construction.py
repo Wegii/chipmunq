@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 # Custom utils
 from experiments.exp_utils.transpilation_utils import *
 from experiments.exp_utils.circuit_generator import QECMemory, QECCircuit
-from qeccm.backends.backend_utils import plot_circuit_layout
+from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
 from qeccm.src.reference_partitions import memory_d5
 from experiments.exp_utils.simulation_utils import *
 
@@ -143,7 +143,8 @@ def _get_tqec_cnot_rotated():
 
 
 def simulate_single_cnot_from_tqec() -> None:
-    backend = BackendChipletV2((2, 2, 12, 15), 5, "nn", "rotated_grid")
+    #backend = BackendChipletV2((2, 2, 15, 8), 8, "nn", "rotated_grid")
+    backend = BackendChipletV2((2, 2, 15, 8), 4, "nn", "rotated_grid")
 
     circuit, partitions = _get_tqec_cnot_rotated()
     _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
@@ -156,6 +157,10 @@ def simulate_single_cnot_from_tqec() -> None:
     plot_circuit_layout(custom_circuit,
                         backend,
                         filename="data/backends/mapping/mapped_circuit_on_backend.png")
+    
+    plot_circuit_layout_utilization(custom_circuit,
+                                    backend,
+                                    filename="experiments/evaluation/single_cnot_rotated_layout_utilization.png")
 
     #with open("stim_circuit_rotated_single_cnot_compiled.stim", "w") as f:
     #    print(custom_circuit, file=f)

@@ -179,6 +179,7 @@ def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV
         filename = filename,
     )
 
+
 def plot_circuit_layout_utilization(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2, filename: str = ""):
     """Plot utilization of qubit
 
@@ -224,6 +225,8 @@ def plot_circuit_layout_utilization(circuit: qiskit.QuantumCircuit, backend: Bac
         line_color = line_colors,
         filename = filename,
     )
+
+
 
 def generate_coordinates(backend):
     # Generate coordinates for nodes
@@ -284,7 +287,7 @@ def generate_coordinates(backend):
 
                     for coordinate in coordinates:
                         total_qubit_coordinates.append(
-                            (coordinate[0]-y*backend.n, coordinate[1]+x*backend.m)
+                            (coordinate[0]-y*(backend.n+1)/2, coordinate[1]+x*(backend.m + 1))
                             
                         )
                         #pass
