@@ -33,8 +33,9 @@ from tqec.computation.pipe import PipeKind
 from tqec.computation.cube import ZXCube
 from tqec.utils.position import FloatPosition3D, Position3D
 from tqec.utils.scale import round_or_fail
-from tqec.gallery import cnot, three_cnots, memory
+from tqec.gallery import cnot, three_cnots, memory, stability, cz
 from tqec.gallery.steane_encoding import steane_encoding
+from tqec.utils.position import Direction3D, Position3D, SignedDirection3D
 from experiments.exp_utils.circuit_utils import stim_to_qiskit
 
 import stim
@@ -231,6 +232,11 @@ class QECCircuit:
         )
 
         return stim_to_qiskit(stim_circuit), stim_circuit
+
+    def complete_memory_patch(self, distance_scale: int = 1):
+        # General issue: when instantiating a memory block, not all qubits are initialized.
+        # TODO: Find a way how to initialize all qubits, even if not all of them are used
+        pass
     
     def multiple_memory_patch(self, num_x1, num_x2: int = 0, distance_scale: int = 1):
         
@@ -243,7 +249,7 @@ class QECCircuit:
                 nodes = [
                     (Position3D(x1, 0, 0), "P", "In"),
                     (Position3D(x1, 0, 1), "ZXZ", ""),
-                    (Position3D(x1, 0, 2), "P", "Out"),
+                    (Position3D(x1, 0, 3), "P", "Out"),
                 ]
                 for pos, kind, label in nodes:
                     g.add_cube(pos, kind, label)
@@ -280,6 +286,72 @@ class QECCircuit:
 
         return stim_circuit
 
+    def full_memory_patch(self, distance_scale: int = 1):
+        """This implements a memory patch on which a hadamard is applied. This allows tqec to assign and utilize all
+        qubits in the patch
+
+        :param distance_scale: _description_, defaults to 1
+        :type distance_scale: int, optional
+        :return: _description_
+        :rtype: _type_
+        """
+        
+        g = BlockGraph("HadamardExample")
+
+        # Compatible cubes for Hadamard
+        in_cube = Position3D(0, 0, 0)
+        g.add_cube(in_cube, "P", "In")
+
+        # Hadamard cube (middle)
+        h_cube = Position3D(0, 0, 1)
+        g.add_cube(h_cube, "XZZ", "H")
+
+        # Output cube
+        out_cube = Position3D(0, 0, 2)
+        g.add_cube(out_cube, "P", "Out")
+
+        # Use the built-in Hadamard pipe
+        g.add_pipe(Position3D(0, 0, 0), Position3D(0, 0, 1))
+        g.add_pipe(h_cube, out_cube, PipeKind(
+            Basis.X,
+            Basis.Z,
+            None,
+            has_hadamard=True,
+        ))  # TQEC infers default pipe for identity
+
+        # Fill ports
+        g.fill_ports({
+            "In": ZXCube.from_str("XZZ"),
+            "Out": ZXCube.from_str("ZXX"),
+        })
+
+        compiled_graph = compile_block_graph(g)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+            manhattan_radius=3
+        )
+
+        # TODO: This should also return the qubits of all patches
+        if distance_scale == 2:
+            memory_d5 = [[
+                0, 1, 2, 3, 4, 5,
+                6, 7, 8, 9, 10,
+                11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21,
+                22, 23, 24, 25, 26, 27,
+                28, 29, 30, 31, 32,
+                33, 34, 35, 36, 37, 38,
+                39, 40, 41, 42, 43,
+                44, 45, 46, 47, 48, 49,
+                50, 51, 52, 53, 54,
+                55, 56, 57, 58, 59, 60
+            ]]
+        else:
+            pass
+
+        return stim_circuit
+
+
     def single_cnot(self, distance_scale: int = 1):
         """Generate single logical CNOT with lattice surgery.
 
@@ -291,6 +363,7 @@ class QECCircuit:
 
         # TODO: add option for manhattan radius
 
+        #graph = cz(["XI -> XZ", "IZ -> IZ"])#.rotate(Direction3D.Z, )
         graph = cnot(Basis.X)
         compiled_graph = compile_block_graph(graph)
         stim_circuit = compiled_graph.generate_stim_circuit(
@@ -299,6 +372,128 @@ class QECCircuit:
         )
 
         return stim_to_qiskit(stim_circuit), stim_circuit
+    
+    def single_cnot_full_memory(self, distance_scale : int = 1):
+        g = cnot(Basis.Z)
+        """
+        g = BlockGraph("CNOT_Hadamard")
+
+        nodes = [
+            (Position3D(0, 0, 0), "P", "In_Control"),
+            (Position3D(0, 0, 1), "XZZ", ""),
+            (Position3D(0, 0, 2), "ZXZ", ""),
+            (Position3D(0, 0, 3), "P", "Out_Control"),
+            (Position3D(0, 1, 0), "P", "In_Ancilla"),
+            (Position3D(0, 1, 1), "XZZ", ""), # XZZ
+            (Position3D(0, 1, 2), "ZXZ", ""), # ZXZ
+            (Position3D(0, 1, 3), "P", "Out_Ancilla"),
+            (Position3D(1, 1, 0), "P", "In_Target"),
+            (Position3D(1, 1, 1), "XZZ", ""),
+            (Position3D(1, 1, 2), "ZXZ", ""),
+            (Position3D(1, 1, 3), "P", "Out_Target"),
+        ]
+        for pos, kind, label in nodes:
+            g.add_cube(pos, kind, label)
+
+        pipes = [(0, 1), (1, 2), (2, 3), # Control
+                 (4, 5), (5, 6), (6, 7), # Ancilla
+                 (1, 5), (6, 10), # Lattice merge
+                 (8, 9), (9, 10), (10, 11)] # Target
+
+        i = 0
+        for p0, p1 in pipes:
+            if i == 1:# or i == 5 or i == 8:
+                g.add_pipe(nodes[p0][0], nodes[p1][0], PipeKind(
+                    Basis.X,
+                    Basis.Z,
+                    None,
+                    has_hadamard=True,
+                ))
+            elif i == 4:
+                g.add_pipe(nodes[p0][0], nodes[p1][0], PipeKind(
+                    Basis.X, # X
+                    Basis.Z, # Z
+                    None,
+                    has_hadamard=True,
+                ))
+            elif i == 5:
+                g.add_pipe(nodes[p0][0], nodes[p1][0], PipeKind(
+                    Basis.Z, # X
+                    Basis.X, # Z
+                    None,
+                    has_hadamard=True,
+                ))
+            else:
+                g.add_pipe(nodes[p0][0], nodes[p1][0])
+            i += 1
+
+        g.fill_ports({
+            "In_Control": ZXCube.from_str("XZZ"),
+            "Out_Control": ZXCube.from_str("ZXX"),
+            
+            "In_Ancilla": ZXCube.from_str("XZZ"),
+            "Out_Ancilla": ZXCube.from_str("XZZ"),
+
+            "In_Target": ZXCube.from_str("XZZ"),
+            "Out_Target": ZXCube.from_str("ZXX")
+        })
+        """
+
+        compiled_graph = compile_block_graph(g)
+        stim_circuit = compiled_graph.generate_stim_circuit(
+            k = distance_scale,
+            manhattan_radius=2
+        )
+
+
+        if distance_scale == 2:
+            partitions = [
+                # Control patch
+                [0, 1, 2, 3, 4, 5,
+                12, 13, 14, 15, 16,
+                23, 24, 25, 26, 27, 28,
+                35, 36, 37, 38, 39,
+                46, 47, 48, 49, 50, 51,
+                58, 59, 60, 61, 62,
+                69, 70, 71, 72, 73, 74,
+                81, 82, 83, 84, 85,
+                92, 93, 94, 95, 96, 97,
+                104, 105, 106, 107, 108,
+                115, 116, 117, 118, 119, 120],
+                # Ancilla Patch
+                [6, 7, 8, 9, 10, 11,
+                18, 19, 20, 21, 22,
+                29, 30, 31, 32, 33, 34,
+                41, 42, 43, 44, 45,
+                52, 53, 54, 55, 56, 57,
+                64, 65, 66, 67, 68,
+                75, 76, 77, 78, 79, 80,
+                87, 88, 89, 90, 91,
+                98, 99, 100, 101, 102, 103,
+                110, 111, 112, 113, 114,
+                121, 122, 123, 124, 125, 126],
+                # Target Patch
+                [132, 133, 134, 135, 136, 137,
+                138, 139, 140, 141, 142,
+                143, 144, 145, 146, 147, 148,
+                149, 150, 151, 152, 153,
+                154, 155, 156, 157, 158, 159,
+                160, 161, 162, 163, 164,
+                165, 166, 167, 168, 169, 170,
+                171, 172, 173, 174, 175,
+                176, 177, 178, 179, 180, 181,
+                182, 183, 184, 185, 186,
+                187, 188, 189, 190, 191, 192],
+                # CA_Patch
+                [17, 40, 63, 86, 109],
+                # AT_Patch
+                [127, 128, 129, 130, 131]
+                ]
+        else:
+            pass
+
+        return stim_circuit, partitions
+
 
     def three_cnot(self, distance_scale: int = 1):
         """Generate three logical CNOTs with lattice surgery.

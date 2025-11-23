@@ -152,6 +152,7 @@ def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV
         for key, val in circuit._layout.initial_layout.get_physical_bits().items():
             bit_register = bit_locations[val]["register"]
             if bit_register is None or bit_register.name != "ancilla":
+
                 qubits.append(key)
                 qubit_labels[key] = str(key)
 

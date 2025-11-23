@@ -29,7 +29,7 @@ class PartitionedHyperGraph:
                 pygraph. 
     """
 
-    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes = None, hgc = None):
+    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes = None, hgc = None, partitions = None):
         
         #"""Generate hypernetx hypergraph given a partitioned kahypar hypergraph
 
@@ -75,23 +75,62 @@ class PartitionedHyperGraph:
                     for j in range(i + 1, len(blocks)):
                         ch.add_edge(blocks[i], blocks[j])
         else:
-            # Implementation in case only one partition is available
+            if partitions != None:
+                block_to_nodes = {"b:" + str(b): [] for b in range(len(partitions))}
+                for i, partition in enumerate(partitions):
+                    block_to_nodes["b:" + str(i)].extend(partition[:])
+                
+                (index_vector, edge_vector) = hgc
+                available_nodes = set(edge_vector)
+                # Construct collapsed hypergraph
+                # All blocks are collapsed to singular nodes, while edges between blocks are kept
+                ch = nx.MultiGraph()
+                # Create a node for each block
+                for b in range(len(partitions)):
+                    ch.add_node(b)
 
-            # Generate dictionary with one block
-            block_to_nodes = {"b:" + str(0): []}
+                # Iterate through all hyperedges
+                num_hyperedges = len(index_vector) - 1
+                for h in range(num_hyperedges):
+                    # Get the nodes inside hyperedge h
+                    start = index_vector[h]
+                    end = index_vector[h + 1]
+                    hyperedge_nodes = edge_vector[start:end]
 
-            (index_vector, edge_vector) = hgc
-            all_nodes = set(edge_vector)
+                    # Determine the blocks these nodes belong to
+                    def find_sublist_index(lst_of_lsts, value):
+                        for index, sublist in enumerate(lst_of_lsts):
+                            if value in sublist:
+                                return index
+                        print(f"unable to find {value}")
+                        return -1
+                    blocks = set(find_sublist_index(partitions, v) for v in hyperedge_nodes)
 
-            # Assign all nodes to this block
-            for node in all_nodes:
-                block_to_nodes["b:" + str(0)].append(node)
+                    # If multiple blocks appear in one hyperedge, connect them
+                    blocks = list(blocks)
+                    for i in range(len(blocks)):
+                        for j in range(i + 1, len(blocks)):
+                            ch.add_edge(blocks[i], blocks[j])
 
-            # Create a node for this block
-            ch = nx.MultiGraph()
-            ch.add_node(0)
+            else:
+                # Implementation in case only one partition is available
+
+                # Generate dictionary with one block
+                block_to_nodes = {"b:" + str(0): []}
+
+                (index_vector, edge_vector) = hgc
+                all_nodes = set(edge_vector)
+
+                # Assign all nodes to this block
+                for node in all_nodes:
+                    block_to_nodes["b:" + str(0)].append(node)
+
+                # Create a node for this block
+                ch = nx.MultiGraph()
+                ch.add_node(0)
 
         # Construct hypergraph from partitioned hypergraph
+        print(block_to_nodes)
         self._phg = hnx.Hypergraph(block_to_nodes)
 
         plt.figure(figsize=(6, 6))
@@ -298,6 +337,8 @@ class HypergraphCircuit(AnalysisPass):
                 edge_vector.extend(edge)
                 idx_vector.append(pos)
                 pos += len(edge)
+            else:
+                print(i)
 
         self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
 

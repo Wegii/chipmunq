@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def transpile_stim_circuit(circuit, backend) -> tuple[float, float]:
+def transpile_stim_circuit(circuit, backend, pre_defined_partitions: list = None) -> tuple[float, float]:
     """Transpilation of circuit to backend using custom and sabre transpilation passes
 
     :param circuit: _description_
@@ -26,7 +26,9 @@ def transpile_stim_circuit(circuit, backend) -> tuple[float, float]:
     stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 
 
-    custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc, backend)
+    custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
+                                                      backend,
+                                                      pre_defined_partitions=pre_defined_partitions)
     sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
 
     # Qiskit to stim

@@ -166,85 +166,6 @@ class TrivialMapper(GenericMapper):
 
         print("Generating Layout")
 
-
-        """
-        print("Manualmapping")
-
-        vq_to_pq = {
-            0: 0,
-            1: 1,
-            2: 2,
-            3: 25,
-            4: 26,
-
-            5: 5,
-            6: 6,
-            7: 7,
-            8: 30,
-            9: 31,
-
-            10: 10,
-            11: 11,
-            12: 12,
-            13: 35,
-            14: 36,
-
-            15: 15,
-            16: 16,
-            17: 17,
-            18: 40,
-            19: 41,
-
-            20: 20,
-            21: 21,
-            22: 22,
-            23: 45,
-            24: 46,
-        }
-        vq_to_pq = {
-            0: 0,
-            1: 1,
-            2: 2,
-            3: 3,
-            4: 4,
-
-            5: 5,
-            6: 6,
-            7: 7,
-            8: 8,
-            9: 9,
-
-            10: 10,
-            11: 11,
-            12: 12,
-            13: 13,
-            14: 14,
-
-            15: 15,
-            16: 16,
-            17: 17,
-            18: 18,
-            19: 19,
-
-            20: 20,
-            21: 21,
-            22: 22,
-            23: 23,
-            24: 25,
-        }
-        layout = Layout()
-
-        # Add all qubit registers first (optional but consistent with Qiskit behavior)
-        for qreg in dag.qregs.values():
-            layout.add_register(qreg)
-
-        # Now add virtual → physical mapping using global qubit indices
-        for i, vq in enumerate(dag.qubits):
-            if i in vq_to_pq:
-                layout.add(vq, vq_to_pq[i])
-        """
-
-        
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
 
@@ -321,8 +242,10 @@ class TrivialMapper(GenericMapper):
                         
 
 
-                    rotated = True
-                    if not rotated:                    
+                    rectangle = False
+                    rotated_simple = False
+                    rotated_full = True
+                    if rectangle:                    
                         # Iterate over all virtual qubits of this partition and assign physical qubits to it in a linear
                         # fashion
                         # Iterator index for the virtual qubits
@@ -341,7 +264,7 @@ class TrivialMapper(GenericMapper):
                                 # Jump to the next row. We have to jump chiplet_width - patch_width
                                 placement_idx += (self.backend.m - patch_width)
 
-                    else:
+                    elif rotated_simple:
                         # TODO: specify distance of code
                         distance = 5#3
                         # Added 1 to patche width and height, in order to have interaction space around them
@@ -421,10 +344,41 @@ class TrivialMapper(GenericMapper):
                                                                              local_x + 5]
                             placement[nodes_of_partition[-1]] = nodes_on_qpu[(start_row + 2) * self.backend.m +
                                                                              local_x + 5]
-
+                            
+                    else:
+                        distance = 5
+                        if distance == 5:
+                            start_row = local_y + 8
+                            start_row = local_y + 10
+                            column_length = 12
+                        else:
+                            # TODO
+                            pass
                         
+                        node_index = 0
 
-                        
+                        row = start_row
+                        index = 0
+                        i = 0
+                        col = local_x
+                        col_iter = 0
+                        while index < len(nodes_of_partition):
+                            #print((row-i)*self.backend.m)
+                            placement[nodes_of_partition[index]] = nodes_on_qpu[(row-i)*self.backend.m + col]
+                            i += 2
+                            index += 1
+
+                            if i == column_length or (i == (column_length-2) and col_iter % 2 != 0):
+
+                                if col_iter % 2 != 0:
+                                    row = start_row
+                                    col += 1
+                                else:
+                                    row = start_row - 1
+
+                                col_iter += 1
+                                i = 0
+
         return placement
 
     def assign_partition_to_qpu(self,
@@ -463,10 +417,10 @@ class TrivialMapper(GenericMapper):
         )
 
         # Plot the assignment of partitions to QPU
-        self.plot_block_counts(width = self.backend.c2,
-                               height = self.backend.c1,
-                               block_assignments = blocks,
-                               filename="tests/data/figures/partition_to_qpu.png")
+        #self.plot_block_counts(width = self.backend.c2,
+        #                       height = self.backend.c1,
+        #                       block_assignments = blocks,
+        #                       filename="tests/data/figures/partition_to_qpu.png")
 
         return placement, blocks
 
@@ -533,6 +487,8 @@ class TrivialMapper(GenericMapper):
         block_coords_list = list(qpu_blocks.keys())
         current_block_idx = 0
         placement = {}
+
+        print(bfs_order)
     
         # Iterate over all partitions, given the order, and place them greedily on the current block. If the QPU is
         # full, find the next QPU to fill.

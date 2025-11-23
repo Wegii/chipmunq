@@ -38,7 +38,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         - https://github.com/kahypar/mt-kahypar
     """
 
-    def __init__(self, backend: BackendChipletV2):
+    def __init__(self, backend: BackendChipletV2, partitions = None):
         """KaHyPar partitioning initializer"""
         super().__init__()
 
@@ -55,6 +55,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # TODO: change objective
         self.khp_context.loadINIconfiguration("qeccm/src/kahypar_config.ini")
 
+        # Option to pass partitions. This way, no partitioning needs to be performed
+        self.partitions = partitions
+
     def run(self, dag: DAGCircuit) -> DAGCircuit:
         """Partition a DAGCircuit into a optimal (calculated) number of partitions
 
@@ -64,34 +67,43 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         :rtype: _type_
         """
 
-        # Get hypergraph representation of dag
-        hgc = self.property_set['hyper_dag']
-        
-        # Calculate number of partitions
-        self.kp, partition_sizes = self.calculate_number_partitions(dag, hgc)
-
-        if self.kp > 1:
-            # Partition graph into calculated number of partitions
-            kahypar_hg = self.perform_partitioning(partition_sizes)
-
-            # Hypergraph
+        # Utilize defined partitions
+        if self.partitions != None:
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
-                partitioned_hgc = kahypar_hg,
-                hgc = self.property_set['hyper_dag_kahypar'])
+                    partitioned_hgc = None,
+                    hgc = self.property_set['hyper_dag_kahypar'],
+                    partitions = self.partitions)
+
         else:
-            # Explicit Partitioning not needed 
-            (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
-            num_vertices = len(index_vector)
-            
-            self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
-                num_nodes = num_vertices,
-                hgc = self.property_set['hyper_dag_kahypar'])
-            # self.property_set["partition_to_qpu"] = partition_to_qpu
 
-        # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without
-        #       any edges intersecting each other. If there are intersecting edges, this is a big problem for the
-        #       routing, since these connections need to be routed through a whole other qpu.
-        #       Goal: We do not want any intersection of edges of the partitioned graph
+            # Get hypergraph representation of dag
+            hgc = self.property_set['hyper_dag']
+            
+            # Calculate number of partitions
+            self.kp, partition_sizes = self.calculate_number_partitions(dag, hgc)
+
+            if self.kp > 1:
+                # Partition graph into calculated number of partitions
+                kahypar_hg = self.perform_partitioning(partition_sizes)
+
+                # Hypergraph
+                self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
+                    partitioned_hgc = kahypar_hg,
+                    hgc = self.property_set['hyper_dag_kahypar'])
+            else:
+                # Explicit Partitioning not needed 
+                (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+                num_vertices = len(index_vector)
+                
+                self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
+                    num_nodes = num_vertices,
+                    hgc = self.property_set['hyper_dag_kahypar'])
+                # self.property_set["partition_to_qpu"] = partition_to_qpu
+
+            # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without
+            #       any edges intersecting each other. If there are intersecting edges, this is a big problem for the
+            #       routing, since these connections need to be routed through a whole other qpu.
+            #       Goal: We do not want any intersection of edges of the partitioned graph
 
         return dag
 
@@ -211,9 +223,12 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
             # Girvan–Newman algorithm because this method produces a contractiontree that approximates the optimal
             # solution in terms of spatial cost.
-            comp = nx.community.girvan_newman(H)
-            communities = tuple(sorted(c) for c in next(comp))
-            print("Found communities")
+            #comp = nx.community.girvan_newman(H)
+            #communities = tuple(sorted(c) for c in next(comp))
+            
+            communities = nx.community.greedy_modularity_communities(H, cutoff=5)
+
+            print(f"Found {len(communities)} communities")
             print(communities)
             k = len(communities)
             #print()
@@ -281,10 +296,22 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         else:
             pass
         
-        k = 4 # 3
+        k = 1#5#3 # 3
         print("!!!Warning: Using hardcoded value!!!")
         print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet
         partition_sizes = [num_qubits_chiplet for c in range(k)]
+        #partition_sizes = [58, 58, 58, 5, 5]
+
+        """
+        (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+        print(edge_vector)
+        print(sorted(set(edge_vector)))
+        
+        num_vertices = len(set(edge_vector))-1#max(max(edge_vector) + 1, len(set(edge_vector))-1)
+        print(num_vertices)
+        num_hyperedges = len(index_vector) - 1
+        print(num_hyperedges)
+        """
 
         return k, partition_sizes

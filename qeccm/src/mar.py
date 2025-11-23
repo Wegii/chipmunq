@@ -76,7 +76,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         return init_pm
 
     #def _generate_layout_pass(self, backend: BackendV2, kp: int = None) -> PassManager:
-    def _generate_layout_pass(self, backend: BackendChipletV2 = None) -> PassManager:
+    def _generate_layout_pass(self, backend: BackendChipletV2 = None, partitions = None) -> PassManager:
         # Consists of analysis and transformation passes
 
         # The hypergraph circuit has multiple edges, since multigraph=True
@@ -84,7 +84,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # In the local mapping these can be again quite interesting
         
         # KaHyPar partitioning pass
-        partition_op = KaHyParPartitioning(backend)
+        partition_op = KaHyParPartitioning(backend, partitions)
 
         # Mapping pass
         # mapping_op = RandomMapper(backend)
@@ -126,7 +126,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         #    seed=42
         #    )
         
-        print("ATTENTION: CURRENTLS SELECT BASIC SWAP FROM QISKIT")
+        print("ATTENTION: CURRENTLY SELECT BASIC SWAP FROM QISKIT")
         routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
         
         # Basic implementation
