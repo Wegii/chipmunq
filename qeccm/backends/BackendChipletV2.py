@@ -5,6 +5,7 @@ import logging
 
 # Numerics
 import numpy as np
+import random
 
 # Graph
 import rustworkx as rx
@@ -31,15 +32,18 @@ class BackendChipletV2(BackendV2):
      - Check out how to modify the backend with target that the qiskit compiler knows all potential constraints
      - More transpiler info: https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.transpiler.Target
 
-    Additions
-        - TODO: Add remote gates to give those higher error
-
-
     Args:
         BackendV2 (_type_): _description_
     """
 
-    def __init__(self, size, n_inter, connectivity: str = "nn", topology: str = "grid") -> None:
+    def __init__(self,
+                 size,
+                 n_inter,
+                 connectivity: str = "nn",
+                 topology: str = "grid",
+                 inter_chiplet_noise: float = None,
+                 inter_chiplet_amplification: float = None,
+                 inter_chiplet_noise_type: str = "") -> None:
         """Instantiate new multi-chip backend.
 
         :param size: _description_
@@ -86,6 +90,10 @@ class BackendChipletV2(BackendV2):
 
         # Dictionary mapping chiplet index to list of nodes on chiplet 
         self.chiplet_to_nodes = {}
+        # Mapping of nodes to chiplet
+        self.node_to_chiplet = {}
+        # Mapping of chiplet to all inter-chiplet connections on this chiplet
+        self.chiplet_to_inter_chiplet_connection = {i: [] for i in range(self.c1 * self.c2)}
 
         # Construct target
         # TODO: Better comment why!
@@ -99,6 +107,11 @@ class BackendChipletV2(BackendV2):
         self.G, self._target = self._generate_chiplet()
         # Connect chiplets together using two-qubit gates
         self._target = self._generate_connected_chiplet()
+
+        # Generate inter-chiplet noise
+        self.inter_chiplet_connections = self.get_inter_chiplet_mapping(noise = inter_chiplet_noise,
+                                                                        amplification = inter_chiplet_amplification,
+                                                                        noise_type = inter_chiplet_noise_type)
 
     def _generate_chiplet(self) -> rx.PyGraph:
         """_summary_
@@ -237,7 +250,11 @@ class BackendChipletV2(BackendV2):
         # Add local two-qubit gates
         cz_props = {}
         for i, c in enumerate(range(self.c1*self.c2)):
-            self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m ))
+            # Add mapping of chiplet to nodes
+            self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m))
+            # Create mapping of nodes to chiplet
+            for cn in list(range(i * self.n * self.m, (i+1) * self.n * self.m)):
+                self.node_to_chiplet[cn] = c
             #print(c)
 
             # Construct gate constraints. Add local two-qubit gates (CZ)
@@ -318,6 +335,11 @@ class BackendChipletV2(BackendV2):
                                 duration=rng.uniform(1e-8, 9e-7),
                             )
 
+                            # Add mapping of node to inter_chiplet_connection
+                            self.chiplet_to_inter_chiplet_connection[self.node_to_chiplet[edge[0]]].append(edge[0])
+                            self.chiplet_to_inter_chiplet_connection[self.node_to_chiplet[edge[1]]].append(edge[1])
+
+
                     # Connect to bottom
                     if y < x_c - 1:
                         bottom_idx = idx + y_c*self.n*self.m
@@ -329,6 +351,9 @@ class BackendChipletV2(BackendV2):
                                 error=rng.uniform(7e-4, 5e-3),
                                 duration=rng.uniform(1e-8, 9e-7),
                             )
+                            # Add mapping of node to inter_chiplet_connection
+                            self.chiplet_to_inter_chiplet_connection[self.node_to_chiplet[edge[0]]].append(edge[0])
+                            self.chiplet_to_inter_chiplet_connection[self.node_to_chiplet[edge[1]]].append(edge[1])
                         """
                         # Second row
                         ct_b -= self.m
@@ -350,10 +375,20 @@ class BackendChipletV2(BackendV2):
 
         return self._target
 
-    def get_chiplet_at(self, index: int):
+    def get_chiplet_at(self, index: int) -> int:
         # Return nodes associated with specified chiplet
         return self.chiplet_to_nodes[index]
+    
+    def get_chiplet_of_node(self, node: int) -> int:
+        """Get chiplet id of the specified node
 
+        :param node: Node to find chiplet of
+        :type node: int
+        :return: Chiplet the node is assigned to
+        :rtype: int
+        """
+        
+        return self.node_to_chiplet[node]
         
     def get_edge_coordinates(self, n, m, offset=0) -> tuple:
         cb_idx = (np.floor(m/2)).astype(int)
@@ -366,12 +401,22 @@ class BackendChipletV2(BackendV2):
 
         return cb_idx + offset, ct_idx + offset, cr_idx + offset, cl_idx + offset
     
-    def get_inter_chiplet(self) -> dict:
+    def get_inter_chiplet_mapping(self,
+                                  noise: float = None,
+                                  amplification: float = None,
+                                  noise_type: str = "constant"
+                                  ) -> dict:
         """Generate dictionary containing inter_chiplet connections and their noise level
 
         :return: _description_
         :rtype: dict
         """
+
+        # TODO: It should be possible to set the noise and amplification during construction of backend
+        if noise == None:
+            noise = 0.1
+        if amplification == None:
+            amplification = 1
 
         # Get all ecr gates (inter-chiplet connections)
         ecr_gate = self.target["ecr"] 
@@ -380,12 +425,16 @@ class BackendChipletV2(BackendV2):
         edges = list(ecr_gate.keys())
 
         d = {}
-
-        # TODO: Add a noise level for the backend in general
-        # TODO: Let the connections vary from 1 to 9 * noise_level. Thus, the worst inter_chiplet connection is 9 times
-        #       worse than the best
         for k, v in edges:
-            d[(int(k), int(v))] = 0.1
+            # Calculate noise levels for every inter-chiplet connection:
+            #       - Random: Varies between [amplification*noise, 10*amplification*noise]
+            #       - Constant: Does not vary at all
+            if noise_type == "constant":
+                d[(int(k), int(v))] = min(0.9, amplification * noise)
+            elif noise_type == "random":
+                # Sample a random factor in the range [1, 10]
+                random_factor = min(max(1, random.random()*10), 10)
+                d[(int(k), int(v))] = min(0.9, random_factor * amplification * noise)
 
         d = dict(d)
         return d

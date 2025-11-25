@@ -40,6 +40,35 @@ def custom_partitioned_transpilation(circuit: QuantumCircuit, backend: BackendCh
     return routed_circuit
 
 
+def custom_cost_transpilation(circuit: QuantumCircuit,
+                              backend: BackendChipletV2,
+                              pre_defined_partitions: list = None,
+                              routing_alpha: float = 0.0,
+                              routing_beta : float = 0.0
+                              ) -> QuantumCircuit:
+    
+    # Initialize transpilation plugin in order to run the different passes
+    mar_pmsp = PartitionedMapRoutePlugin()
+    # Pass to construct hypergraph from circuit
+    init_pm = mar_pmsp._generate_initial_pass()
+    # Pass to perform partition and mapping
+    partitioning_pm = mar_pmsp._generate_layout_pass(backend,
+                                                     partitions = pre_defined_partitions)
+    # Perform routing utilizing cost routing
+    routing_pm = mar_pmsp._generate_routing_pass(backend,
+                                                 routing_type="cost",
+                                                 alpha = routing_alpha,
+                                                 beta = routing_beta)
+    # Construct pass manager with all passes
+    staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=partitioning_pm,
+                                  routing=routing_pm)
+    
+    # Run passes
+    routed_circuit = staged_pm.run(circuit)
+
+    return routed_circuit
+
+
 def custom_accelerated_partitioned_transpilation(circuit: QuantumCircuit,
                                                  backend: BackendChipletV2) -> qiskit.QuantumCircuit:
     """Transpile circuit to a chiplet backend using custom mapping and accelerated routing.

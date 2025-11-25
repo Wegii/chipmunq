@@ -13,7 +13,6 @@ from qeccm.backends.backend_utils import plot_circuit_layout_utilization, plot_c
 from qiskit.transpiler import StagedPassManager
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.visualization import circuit_drawer
-from qiskit._accelerate.basic_swap import basic_routing
 # Transpiler passes
 import qiskit
 from qiskit.transpiler import PassManager, StagedPassManager, CouplingMap
@@ -77,17 +76,16 @@ def test_accelerated_routing() -> None:
     print(circuit_drawer(circ_routed, output="text"))
 
 
-
 def test_generic_circuit_routing():
     """Test routing of hypergraph"""
 
-    num_qubits = 10*10 -10
+    num_qubits = 5*5 - 5
     circuit_generator = GenericCircuit(num_qubits)
     # Note: This is not a stim_circuit !
-    circuit = circuit_generator.generate_circuit(16*16)
+    circuit = circuit_generator.generate_circuit(2*2)
 
     # Initialize backend to map to
-    chiplet_backend = BackendChipletV2((18, 18, 10, 10), 5)
+    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 5)
     
     mar_pmsp = PartitionedMapRoutePlugin()
     # Construct hypergraph from circui[t
@@ -154,9 +152,41 @@ def test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing():
     #plot_circuit_layout_utilization(routed_circuit, chiplet_backend, "data/backends/mapping/routed_circuit_on_backend_utilization.png")
     
 
+def test_global_routing():
+    """Test routing of hypergraph"""
+
+    num_qubits = 5*5 - 5
+    circuit_generator = GenericCircuit(num_qubits)
+    # Note: This is not a stim_circuit !
+    circuit = circuit_generator.generate_circuit(2*2)
+
+    # Initialize backend to map to
+    chiplet_backend = BackendChipletV2((2, 2, 15, 8), 8, "nn", "rotated_grid")
+    
+    mar_pmsp = PartitionedMapRoutePlugin()
+    # Construct hypergraph from circuit
+    init_pm = mar_pmsp._generate_initial_pass()
+    # Perform partition and mapping
+    partitioning_pm = mar_pmsp._generate_layout_pass(chiplet_backend)
+    # Perform routing
+    routing_pm = mar_pmsp._generate_routing_pass(chiplet_backend,
+                                                 routing_type="cost")
+
+    staged_pm = StagedPassManager(stages=["init", "layout", "routing"], init=init_pm, layout=partitioning_pm,
+                                  routing=routing_pm)
+    
+    routed_circuit = staged_pm.run(circuit)
+
+    plot_circuit_layout_utilization(routed_circuit,
+                                    chiplet_backend,
+                                    filename="tests/data/figures/cost_routing_layout_utilization.png")
+
+
 if __name__ == "__main__":
     #test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing()
     
     #test_generic_circuit_routing()
 
-    test_accelerated_routing()
+    # test_accelerated_routing()
+
+    test_global_routing()

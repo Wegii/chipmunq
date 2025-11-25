@@ -11,24 +11,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def transpile_stim_circuit(circuit, backend, pre_defined_partitions: list = None) -> tuple[float, float]:
+def transpile_stim_circuit(circuit: StimCodeCircuit,
+                           backend: BackendChipletV2,
+                           pre_defined_partitions: list = None,
+                           routing_type: str = "",
+                           routing_alpha: float = 0.0,
+                           routing_beta : float = 0.0
+                           ) -> tuple[StimCodeCircuit, QuantumCircuit, StimCodeCircuit, QuantumCircuit]:
     """Transpilation of circuit to backend using custom and sabre transpilation passes
 
     :param circuit: _description_
-    :type circuit: qiskit.QuantumCircuit
+    :type circuit: StimCodeCircuit
     :param backend: _description_
     :type backend: BackendChipletV2
+    :param pre_defined_partitions: _description_, defaults to None
+    :type pre_defined_partitions: list, optional
+    :param routing_type: _description_, defaults to ""
+    :type routing_type: str, optional
     :return: _description_
-    :rtype: tuple[float, float]
+    :rtype: tuple[StimCodeCircuit, QuantumCircuit, StimCodeCircuit, QuantumCircuit]
     """
 
     # Stim to qiskit
     stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 
-
-    custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
-                                                      backend,
-                                                      pre_defined_partitions=pre_defined_partitions)
+    # Transpile using custom implementation
+    if routing_type == "default":
+        custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
+                                                        backend,
+                                                        pre_defined_partitions=pre_defined_partitions)
+    else:
+        custom_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                   backend,
+                                                   pre_defined_partitions=pre_defined_partitions,
+                                                   routing_alpha = routing_alpha,
+                                                   routing_beta = routing_beta)
+        
+    # Transpile using standard SABRE
     sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
 
     # Qiskit to stim
@@ -53,6 +72,7 @@ def run_sinter_simulation(tasks_fct, ks, ps):
     )
 
     return stats
+
 
 def run_simulation_transpiled_circuit(circuit_generator, backend):
 

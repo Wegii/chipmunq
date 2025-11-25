@@ -44,6 +44,17 @@ import stim
 import matplotlib.pyplot as plt
 
 
+def get_tqec_cnot_rotated(distance_scale: int = 2) -> tuple[StimCodeCircuit, list]:
+    circuit_generator = QECCircuit()
+    stim_circuit, partitions = circuit_generator.single_cnot_full_memory(distance_scale = distance_scale)
+
+    #with open("stim_circuit_cnot.stim", "w") as f:
+    #    print(stim_circuit, file=f)
+  
+    return stim_circuit, partitions
+
+
+
 class GenericCircuit():
     def __init__(self, nq: int):
         self.num_qubits = nq
@@ -53,7 +64,7 @@ class GenericCircuit():
         # Generate GHZ circuit
         ghz = QuantumCircuit(self.num_qubits)
         # Apply H on qubit 0
-        ghz.h(0)
+        #ghz.h(0)
         # Apply CNOT chain
         for i in range(self.num_qubits - 1):
             ghz.cx(i, i + 1)
