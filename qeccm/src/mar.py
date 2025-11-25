@@ -12,7 +12,7 @@ from qeccm.backends import BackendChipletV2
 from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 from qeccm.src.mapper import RandomMapper, TrivialMapper
-from qeccm.src.router import BasicSwapRouter, ParallelSwapRouter
+from qeccm.src.router import BasicSwapRouter, ParallelSwapRouter, CostRouter
 
 
 class GenericMapRoute(abc.ABC):
@@ -109,7 +109,20 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
         return layout_pm
 
-    def _generate_routing_pass(self, backend):
+    def _generate_routing_pass(self,
+                               backend,
+                               routing_type: str = "basic",
+                               alpha: float = 0.0,
+                               beta: float = 0.0) -> PassManager:
+        """_summary_
+
+        :param backend: _description_
+        :type backend: _type_
+        :param routing_type: Type of routing method. Select from: basic, basic_parallel, cost, sabre. Default: "basic"
+        :type routing_type: str, optional
+        :return: _description_
+        :rtype: PassManager
+        """
         # Consists of transformation passes
 
         # Note: it is necessary to perform the mapping_op twice. After the first mapping, we are only working on a
@@ -119,22 +132,28 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # In order to *merge* the normal and ancilla qubit register, simply perform the mapping operation again. This
         # generates a single qubit register with the correct mapping and size
 
-        # SABRE
-        #routing_op = qiskit.transpiler.passes.SabreSwap(
-        #    coupling_map=CouplingMap(backend.coupling_map),
-        #    heuristic='decay',
-        #    seed=42
-        #    )
-        
-        print("ATTENTION: CURRENTLY SELECT BASIC SWAP FROM QISKIT")
-        routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
-        
-        # Basic implementation
-        #routing_op = BasicSwapRouter(backend)
+        if routing_type == "basic":
+            # Optimized swap router
+            routing_op = BasicSwapRouter(backend)
+        elif routing_type == "basic_parallel":
+            # Parallel implementation of the basic routing
+            routing_op = ParallelSwapRouter(backend)
+        elif routing_type == "cost":
+            # Optimized implementation using an additional cost metric
+            routing_op = CostRouter(backend,
+                                    alpha = alpha,
+                                    beta = beta)
+        elif routing_type == "sabre":
+            # Qiskit accelerate SABRE implementation
+            routing_op = qiskit.transpiler.passes.SabreSwap(
+                coupling_map=CouplingMap(backend.coupling_map),
+                heuristic='decay',
+                seed=42
+                )
+        else:
+            # Qiskit basic swap implementation
+            routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
 
-        # Parallel SWAPRouter
-        #routing_op = ParallelSwapRouter(backend)
-
-        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])#, routing_op])
+        router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])
         
         return router_pm

@@ -187,6 +187,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             # Try to find all higly connected patches in a circuit
             
             (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+
             
             # Create multigraph given index and edge vectors
             H = nx.MultiGraph()
@@ -215,19 +216,19 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
 
             plt.figure(figsize=(6, 6))
-            
             # Draw the graph
             nx.draw(H, with_labels=True, node_size=100)
             plt.savefig("data/backends/mapping/hx_graph_of_circuit.png", dpi=300)
             plt.close()
+            print("Printed graph")
 
 
             # Girvan–Newman algorithm because this method produces a contractiontree that approximates the optimal
             # solution in terms of spatial cost.
-            #comp = nx.community.girvan_newman(H)
-            #communities = tuple(sorted(c) for c in next(comp))
+            comp = nx.community.girvan_newman(H)
+            communities = tuple(sorted(c) for c in next(comp))
             
-            communities = nx.community.greedy_modularity_communities(H, cutoff=5)
+            #communities = nx.community.greedy_modularity_communities(H, cutoff=5)
 
             print(f"Found {len(communities)} communities")
             print(communities)
@@ -297,7 +298,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         else:
             pass
         
-        k = 1#5#3 # 3
+        #k = 1#5#3 # 3
         print("!!!Warning: Using hardcoded value!!!")
         print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet

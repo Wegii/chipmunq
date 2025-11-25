@@ -1,3 +1,6 @@
+# Typing
+from qeccm.backends.BackendChipletV2 import BackendChipletV2
+
 # Qiskit
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.dagcircuit import DAGCircuit
@@ -7,7 +10,7 @@ from qiskit.transpiler.layout import Layout
 
 class GenericRouter(TransformationPass):
 
-    def __init__(self, backend):
+    def __init__(self, backend: BackendChipletV2):
         super().__init__()
 
         #coupling_map (Union[CouplingMap, Target]): Directed graph represented a coupling map.
@@ -144,13 +147,329 @@ class BasicSwapRouter(GenericRouter):
     
 class CostRouter(GenericRouter):
 
-    def __init__(self, backend):
+    def __init__(self, backend: BackendChipletV2, alpha: float = 0.0, beta: float = 0.0):
         super().__init__(backend)
 
-    # TODO: Implement routing given a cost metric:
-    #           - Path length
-    #           - Error of a interconnection
-    #           - How often a certain interconnection has been used (in order to not reduce code distance/circuit depth)
+        self.alpha = alpha
+        self.beta = beta
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        current_layout = self.property_set["layout"]
+
+        # Route gates that are on a chip 
+        local_routed_dag = self._local_routing(dag)
+        # Route gates across chips
+        full_routed_dag = self._global_routing(local_routed_dag)
+
+        # Set final layout
+        self.property_set["final_layout"] = current_layout
+
+        return full_routed_dag##full_routed_dag
+
+    def _local_routing(self, dag: DAGCircuit) -> DAGCircuit:
+        # TODO: Simply iterate over dag and route all connections that are on chip
+
+        new_dag = DAGCircuit()
+        for qreg in dag.qregs.values():
+            new_dag.add_qreg(qreg)
+        for creg in dag.cregs.values():
+            new_dag.add_creg(creg)
+
+        for node in dag.topological_op_nodes():
+            if len(node.qargs) == 2:
+                q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+
+                # Check distance in coupling map
+                if not self.coupling_map.distance(q0, q1) == 1:
+                    if self.backend.get_chiplet_of_node(q0) == self.backend.get_chiplet_of_node(q0):
+                        # Perform routing of local gate
+                        path = self.coupling_map.shortest_undirected_path(q0, q1)
+                        #new_dag = self._perform_routing_between_nodes(new_dag = new_dag,
+                        #                                              path = path,
+                        #                                              gate_operation = node.op,
+                        #                                              method = "")
+                        
+
+                        for i in range(len(path) - 1):
+                            new_dag.apply_operation_back(
+                                SwapGate(),
+                                qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            )
+
+                        # Apply the desired two-qubit gate on the now-adjacent qubits
+                        new_dag.apply_operation_back(
+                            node.op,
+                            qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]]
+                        )
+
+                        # Undo swaps to restore original layout
+                        for i in reversed(range(len(path) - 1)):
+                            new_dag.apply_operation_back(
+                                SwapGate(),
+                                qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                            )
+                            
+                        #new_dag.apply_operation_back(node.op, qargs=node.qargs)
+                    else:
+                        # Remote gate. Routing performed during global_routing step
+                        new_dag.apply_operation_back(node.op, qargs=node.qargs)
+                else:
+                    # Add local two-qubit gates that do not require routing
+                    new_dag.apply_operation_back(node.op, qargs=node.qargs)
+            else:
+                # Add single-qubit gates to do not require routing
+                new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
+        
+        return new_dag
+
+    def _global_routing(self, dag: DAGCircuit) -> DAGCircuit:
+        """_summary_
+
+        path_cost = path_length + alpha*inter_chiplet_error + beta*inter_chiplet_utilization
+
+        :param dag: _description_
+        :type dag: DAGCircuit
+        :return: _description_
+        :rtype: DAGCircuit
+        """
+
+        print("Global routing")
+
+        """
+
+        # Inter-chiplet routing
+        new_dag = DAGCircuit()
+        for qreg in dag.qregs.values():
+            new_dag.add_qreg(qreg)
+        for creg in dag.cregs.values():
+            new_dag.add_creg(creg)
+
+        # Get all inter-chiplet connections and their respective noise from the backend
+        inter_chiplet_connections = self.backend.inter_chiplet_connections
+        # Keep track of utilization of inter-chiplet connection
+        inter_chiplet_utilization = {key: 0 for key in inter_chiplet_connections}
+
+        for node in dag.topological_op_nodes():
+            if len(node.qargs) == 2:
+                q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+                
+                # Check distance in coupling map
+                if not self.coupling_map.distance(q0, q1) == 1:
+                    # Gates on the same chiplet are already routed
+
+                    if self.backend.get_chiplet_of_node(q0) != self.backend.get_chiplet_of_node(q1):
+                        new_dag.apply_operation_back(node.op, qargs=node.qargs)
+                        
+                        # Assume that we only need one inter-chiplet connection from one chip to the next, and not 
+                        # multiple inter-chiplet connections from the source to the target
+
+                        # Shortest path
+                        path = self.coupling_map.shortest_undirected_path(q0, q1)
+
+                        # Get error of inter-chiplet connection 
+                        inter_chiplet_nodes = None
+                        for i in range(len(path) - 1):
+                            n0 = path[i]
+                            n1 = path[i+1]
+
+                            # Found remote connection if the chiplets do not match
+                            if self.backend.get_chiplet_of_node(n0) != self.backend.get_chiplet_of_node(n1):
+                                inter_chiplet_nodes = (n0, n1)
+                                break
+
+                        # In case the connection is found, try to get the noise value from it. Flip source and target
+                        # if the node could not be found
+                        if not (inter_chiplet_nodes in inter_chiplet_connections):
+                            inter_chiplet_nodes = (inter_chiplet_nodes[1], inter_chiplet_nodes[0])
+
+                        current_path_cost = (len(path) +
+                                             self.alpha * inter_chiplet_connections[inter_chiplet_nodes] +
+                                             self.beta * (inter_chiplet_utilization[inter_chiplet_nodes] + 1))
+
+                        best_path = path
+                        # Iterate over inter-chiplet connections of this chip, and see if it is possible to generate 
+                        # a better routing
+                        # TODO: Add option to only select the k-nearest inter-chiplet connections
+                        for cicc in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
+                            # Route from source to inter-chiplet connection
+                            p0 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
+                            # Route from inter-chiplet connection to target
+                            p1 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
+                            # Combine into one full path
+                            p_combined = p0 + p1[1:]
+
+                            path_cost = (len(p_combined) +
+                                         self.alpha * inter_chiplet_connections[inter_chiplet_nodes] +
+                                         self.beta * (inter_chiplet_utilization[inter_chiplet_nodes] + 1))
+                            
+                            if path_cost < current_path_cost:
+                                current_path_cost = path_cost
+                                best_path = p_combined
+
+                        # Route path with lowest cost
+                        #new_dag = self._perform_routing_between_nodes(new_dag = new_dag,
+                        #                                              path = best_path,
+                        #                                              gate_operation = node.op,
+                        #                                              method = "optimized")
+                        
+                        #new_dag.apply_operation_back(node.op, qargs=node.qargs)
+
+                        # Update inter-chiplet connection utilization
+                        inter_chiplet_utilization[inter_chiplet_nodes] += 1
+                        
+                else:
+                    # Add local two-qubit gates that do not require routing
+                    new_dag.apply_operation_back(node.op, qargs=node.qargs)
+            else:
+                # Single-qubit gates
+                new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
+
+        return new_dag
+    """
+        new_dag = DAGCircuit()
+        for qreg in dag.qregs.values():
+            new_dag.add_qreg(qreg)
+        for creg in dag.cregs.values():
+            new_dag.add_creg(creg)
+            
+        # Get all inter-chiplet connections and their respective noise from the backend
+        inter_chiplet_connections = self.backend.inter_chiplet_connections
+        # Keep track of utilization of inter-chiplet connection
+        inter_chiplet_utilization = {key: 0 for key in inter_chiplet_connections}
+
+        for node in dag.topological_op_nodes():
+            if len(node.qargs) == 2:
+                q0, q1 = node.qargs[0]._index, node.qargs[1]._index
+
+                # Check distance in coupling map
+                if not self.coupling_map.distance(q0, q1) == 1:
+                    if self.backend.get_chiplet_of_node(q0) != self.backend.get_chiplet_of_node(q1):
+                        
+                        # Assume that we only need one inter-chiplet connection from one chip to the next, and not 
+                        # multiple inter-chiplet connections from the source to the target
+
+                        # Shortest path
+                        path = self.coupling_map.shortest_undirected_path(q0, q1)
+
+                        # Get error of inter-chiplet connection 
+                        inter_chiplet_nodes = None
+                        for i in range(len(path) - 1):
+                            n0 = path[i]
+                            n1 = path[i+1]
+
+                            # Found remote connection if the chiplets do not match
+                            if self.backend.get_chiplet_of_node(n0) != self.backend.get_chiplet_of_node(n1):
+                                inter_chiplet_nodes = (n0, n1)
+                                break
+
+                        # In case the connection is found, try to get the noise value from it. Flip source and target
+                        # if the node could not be found
+                        if not (inter_chiplet_nodes in inter_chiplet_connections):
+                            inter_chiplet_nodes = (inter_chiplet_nodes[1], inter_chiplet_nodes[0])
+
+                        current_path_cost = (len(path) +
+                                             self.alpha * inter_chiplet_connections[inter_chiplet_nodes] +
+                                             self.beta * (inter_chiplet_utilization[inter_chiplet_nodes] + 1))
+
+                        best_path = path
+                        # Iterate over inter-chiplet connections of this chip, and see if it is possible to generate 
+                        # a better routing
+                        # TODO: Add option to only select the k-nearest inter-chiplet connections
+                        for cicc in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
+                            # Route from source to inter-chiplet connection
+                            p0 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
+                            # Route from inter-chiplet connection to target
+                            p1 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
+                            # Combine into one full path
+                            p_combined = p0 + p1[1:]
+
+                            path_cost = (len(p_combined) +
+                                         self.alpha * inter_chiplet_connections[inter_chiplet_nodes] +
+                                         self.beta * (inter_chiplet_utilization[inter_chiplet_nodes] + 1))
+                            
+                            if path_cost < current_path_cost:
+                                current_path_cost = path_cost
+                                best_path = p_combined
+
+                        # Route path with lowest cost
+                        #new_dag = self._perform_routing_between_nodes(new_dag = new_dag,
+                        #                                              path = best_path,
+                        #                                              gate_operation = node.op,
+                        #                                              method = "optimized")
+                        
+                        new_dag.apply_operation_back(node.op, qargs=node.qargs)
+
+                        # Update inter-chiplet connection utilization
+                        inter_chiplet_utilization[inter_chiplet_nodes] += 1
+                    else:
+                    
+                        new_dag.apply_operation_back(node.op, qargs=node.qargs)
+                else:
+                    # Add local two-qubit gates that do not require routing
+                    new_dag.apply_operation_back(node.op, qargs=node.qargs)
+            else:
+                # Add single-qubit gates to do not require routing
+                new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
+
+        
+        return new_dag
+    
+
+    def _perform_routing_between_nodes(self, new_dag, path, gate_operation, method: str = "") -> DAGCircuit:
+        if method == "" or "simple":
+            # Forward swaps to bring the two qubits next to each other
+            for i in range(len(path) - 1):
+                new_dag.apply_operation_back(
+                    SwapGate(),
+                    qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                )
+
+            # Apply the desired two-qubit gate on the now-adjacent qubits
+            new_dag.apply_operation_back(
+                gate_operation,
+                qargs=[new_dag.qubits[path[-2]], new_dag.qubits[path[-1]]]
+            )
+
+            # Undo swaps to restore original layout
+            for i in reversed(range(len(path) - 1)):
+                new_dag.apply_operation_back(
+                    SwapGate(),
+                    qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                )
+        else:
+            # Divide path in half. Then swap from source to middle and target to middle in parallel
+            mid = len(path) // 2
+            #swap = SwapGate()
+
+            # Route from start to middle
+            for i in range(mid - 1):
+                new_dag.apply_operation_back(
+                    SwapGate(), qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                )
+            # Route from end to middle
+            for i in range(len(path) - 1, mid, -1):
+                new_dag.apply_operation_back(
+                    SwapGate(), qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                )
+
+            # Apply original gate
+            new_dag.apply_operation_back(gate_operation,
+                                         qargs=[new_dag.qubits[path[mid - 1]], new_dag.qubits[path[mid]]])
+
+            # Route backwards
+            for i in reversed(range(mid - 1)):
+                new_dag.apply_operation_back(
+                    SwapGate(), qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i+1]]]
+                )
+
+            for i in reversed(range(len(path) - 1, mid, -1)):
+                new_dag.apply_operation_back(
+                    SwapGate(), qargs=[new_dag.qubits[path[i]], new_dag.qubits[path[i-1]]]
+                )
+        
+        return new_dag
+
+
 
 class AcceleratedBasicSwapRouter(GenericRouter):
     """ Accelerated version of qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
