@@ -15,7 +15,8 @@ class GenericRouter(TransformationPass):
 
         #coupling_map (Union[CouplingMap, Target]): Directed graph represented a coupling map.
         self.backend = backend
-        self.coupling_map = backend.coupling_map
+        # Select the coupling_map that has defective qubits removed
+        self.coupling_map = backend.defective_coupling_map #backend.coupling_map
 
     def _local_routing(self):
         # Intra-chiplet routing

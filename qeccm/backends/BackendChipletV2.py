@@ -24,7 +24,6 @@ from qiskit.circuit import Measure, Delay, Parameter, Reset
 LABEL_ON_CHIP = 'on_chip_connection'
 LABEL_INTER_CHIP = 'inter_chip_connection'
 
-
 class BackendChipletV2(BackendV2):
     """ Simple chiplet backend
 
@@ -43,7 +42,9 @@ class BackendChipletV2(BackendV2):
                  topology: str = "grid",
                  inter_chiplet_noise: float = None,
                  inter_chiplet_amplification: float = None,
-                 inter_chiplet_noise_type: str = "") -> None:
+                 inter_chiplet_noise_type: str = "",
+                 num_defective_qubits: int = 0
+                 ) -> None:
         """Instantiate new multi-chip backend.
 
         :param size: _description_
@@ -84,9 +85,15 @@ class BackendChipletV2(BackendV2):
         # Note: This can't necessarily be applied on all type of topologies.
         self.connectivity = connectivity
 
-        # TODO: not usable qubits
-        # TODO: Create a either a list of qubits that can not be used, or potentially remove the completely from the 
-        #       coupling map. For now, this case is not considered
+        # Number of unusable qubits per chiplet
+        self.num_defective_qubits_per_chiplet = num_defective_qubits
+        print(self.num_defective_qubits_per_chiplet)
+        # Mapping of chiplet to defective qubits
+        self.chiplet_to_defective_qubits = {}
+        # Coupling map with the defective qubits
+        self.defective_coupling_map = None        
+        # The coupling map without the defective qubits will be stored in the _target and then coupling_map
+
 
         # Dictionary mapping chiplet index to list of nodes on chiplet 
         self.chiplet_to_nodes = {}
@@ -95,23 +102,31 @@ class BackendChipletV2(BackendV2):
         # Mapping of chiplet to all inter-chiplet connections on this chiplet
         self.chiplet_to_inter_chiplet_connection = {i: [] for i in range(self.c1 * self.c2)}
 
+
         # Construct target
         # TODO: Better comment why!
         if self.chiplet_topology == "line":
             self.num_qubits_total = self.c1* self.n * self.m
         else:
             self.num_qubits_total = self.c1*self.c2 * self.n * self.m
-        self._target = Target("Fake chiplet backend", num_qubits=self.num_qubits_total)
+
+        #
+        self._target = Target("Defect free chiplet backend", num_qubits=self.num_qubits_total)
+        self._defective_target = Target("Defective chiplet backend", num_qubits=self.num_qubits_total)
+
 
         # Construct local chip and gates (single- and two-qubit gates)
-        self.G, self._target = self._generate_chiplet()
+        self.G, self._target, self._defective_target = self._generate_chiplet()
         # Connect chiplets together using two-qubit gates
-        self._target = self._generate_connected_chiplet()
+        self._target, self._defective_target = self._generate_connected_chiplet()
 
         # Generate inter-chiplet noise
         self.inter_chiplet_connections = self.get_inter_chiplet_mapping(noise = inter_chiplet_noise,
                                                                         amplification = inter_chiplet_amplification,
                                                                         noise_type = inter_chiplet_noise_type)
+        
+        # Build coupling map for defective_target
+        self.defective_coupling_map = self._defective_target.build_coupling_map()
 
     def _generate_chiplet(self) -> rx.PyGraph:
         """_summary_
@@ -173,7 +188,6 @@ class BackendChipletV2(BackendV2):
                         for nb in remote_neighbors:
                             if nb != node and not G.has_edge(node, nb):
                                 G.add_edge(node, nb, None)
-                
         elif self.topology == "rotated_grid":
             if self.connectivity == "nn":
                 # Reference: https://blog.google/technology/research/google-willow-quantum-chip/
@@ -205,7 +219,6 @@ class BackendChipletV2(BackendV2):
                         # Connection to top right node
                         if r%2 != 1 or c < cols-1:
                             G.add_edge(a, b, None)
-
         elif self.topology == "heavy-hex":
             distance = 3
             G = rx.generators.directed_heavy_hex_graph(distance, bidirectional=False)
@@ -244,36 +257,70 @@ class BackendChipletV2(BackendV2):
         self._target.add_instruction(RZGate(Parameter("theta")), rz_props)
         self._target.add_instruction(Measure(), measure_props)
         self._target.add_instruction(Reset(), measure_props)
- 
         self._target.add_instruction(Delay(Parameter("t")), delay_props)
 
-        # Add local two-qubit gates
+        # Create target and coupling map that has the defective qubits removed.
+        self._defective_target.add_instruction(XGate(), x_props)
+        self._defective_target.add_instruction(SXGate(), sx_props)
+        self._defective_target.add_instruction(RZGate(Parameter("theta")), rz_props)
+        self._defective_target.add_instruction(Measure(), measure_props)
+        self._defective_target.add_instruction(Reset(), measure_props)
+        self._defective_target.add_instruction(Delay(Parameter("t")), delay_props)
+
+        # Add local two-qubit gates on all chiplets. If necessary, remove a certain amount of qubits on each chiplet
         cz_props = {}
+        cz_props_defective = {}
         for i, c in enumerate(range(self.c1*self.c2)):
             # Add mapping of chiplet to nodes
             self.chiplet_to_nodes[c] = list(range(i * self.n * self.m, (i+1) * self.n * self.m))
             # Create mapping of nodes to chiplet
             for cn in list(range(i * self.n * self.m, (i+1) * self.n * self.m)):
                 self.node_to_chiplet[cn] = c
-            #print(c)
+
+
+            if (self.num_defective_qubits_per_chiplet > 0):
+                # Define which qubits should be defective
+                num_qubits_on_chip = self.n * self.m
+                rng = np.random.default_rng(seed=12345678942)
+                defective_q = []
+                random_num = -1
+                # Select random qubit out of all qubits on the chiplet to be selected as defective   
+                for i in range(0, self.num_defective_qubits_per_chiplet):
+                    while (random_num in defective_q or random_num == -1):
+                        random_num = int(random.random()*num_qubits_on_chip)
+    
+                    defective_q.append(random_num)
+            else:
+                defective_q = []
+                
+            defective_q = []
+            # Add defective qubits to chiplet
+            self.chiplet_to_defective_qubits[c] = defective_q
 
             # Construct gate constraints. Add local two-qubit gates (CZ)
             for root_edge in G.edge_list():
                 offset = i * len(G)
+
                 edge = (root_edge[0] + offset, root_edge[1] + offset)
+                # Only add the gate if the utilized qubits are not marked as defective to the defective target
+                #if (root_edge[0] not in defective_q) or (root_edge[1] not in defective_q):
+                cz_props_defective[edge] = InstructionProperties(
+                    error=rng.uniform(7e-4, 5e-3),
+                    duration=rng.uniform(1e-8, 9e-7),
+                )
+
+                # Add all gates to the normal target
                 cz_props[edge] = InstructionProperties(
                     error=rng.uniform(7e-4, 5e-3),
                     duration=rng.uniform(1e-8, 9e-7),
                 )
-            #for edge in G.edge_list():
-            #    cz_props[edge] = InstructionProperties(
-            #        error=rng.uniform(7e-4, 5e-3),
-            #        duration=rng.uniform(1e-8, 9e-7),
-            #    )
 
+        # Construct the target that contains all qubits
         self._target.add_instruction(CZGate(), cz_props)
+        # Only add non-defective qubits to backend
+        self._defective_target.add_instruction(CZGate(), cz_props_defective)
 
-        return G, self._target
+        return G, self._target, self._defective_target
     
     def _generate_connected_chiplet(self):
         """_summary_
@@ -369,11 +416,13 @@ class BackendChipletV2(BackendV2):
 
         if self.remote_gate_type == "ecr":
             self._target.add_instruction(ECRGate(), cx_props)
+            self._defective_target.add_instruction(ECRGate(), cx_props)
         else:
             # TODO: add option to have other remote gates
             self._target.add_instruction(ECRGate(), cx_props)
+            self._defective_target.add_instruction(ECRGate(), cx_props)
 
-        return self._target
+        return self._target, self._defective_target
 
     def get_chiplet_at(self, index: int) -> int:
         # Return nodes associated with specified chiplet

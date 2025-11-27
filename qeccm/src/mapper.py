@@ -529,7 +529,8 @@ class TrivialMapper(GenericMapper):
             pass
         print(pos)
         """
-
+        # TODO: Change to automatic placement.
+        # Idea: Always go from top left to bottom right.
         # Manual placement
         pos = qpu_blocks[(0, 0)].place_partition(0, pw, ph)
         placement[0] = pos
