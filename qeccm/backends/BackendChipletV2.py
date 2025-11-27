@@ -87,11 +87,12 @@ class BackendChipletV2(BackendV2):
 
         # Number of unusable qubits per chiplet
         self.num_defective_qubits_per_chiplet = num_defective_qubits
-        print(self.num_defective_qubits_per_chiplet)
         # Mapping of chiplet to defective qubits
         self.chiplet_to_defective_qubits = {}
         # Coupling map with the defective qubits
         self.defective_coupling_map = None        
+        # Store index of all defective qubits
+        self.all_defective_qubits = []
         # The coupling map without the defective qubits will be stored in the _target and then coupling_map
 
 
@@ -307,6 +308,10 @@ class BackendChipletV2(BackendV2):
                         error=rng.uniform(7e-4, 5e-3),
                         duration=rng.uniform(1e-8, 9e-7),
                     )
+                if root_edge[0] in defective_q:
+                    self.all_defective_qubits.append(root_edge[0] + offset)
+                elif root_edge[1] in defective_q:
+                    self.all_defective_qubits.append(root_edge[1] + offset)
 
                 # Add all gates to the normal target
                 cz_props[edge] = InstructionProperties(
@@ -331,6 +336,7 @@ class BackendChipletV2(BackendV2):
 
         # Add inter-chip two-qubit gates (CX)
         cx_props = {}
+        cx_props_defective = {}
         if self.chiplet_topology == "line":
             for i in range(1, self.c1):
                 cb_idx, ct_idx, cr_idx, cl_idx = self.get_edge_coordinates(self.n, self.m, (i-1)*self.n*self.m)
@@ -376,6 +382,13 @@ class BackendChipletV2(BackendV2):
                         for oi in offset_indices_right:
                             edge = (cr_idx + (oi*self.m), cl_r + (oi*self.m))
 
+                            # Check if the edge does not contain a qubit that is defective
+                            if (edge[0] not in self.all_defective_qubits) and (edge[1] not in self.all_defective_qubits):
+                                cx_props_defective[edge] = InstructionProperties(
+                                    error=rng.uniform(7e-4, 5e-3),
+                                    duration=rng.uniform(1e-8, 9e-7),
+                                )
+                            
                             cx_props[edge] = InstructionProperties(
                                 error=rng.uniform(7e-4, 5e-3),
                                 duration=rng.uniform(1e-8, 9e-7),
@@ -385,7 +398,6 @@ class BackendChipletV2(BackendV2):
                             self.chiplet_to_inter_chiplet_connection[self.node_to_chiplet[edge[0]]].append(edge[0])
                             self.chiplet_to_inter_chiplet_connection[self.node_to_chiplet[edge[1]]].append(edge[1])
 
-
                     # Connect to bottom
                     if y < x_c - 1:
                         bottom_idx = idx + y_c*self.n*self.m
@@ -393,6 +405,12 @@ class BackendChipletV2(BackendV2):
                         # First row
                         for oi in offset_indices:
                             edge = (cb_idx + oi, ct_b + oi)
+                            if (edge[0] not in self.all_defective_qubits) and (edge[1] not in self.all_defective_qubits):
+                                cx_props_defective[edge] = InstructionProperties(
+                                    error=rng.uniform(7e-4, 5e-3),
+                                    duration=rng.uniform(1e-8, 9e-7),
+                                )
+                                
                             cx_props[edge] = InstructionProperties(
                                 error=rng.uniform(7e-4, 5e-3),
                                 duration=rng.uniform(1e-8, 9e-7),
@@ -415,11 +433,7 @@ class BackendChipletV2(BackendV2):
 
         if self.remote_gate_type == "ecr":
             self._target.add_instruction(ECRGate(), cx_props)
-            self._defective_target.add_instruction(ECRGate(), cx_props)
-        else:
-            # TODO: add option to have other remote gates
-            self._target.add_instruction(ECRGate(), cx_props)
-            self._defective_target.add_instruction(ECRGate(), cx_props)
+            self._defective_target.add_instruction(ECRGate(), cx_props_defective)
 
         return self._target, self._defective_target
 

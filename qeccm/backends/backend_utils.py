@@ -305,8 +305,6 @@ def generate_formatting(backend: BackendChipletV2, qubit_coordinates: list):
     target = backend.target
     coupling_map_backend = target.build_coupling_map()
 
-    print(coupling_map_backend)
-
     # Access the defective map (representing the functional hardware)
     defective_qubit_coupling_map = backend.defective_coupling_map
     

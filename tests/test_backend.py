@@ -30,7 +30,7 @@ def test_chiplet_backend():
                   filename = "data/backends/grid/t_multi_chiplet_rotated.png",
                   show_bb_node_color = True)
     
-    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 2, "nn", "rotated_grid", num_defective_qubits=1)
+    chiplet_backend = BackendChipletV2((2, 2, 5, 5), 2, "nn", "rotated_grid", num_defective_qubits=3)
     plot_gate_map(backend = chiplet_backend,
                   filename = "data/backends/grid/t_multi_chiplet_rotated_defective.png",
                   show_bb_node_color = True)
