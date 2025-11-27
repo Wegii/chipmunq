@@ -285,7 +285,7 @@ class BackendChipletV2(BackendV2):
                 defective_q = []
                 random_num = -1
                 # Select random qubit out of all qubits on the chiplet to be selected as defective   
-                for i in range(0, self.num_defective_qubits_per_chiplet):
+                for rn in range(0, self.num_defective_qubits_per_chiplet):
                     while (random_num in defective_q or random_num == -1):
                         random_num = int(random.random()*num_qubits_on_chip)
     
@@ -293,7 +293,6 @@ class BackendChipletV2(BackendV2):
             else:
                 defective_q = []
                 
-            defective_q = []
             # Add defective qubits to chiplet
             self.chiplet_to_defective_qubits[c] = defective_q
 
@@ -303,11 +302,11 @@ class BackendChipletV2(BackendV2):
 
                 edge = (root_edge[0] + offset, root_edge[1] + offset)
                 # Only add the gate if the utilized qubits are not marked as defective to the defective target
-                #if (root_edge[0] not in defective_q) or (root_edge[1] not in defective_q):
-                cz_props_defective[edge] = InstructionProperties(
-                    error=rng.uniform(7e-4, 5e-3),
-                    duration=rng.uniform(1e-8, 9e-7),
-                )
+                if (root_edge[0] not in defective_q) and (root_edge[1] not in defective_q):
+                    cz_props_defective[edge] = InstructionProperties(
+                        error=rng.uniform(7e-4, 5e-3),
+                        duration=rng.uniform(1e-8, 9e-7),
+                    )
 
                 # Add all gates to the normal target
                 cz_props[edge] = InstructionProperties(

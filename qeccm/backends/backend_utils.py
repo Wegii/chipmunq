@@ -302,9 +302,12 @@ def generate_coordinates(backend):
     return total_qubit_coordinates
 
 
+"""
 def generate_formatting(backend: BackendChipletV2, qubit_coordinates: list):
     target = backend.target
     coupling_map_backend = target.build_coupling_map()
+
+    defective_qubit_coupling_map = backend.defective_coupling_map
 
     # Select color depending on distance of connections. Direct connections receive blue color for edge, while remote
     # connections (i. e. physical distance > 1) receive violet color for edge
@@ -329,5 +332,57 @@ def generate_formatting(backend: BackendChipletV2, qubit_coordinates: list):
             line_colors[i] = "#FF746C"
 
     qubit_colors = ["#007878" for qubit in coupling_map_backend.physical_qubits]
+
+    return line_colors, qubit_colors
+"""
+
+def generate_formatting(backend: BackendChipletV2, qubit_coordinates: list):
+    target = backend.target
+    coupling_map_backend = target.build_coupling_map()
+
+    print(coupling_map_backend)
+
+    # Access the defective map (representing the functional hardware)
+    defective_qubit_coupling_map = backend.defective_coupling_map
+    
+    # Create sets for faster lookup of functional components
+    # We assume the defective map contains ONLY the working edges/nodes
+    active_edges = set(defective_qubit_coupling_map.get_edges())
+    #active_nodes = set(defective_qubit_coupling_map.physical_qubits)
+    active_nodes = set({qubit for edge in active_edges for qubit in edge})
+
+    # 1. Base Line Coloring: Select color depending on distance of connections. 
+    # Direct connections = Blue (#6D8196), Remote (>1) = Violet (#9400D3)
+    line_colors = [
+        "#6D8196" if math.isclose(
+            math.sqrt((qubit_coordinates[a][0] - qubit_coordinates[b][0])**2 +
+                      (qubit_coordinates[a][1] - qubit_coordinates[b][1])**2),
+            0
+        ) else "#6D8196" 
+        for a, b in coupling_map_backend.get_edges()
+    ]
+
+    ecr_edges = []
+    
+    # Get tuples for the edges which have an ecr instruction attached
+    for instruction in target.instructions:
+        if instruction[0].name == backend.remote_gate_type:
+            ecr_edges.append(instruction[1])
+    
+    # 2. Iterate to apply specific overrides (ECR and Defective)
+    for i, edge in enumerate(coupling_map_backend.get_edges()):
+        # Apply ECR color (Salmon/Orange)
+        if edge in ecr_edges:
+            line_colors[i] = "#9400D3"
+        
+        # OVERRIDE: If edge is missing from defective map, color it Red
+        if edge not in active_edges:
+            line_colors[i] = "#FF0000"
+
+    # 3. Node Coloring: Default Teal, override with Red if broken
+    qubit_colors = [
+        "#007878" if qubit in active_nodes else "#FF746C"
+        for qubit in coupling_map_backend.physical_qubits
+    ]
 
     return line_colors, qubit_colors
