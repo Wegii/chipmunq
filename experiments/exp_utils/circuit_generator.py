@@ -485,87 +485,108 @@ class QECCircuit:
                 pass
         else:
             print("Generating multiple single_cnot")
-            
+
+            # Contains all patches and operations
             g = BlockGraph("Logical CNOT")
-            nodes = [
-                (Position3D(0, 0, 0), "P", "In_Control"),
-                (Position3D(0, 0, 1), "ZXX", ""),
-                (Position3D(0, 0, 2), "ZXZ", ""),
-                (Position3D(0, 0, 3), "P", "Out_Control"),
-                (Position3D(0, 1, 1), "ZXX", ""),
-                (Position3D(0, 1, 2), "ZXZ", ""),
-                (Position3D(1, 1, 0), "P", "In_Target"),
-                (Position3D(1, 1, 1), "ZXZ", ""),
-                (Position3D(1, 1, 2), "ZXZ", ""),
-                (Position3D(1, 1, 3), "P", "Out_Target"),
-            ]
-            for pos, kind, label in nodes:
-                g.add_cube(pos, kind, label)
 
-            pipes = [(0, 1), (1, 2), (2, 3),
-                     (1, 4), (4, 5),
-                     (5, 8),
-                     (6, 7), (7, 8), (8, 9)]
+            n1 = 3
+            n2 = 3
 
-            for p0, p1 in pipes:
-                g.add_pipe(nodes[p0][0], nodes[p1][0])
+            placement_x = 0
+            placement_y = 0
+            cnot_counter = 0
+            # Used to determine if the cnot is placed downwards+right, or right+downwards, in order to completely
+            # fill the grid optimally
+            rotation_counter = 0
+            for x1 in range(n1):
+                placement_y = 0
 
-            g.fill_ports(ZXCube.from_str("ZXZ"))
+                for y1 in range(n2):
+                    if rotation_counter%2 == 0:
+                        # Place downwards+right
+                        nodes = [
+                            (Position3D(placement_x, placement_y, 0), "P", f"In_Control_{cnot_counter}"),
+                            (Position3D(placement_x, placement_y, 1), "ZXX", ""),
+                            (Position3D(placement_x, placement_y, 2), "ZXZ", ""),
+                            (Position3D(placement_x, placement_y, 3), "P", f"Out_Control_{cnot_counter}"),
+                            (Position3D(placement_x, placement_y+1, 1), "ZXX", ""),
+                            (Position3D(placement_x, placement_y+1, 2), "ZXZ", ""),
+                            (Position3D(placement_x+1, placement_y+1, 0), "P", f"In_Target_{cnot_counter}"),
+                            (Position3D(placement_x+1, placement_y+1, 1), "ZXZ", ""),
+                            (Position3D(placement_x+1, placement_y+1, 2), "ZXZ", ""),
+                            (Position3D(placement_x+1, placement_y+1, 3), "P", f"Out_Target_{cnot_counter}"),
+                        ]
+                        for pos, kind, label in nodes:
+                            g.add_cube(pos, kind, label)
+
+                        pipes = [(0, 1), (1, 2), (2, 3), # Control
+                                (1, 4), (4, 5), # Ancilla
+                                (5, 8), # Merge
+                                (6, 7), (7, 8), (8, 9) # Target
+                                ]
+
+                        for p0, p1 in pipes:
+                            g.add_pipe(nodes[p0][0], nodes[p1][0])
+
+                        g.fill_ports(ZXCube.from_str("ZXZ"))
+                        
+                    else:
+                        # Place right+downwards
+                        nodes_2 = [
+
+                            (Position3D(placement_x, placement_y, 0), "P", f"In_Control_{cnot_counter}"),    
+                            (Position3D(placement_x, placement_y, 1), "ZXZ", ""),
+                            (Position3D(placement_x, placement_y, 2), "ZXZ", ""),
+                            (Position3D(placement_x, placement_y, 3), "P", f"Out_Control_{cnot_counter}"),
+                            (Position3D(placement_x+1, placement_y, 1), "ZXZ", ""),
+                            (Position3D(placement_x+1, placement_y, 2), "ZXX", ""),
+                            (Position3D(placement_x+1, placement_y+1, 0), "P", f"In_Target_{cnot_counter}"),
+                            (Position3D(placement_x+1, placement_y+1, 1), "ZXZ", ""),
+                            (Position3D(placement_x+1, placement_y+1, 2), "ZXX", ""),
+                            (Position3D(placement_x+1, placement_y+1, 3), "P", f"Out_Target_{cnot_counter}"),
+                        ]
+
+                        for pos, kind, label in nodes_2:
+                            g.add_cube(pos, kind, label)
+
+                        pipes_2 = [(0, 1), (1, 2), (2, 3),
+                                    (1, 4), (4, 5),
+                                    (5, 8),
+                                    (6, 7), (7, 8), (8, 9)
+                                    ]
+
+                        # Get the absolute positions for the new pipes.
+                        new_pipe_positions = [(nodes_2[p0][0], nodes_2[p1][0]) for p0, p1 in pipes_2]
+
+                        # Add the new pipes to the graph.
+                        for p0_pos, p1_pos in new_pipe_positions:
+                            g.add_pipe(p0_pos, p1_pos)
+
+                        # Fill ports for the new cubes (optional, but good for completeness)
+                        g.fill_ports(ZXCube.from_str("ZXZ"))
 
 
+                    # Counter for labeling the input and output ports of every pipe
+                    cnot_counter += 1   
+                    # Every CNOTS needs a height 2, so increment the placement_y by 2
+                    placement_y += 2
+                    
+                # Every CNOTS needs a width of 1 or 2, depending on orientation
+                if rotation_counter % 2 != 0:
+                    placement_x += 2
+                else:
+                    placement_x += 1
+                rotation_counter += 1
 
-            nodes_2 = [
-                # Control Qubit - Patches (1, 0) and (2, 0)
-                (Position3D(1, 0, 0), "P", "In_Control_2"),    # (0, 0, 0) -> (1, 0, 0)
-                (Position3D(1, 0, 1), "ZXZ", ""),              # (0, 0, 1) -> (1, 0, 1)
-                (Position3D(1, 0, 2), "ZXZ", ""),              # (0, 0, 2) -> (1, 0, 2)
-                (Position3D(1, 0, 3), "P", "Out_Control_2"),   # (0, 0, 3) -> (1, 0, 3)
-                (Position3D(2, 0, 1), "ZXZ", ""),              # (0, 1, 1) -> (1 + 1, 0, 1) -> (2, 0, 1)
-                (Position3D(2, 0, 2), "ZXX", ""),              # (0, 1, 2) -> (1 + 1, 0, 2) -> (2, 0, 2)
-
-                # Target Qubit - Patch (2, 1)
-                (Position3D(2, 1, 0), "P", "In_Target_2"),     # (1, 1, 0) -> (1 + 1, 1, 0) -> (2, 1, 0)
-                (Position3D(2, 1, 1), "ZXZ", ""),              # (1, 1, 1) -> (1 + 1, 1, 1) -> (2, 1, 1)
-                (Position3D(2, 1, 2), "ZXX", ""),              # (1, 1, 2) -> (1 + 1, 1, 2) -> (2, 1, 2)
-                (Position3D(2, 1, 3), "P", "Out_Target_2"),    # (1, 1, 3) -> (1 + 1, 1, 3) -> (2, 1, 3)
-            ]
-
-            # Add the new nodes (cubes) to the graph 'g'.
-            for pos, kind, label in nodes_2:
-                g.add_cube(pos, kind, label)
-
-            # Define the pipes for the second CNOT. The node indices are relative to the 'nodes_2' list.
-            # The connectivity structure remains the same as the first CNOT:
-            # Control: (0, 1), (1, 2), (2, 3), 
-            # Anciall (1, 4), (4, 5)
-            # Target: (6, 7), (7, 8), (8, 9)
-            # Fusion: (5, 8)
-
-            pipes_2 = [(0, 1), (1, 2), (2, 3),
-                       (1, 4), (4, 5),
-                       (5, 8),
-                       (6, 7), (7, 8), (8, 9)]
-
-            # Get the absolute positions for the new pipes.
-            new_pipe_positions = [(nodes_2[p0][0], nodes_2[p1][0]) for p0, p1 in pipes_2]
-
-            # Add the new pipes to the graph 'g'.
-            for p0_pos, p1_pos in new_pipe_positions:
-                g.add_pipe(p0_pos, p1_pos)
-
-
-
-            # Fill ports for the new cubes (optional, but good for completeness)
-            g.fill_ports(ZXCube.from_str("ZXZ"))
-
-
-            # Construct multiple CNOT operations
+            # Compile the block graph and construct stim circuit
             compiled_graph = compile_block_graph(g)
             stim_circuit = compiled_graph.generate_stim_circuit(
                 k = distance_scale,
                 manhattan_radius=2
             )
-
+            
+            # Compute partitions
+            # TODO: This needs to be fixed for multiple cnots
             if distance_scale == 2:
                 partitions = [
                     # Control patch
