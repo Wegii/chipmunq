@@ -74,7 +74,9 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                     hgc = self.property_set['hyper_dag_kahypar'],
                     partitions = self.partitions,
                     dag = dag)
-
+            
+            # Store the pre-defined partitions for all other passes to access
+            self.property_set["pre_defined_partitions"] = self.partitions
         else:
 
             # Get hypergraph representation of dag

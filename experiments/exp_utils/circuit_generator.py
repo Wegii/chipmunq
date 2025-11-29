@@ -44,12 +44,14 @@ import stim
 import matplotlib.pyplot as plt
 
 
-def get_tqec_cnot_rotated(distance_scale: int = 2) -> tuple[StimCodeCircuit, list]:
+def get_tqec_cnot_rotated(distance_scale: int = 2, n1: int = 1, n2: int = 0) -> tuple[StimCodeCircuit, list]:
     circuit_generator = QECCircuit()
-    stim_circuit, partitions = circuit_generator.single_cnot_full_memory(distance_scale = distance_scale)
+    stim_circuit, partitions = circuit_generator.single_cnot_full_memory(distance_scale = distance_scale,
+                                                                         n1 = n1,
+                                                                         n2 = n2)
 
-    #with open("stim_circuit_cnot.stim", "w") as f:
-    #    print(stim_circuit, file=f)
+    with open("stim_circuit_cnot_multiple.stim", "w") as f:
+        print(stim_circuit, file=f)
   
     return stim_circuit, partitions
 
@@ -384,124 +386,268 @@ class QECCircuit:
 
         return stim_to_qiskit(stim_circuit), stim_circuit
     
-    def single_cnot_full_memory(self, distance_scale : int = 1):
-        g = cnot(Basis.Z)
-        """
-        g = BlockGraph("CNOT_Hadamard")
+    def single_cnot_full_memory(self, distance_scale: int = 1, n1: int = 1, n2: int = 0):
 
-        nodes = [
-            (Position3D(0, 0, 0), "P", "In_Control"),
-            (Position3D(0, 0, 1), "XZZ", ""),
-            (Position3D(0, 0, 2), "ZXZ", ""),
-            (Position3D(0, 0, 3), "P", "Out_Control"),
-            (Position3D(0, 1, 0), "P", "In_Ancilla"),
-            (Position3D(0, 1, 1), "XZZ", ""), # XZZ
-            (Position3D(0, 1, 2), "ZXZ", ""), # ZXZ
-            (Position3D(0, 1, 3), "P", "Out_Ancilla"),
-            (Position3D(1, 1, 0), "P", "In_Target"),
-            (Position3D(1, 1, 1), "XZZ", ""),
-            (Position3D(1, 1, 2), "ZXZ", ""),
-            (Position3D(1, 1, 3), "P", "Out_Target"),
-        ]
-        for pos, kind, label in nodes:
-            g.add_cube(pos, kind, label)
+        if n1 == 1 and n2 == 0:
+            # Construct a single CNOT
+            g = cnot(Basis.Z)
 
-        pipes = [(0, 1), (1, 2), (2, 3), # Control
-                 (4, 5), (5, 6), (6, 7), # Ancilla
-                 (1, 5), (6, 10), # Lattice merge
-                 (8, 9), (9, 10), (10, 11)] # Target
+            compiled_graph = compile_block_graph(g)
+            stim_circuit = compiled_graph.generate_stim_circuit(
+                k = distance_scale,
+                manhattan_radius=2
+            )
 
-        i = 0
-        for p0, p1 in pipes:
-            if i == 1:# or i == 5 or i == 8:
-                g.add_pipe(nodes[p0][0], nodes[p1][0], PipeKind(
-                    Basis.X,
-                    Basis.Z,
-                    None,
-                    has_hadamard=True,
-                ))
-            elif i == 4:
-                g.add_pipe(nodes[p0][0], nodes[p1][0], PipeKind(
-                    Basis.X, # X
-                    Basis.Z, # Z
-                    None,
-                    has_hadamard=True,
-                ))
-            elif i == 5:
-                g.add_pipe(nodes[p0][0], nodes[p1][0], PipeKind(
-                    Basis.Z, # X
-                    Basis.X, # Z
-                    None,
-                    has_hadamard=True,
-                ))
-            else:
-                g.add_pipe(nodes[p0][0], nodes[p1][0])
-            i += 1
-
-        g.fill_ports({
-            "In_Control": ZXCube.from_str("XZZ"),
-            "Out_Control": ZXCube.from_str("ZXX"),
-            
-            "In_Ancilla": ZXCube.from_str("XZZ"),
-            "Out_Ancilla": ZXCube.from_str("XZZ"),
-
-            "In_Target": ZXCube.from_str("XZZ"),
-            "Out_Target": ZXCube.from_str("ZXX")
-        })
-        """
-
-        compiled_graph = compile_block_graph(g)
-        stim_circuit = compiled_graph.generate_stim_circuit(
-            k = distance_scale,
-            manhattan_radius=2
-        )
-
-
-        if distance_scale == 2:
-            partitions = [
-                # Control patch
-                [0, 1, 2, 3, 4, 5,
-                12, 13, 14, 15, 16,
-                23, 24, 25, 26, 27, 28,
-                35, 36, 37, 38, 39,
-                46, 47, 48, 49, 50, 51,
-                58, 59, 60, 61, 62,
-                69, 70, 71, 72, 73, 74,
-                81, 82, 83, 84, 85,
-                92, 93, 94, 95, 96, 97,
-                104, 105, 106, 107, 108,
-                115, 116, 117, 118, 119, 120],
-                # Ancilla Patch
-                [6, 7, 8, 9, 10, 11,
-                18, 19, 20, 21, 22,
-                29, 30, 31, 32, 33, 34,
-                41, 42, 43, 44, 45,
-                52, 53, 54, 55, 56, 57,
-                64, 65, 66, 67, 68,
-                75, 76, 77, 78, 79, 80,
-                87, 88, 89, 90, 91,
-                98, 99, 100, 101, 102, 103,
-                110, 111, 112, 113, 114,
-                121, 122, 123, 124, 125, 126],
-                # Target Patch
-                [132, 133, 134, 135, 136, 137,
-                138, 139, 140, 141, 142,
-                143, 144, 145, 146, 147, 148,
-                149, 150, 151, 152, 153,
-                154, 155, 156, 157, 158, 159,
-                160, 161, 162, 163, 164,
-                165, 166, 167, 168, 169, 170,
-                171, 172, 173, 174, 175,
-                176, 177, 178, 179, 180, 181,
-                182, 183, 184, 185, 186,
-                187, 188, 189, 190, 191, 192],
-                # CA_Patch
-                [17, 40, 63, 86, 109],
-                # AT_Patch
-                [127, 128, 129, 130, 131]
+            if distance_scale == 2:
+                partitions = [
+                    # Control patch
+                    {
+                        "indices": [
+                            0, 1, 2, 3, 4, 5,
+                            12, 13, 14, 15, 16,
+                            23, 24, 25, 26, 27, 28,
+                            35, 36, 37, 38, 39,
+                            46, 47, 48, 49, 50, 51,
+                            58, 59, 60, 61, 62,
+                            69, 70, 71, 72, 73, 74,
+                            81, 82, 83, 84, 85,
+                            92, 93, 94, 95, 96, 97,
+                            104, 105, 106, 107, 108,
+                            115, 116, 117, 118, 119, 120
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # Ancilla Patch
+                    {
+                        "indices": [
+                            6, 7, 8, 9, 10, 11,
+                            18, 19, 20, 21, 22,
+                            29, 30, 31, 32, 33, 34,
+                            41, 42, 43, 44, 45,
+                            52, 53, 54, 55, 56, 57,
+                            64, 65, 66, 67, 68,
+                            75, 76, 77, 78, 79, 80,
+                            87, 88, 89, 90, 91,
+                            98, 99, 100, 101, 102, 103,
+                            110, 111, 112, 113, 114,
+                            121, 122, 123, 124, 125, 126
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # Target Patch
+                    {
+                        "indices": [
+                            132, 133, 134, 135, 136, 137,
+                            138, 139, 140, 141, 142,
+                            143, 144, 145, 146, 147, 148,
+                            149, 150, 151, 152, 153,
+                            154, 155, 156, 157, 158, 159,
+                            160, 161, 162, 163, 164,
+                            165, 166, 167, 168, 169, 170,
+                            171, 172, 173, 174, 175,
+                            176, 177, 178, 179, 180, 181,
+                            182, 183, 184, 185, 186,
+                            187, 188, 189, 190, 191, 192
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # CA_Patch
+                    {
+                        "indices": [17, 40, 63, 86, 109],
+                        "width": 6,
+                        "height": 1,
+                        "distance": 5,
+                        "type": "rotated_surface_code_ancilla"
+                    },
+                    # AT_Patch
+                    {
+                        "indices": [127, 128, 129, 130, 131],
+                        "width": 1,
+                        "height": 6,
+                        "distance": 5,
+                        "type": "rotated_surface_code_ancilla"
+                    }
                 ]
+            elif distance_scale == 3:
+                # TODO: implement distance 7
+                pass
+            elif distance_scale == 4:
+                # TODO: implement distance 9
+                pass
         else:
-            pass
+            print("Generating multiple single_cnot")
+            
+            g = BlockGraph("Logical CNOT")
+            nodes = [
+                (Position3D(0, 0, 0), "P", "In_Control"),
+                (Position3D(0, 0, 1), "ZXX", ""),
+                (Position3D(0, 0, 2), "ZXZ", ""),
+                (Position3D(0, 0, 3), "P", "Out_Control"),
+                (Position3D(0, 1, 1), "ZXX", ""),
+                (Position3D(0, 1, 2), "ZXZ", ""),
+                (Position3D(1, 1, 0), "P", "In_Target"),
+                (Position3D(1, 1, 1), "ZXZ", ""),
+                (Position3D(1, 1, 2), "ZXZ", ""),
+                (Position3D(1, 1, 3), "P", "Out_Target"),
+            ]
+            for pos, kind, label in nodes:
+                g.add_cube(pos, kind, label)
+
+            pipes = [(0, 1), (1, 2), (2, 3),
+                     (1, 4), (4, 5),
+                     (5, 8),
+                     (6, 7), (7, 8), (8, 9)]
+
+            for p0, p1 in pipes:
+                g.add_pipe(nodes[p0][0], nodes[p1][0])
+
+            g.fill_ports(ZXCube.from_str("ZXZ"))
+
+
+
+            nodes_2 = [
+                # Control Qubit - Patches (1, 0) and (2, 0)
+                (Position3D(1, 0, 0), "P", "In_Control_2"),    # (0, 0, 0) -> (1, 0, 0)
+                (Position3D(1, 0, 1), "ZXZ", ""),              # (0, 0, 1) -> (1, 0, 1)
+                (Position3D(1, 0, 2), "ZXZ", ""),              # (0, 0, 2) -> (1, 0, 2)
+                (Position3D(1, 0, 3), "P", "Out_Control_2"),   # (0, 0, 3) -> (1, 0, 3)
+                (Position3D(2, 0, 1), "ZXZ", ""),              # (0, 1, 1) -> (1 + 1, 0, 1) -> (2, 0, 1)
+                (Position3D(2, 0, 2), "ZXX", ""),              # (0, 1, 2) -> (1 + 1, 0, 2) -> (2, 0, 2)
+
+                # Target Qubit - Patch (2, 1)
+                (Position3D(2, 1, 0), "P", "In_Target_2"),     # (1, 1, 0) -> (1 + 1, 1, 0) -> (2, 1, 0)
+                (Position3D(2, 1, 1), "ZXZ", ""),              # (1, 1, 1) -> (1 + 1, 1, 1) -> (2, 1, 1)
+                (Position3D(2, 1, 2), "ZXX", ""),              # (1, 1, 2) -> (1 + 1, 1, 2) -> (2, 1, 2)
+                (Position3D(2, 1, 3), "P", "Out_Target_2"),    # (1, 1, 3) -> (1 + 1, 1, 3) -> (2, 1, 3)
+            ]
+
+            # Add the new nodes (cubes) to the graph 'g'.
+            for pos, kind, label in nodes_2:
+                g.add_cube(pos, kind, label)
+
+            # Define the pipes for the second CNOT. The node indices are relative to the 'nodes_2' list.
+            # The connectivity structure remains the same as the first CNOT:
+            # Control: (0, 1), (1, 2), (2, 3), 
+            # Anciall (1, 4), (4, 5)
+            # Target: (6, 7), (7, 8), (8, 9)
+            # Fusion: (5, 8)
+
+            pipes_2 = [(0, 1), (1, 2), (2, 3),
+                       (1, 4), (4, 5),
+                       (5, 8),
+                       (6, 7), (7, 8), (8, 9)]
+
+            # Get the absolute positions for the new pipes.
+            new_pipe_positions = [(nodes_2[p0][0], nodes_2[p1][0]) for p0, p1 in pipes_2]
+
+            # Add the new pipes to the graph 'g'.
+            for p0_pos, p1_pos in new_pipe_positions:
+                g.add_pipe(p0_pos, p1_pos)
+
+
+
+            # Fill ports for the new cubes (optional, but good for completeness)
+            g.fill_ports(ZXCube.from_str("ZXZ"))
+
+
+            # Construct multiple CNOT operations
+            compiled_graph = compile_block_graph(g)
+            stim_circuit = compiled_graph.generate_stim_circuit(
+                k = distance_scale,
+                manhattan_radius=2
+            )
+
+            if distance_scale == 2:
+                partitions = [
+                    # Control patch
+                    {
+                        "indices": [
+                            0, 1, 2, 3, 4, 5,
+                            12, 13, 14, 15, 16,
+                            23, 24, 25, 26, 27, 28,
+                            35, 36, 37, 38, 39,
+                            46, 47, 48, 49, 50, 51,
+                            58, 59, 60, 61, 62,
+                            69, 70, 71, 72, 73, 74,
+                            81, 82, 83, 84, 85,
+                            92, 93, 94, 95, 96, 97,
+                            104, 105, 106, 107, 108,
+                            115, 116, 117, 118, 119, 120
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # Ancilla Patch
+                    {
+                        "indices": [
+                            6, 7, 8, 9, 10, 11,
+                            18, 19, 20, 21, 22,
+                            29, 30, 31, 32, 33, 34,
+                            41, 42, 43, 44, 45,
+                            52, 53, 54, 55, 56, 57,
+                            64, 65, 66, 67, 68,
+                            75, 76, 77, 78, 79, 80,
+                            87, 88, 89, 90, 91,
+                            98, 99, 100, 101, 102, 103,
+                            110, 111, 112, 113, 114,
+                            121, 122, 123, 124, 125, 126
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # Target Patch
+                    {
+                        "indices": [
+                            132, 133, 134, 135, 136, 137,
+                            138, 139, 140, 141, 142,
+                            143, 144, 145, 146, 147, 148,
+                            149, 150, 151, 152, 153,
+                            154, 155, 156, 157, 158, 159,
+                            160, 161, 162, 163, 164,
+                            165, 166, 167, 168, 169, 170,
+                            171, 172, 173, 174, 175,
+                            176, 177, 178, 179, 180, 181,
+                            182, 183, 184, 185, 186,
+                            187, 188, 189, 190, 191, 192
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # CA_Patch
+                    {
+                        "indices": [17, 40, 63, 86, 109],
+                        "width": 6,
+                        "height": 1,
+                        "distance": 5,
+                        "type": "rotated_surface_code_ancilla"
+                    },
+                    # AT_Patch
+                    {
+                        "indices": [127, 128, 129, 130, 131],
+                        "width": 1,
+                        "height": 6,
+                        "distance": 5,
+                        "type": "rotated_surface_code_ancilla"
+                    }
+                ]
+            else:
+                partitions = None
+        
 
         return stim_circuit, partitions
 

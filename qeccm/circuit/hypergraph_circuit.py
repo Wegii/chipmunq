@@ -83,26 +83,24 @@ class PartitionedHyperGraph:
             if partitions != None:
                 block_to_nodes = {"b:" + str(b): [] for b in range(len(partitions))}
                 for i, partition in enumerate(partitions):
-                    block_to_nodes["b:" + str(i)].extend(partition[:])
+                    block_to_nodes["b:" + str(i)].extend(partition['indices'][:])
                 
                 (index_vector, edge_vector) = hgc
                 available_nodes = set(edge_vector)
                 # Construct collapsed hypergraph
                 # All blocks are collapsed to singular nodes, while edges between blocks are kept
                 ch = nx.MultiGraph()
-                # Create a node for each block
+                # Create a node for each partition
                 for b in range(len(partitions)):
                     ch.add_node(b)
-
-                interactions = {i: set() for i in range(len(partitions))}
 
                 # Precompute qubit to partition mapping
                 qubit_to_partition = {}
                 for p_index, part in enumerate(partitions):
-                    for qubit in part:
+                    for qubit in part['indices']:
                         qubit_to_partition[qubit] = p_index
 
-
+                interactions = {i: set() for i in range(len(partitions))}
                 # Iterate over all 2-qubit gates in the DAG
                 for node in dag.two_qubit_ops():
                     q_indices = [q._index for q in node.qargs]

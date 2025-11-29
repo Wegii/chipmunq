@@ -133,6 +133,9 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         # generates a single qubit register with the correct mapping and size
 
         if routing_type == "basic":
+            # Qiskit basic swap implementation
+            routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
+        elif routing_type == "basic_optimized":
             # Optimized swap router
             routing_op = BasicSwapRouter(backend)
         elif routing_type == "basic_parallel":
@@ -150,9 +153,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
                 heuristic='decay',
                 seed=42
                 )
-        else:
-            # Qiskit basic swap implementation
-            routing_op = qiskit.transpiler.passes.BasicSwap(coupling_map=CouplingMap(backend.coupling_map))
+        
 
         router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])
         
