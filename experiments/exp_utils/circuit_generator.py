@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import os
 import logging
+import copy
 #sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
@@ -483,14 +484,158 @@ class QECCircuit:
             elif distance_scale == 4:
                 # TODO: implement distance 9
                 pass
+        
+        elif n1 > 1 and n2 == 0:
+            # go from left to right and place cnots
+
+            # Contains all patches and operations
+            g = BlockGraph("Logical CNOT")
+
+            placement_x = 0
+            placement_y = 0
+            cnot_counter = 0
+            for _ in range(n1):
+                nodes = [
+                    (Position3D(placement_x, placement_y, 0), "P", f"In_Control_{cnot_counter}"),
+                    (Position3D(placement_x, placement_y, 1), "ZXX", ""),
+                    (Position3D(placement_x, placement_y, 2), "ZXZ", ""),
+                    (Position3D(placement_x, placement_y, 3), "P", f"Out_Control_{cnot_counter}"),
+                    (Position3D(placement_x, placement_y+1, 1), "ZXX", ""),
+                    (Position3D(placement_x, placement_y+1, 2), "ZXZ", ""),
+                    (Position3D(placement_x+1, placement_y+1, 0), "P", f"In_Target_{cnot_counter}"),
+                    (Position3D(placement_x+1, placement_y+1, 1), "ZXZ", ""),
+                    (Position3D(placement_x+1, placement_y+1, 2), "ZXZ", ""),
+                    (Position3D(placement_x+1, placement_y+1, 3), "P", f"Out_Target_{cnot_counter}"),
+                ]
+                for pos, kind, label in nodes:
+                    g.add_cube(pos, kind, label)
+
+                pipes = [(0, 1), (1, 2), (2, 3), # Control
+                        (1, 4), (4, 5), # Ancilla
+                        (5, 8), # Merge
+                        (6, 7), (7, 8), (8, 9) # Target
+                        ]
+
+                for p0, p1 in pipes:
+                    g.add_pipe(nodes[p0][0], nodes[p1][0])
+
+                g.fill_ports(ZXCube.from_str("ZXZ"))
+
+                # Every CNOTS needs a width of 2
+                placement_x += 2
+
+            # Compile the block graph and construct stim circuit
+            compiled_graph = compile_block_graph(g)
+            stim_circuit = compiled_graph.generate_stim_circuit(
+                k = distance_scale,
+                manhattan_radius=2
+            )
+
+            # Utilize the patches from the first and add the qubit shift the every additional patch
+            if distance_scale == 2:
+                single_partitions = [
+                    # Control patch
+                    {
+                        "indices": [
+                            0, 1, 2, 3, 4, 5,
+                            12, 13, 14, 15, 16,
+                            23, 24, 25, 26, 27, 28,
+                            35, 36, 37, 38, 39,
+                            46, 47, 48, 49, 50, 51,
+                            58, 59, 60, 61, 62,
+                            69, 70, 71, 72, 73, 74,
+                            81, 82, 83, 84, 85,
+                            92, 93, 94, 95, 96, 97,
+                            104, 105, 106, 107, 108,
+                            115, 116, 117, 118, 119, 120
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # Ancilla Patch
+                    {
+                        "indices": [
+                            6, 7, 8, 9, 10, 11,
+                            18, 19, 20, 21, 22,
+                            29, 30, 31, 32, 33, 34,
+                            41, 42, 43, 44, 45,
+                            52, 53, 54, 55, 56, 57,
+                            64, 65, 66, 67, 68,
+                            75, 76, 77, 78, 79, 80,
+                            87, 88, 89, 90, 91,
+                            98, 99, 100, 101, 102, 103,
+                            110, 111, 112, 113, 114,
+                            121, 122, 123, 124, 125, 126
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # Target Patch
+                    {
+                        "indices": [
+                            132, 133, 134, 135, 136, 137,
+                            138, 139, 140, 141, 142,
+                            143, 144, 145, 146, 147, 148,
+                            149, 150, 151, 152, 153,
+                            154, 155, 156, 157, 158, 159,
+                            160, 161, 162, 163, 164,
+                            165, 166, 167, 168, 169, 170,
+                            171, 172, 173, 174, 175,
+                            176, 177, 178, 179, 180, 181,
+                            182, 183, 184, 185, 186,
+                            187, 188, 189, 190, 191, 192
+                        ],
+                        "width": 6,
+                        "height": 11,
+                        "distance": 5,
+                        "type": "rotated_surface_code"
+                    },
+                    # CA_Patch
+                    {
+                        "indices": [17, 40, 63, 86, 109],
+                        "width": 6,
+                        "height": 1,
+                        "distance": 5,
+                        "type": "rotated_surface_code_ancilla"
+                    },
+                    # AT_Patch
+                    {
+                        "indices": [127, 128, 129, 130, 131],
+                        "width": 1,
+                        "height": 6,
+                        "distance": 5,
+                        "type": "rotated_surface_code_ancilla"
+                    }
+                ]
+                max_qubit = 192
+                qubit_shift = max_qubit + 1
+                
+            else:
+                pass
+
+            partitions = []
+            for nc in range(n1):
+                print(nc)
+                
+                # Iterate over all single partitions
+                for p in single_partitions:
+                    modified_p = copy.deepcopy(p) 
+                    modified_p['indices'] = [i + nc * qubit_shift for i in modified_p['indices']]
+                    partitions.append(modified_p)
+
+            print(partitions)
         else:
             print("Generating multiple single_cnot")
 
             # Contains all patches and operations
             g = BlockGraph("Logical CNOT")
 
-            n1 = 3
-            n2 = 3
+            n1 = 2
+            n2 = 2
 
             placement_x = 0
             placement_y = 0
@@ -498,10 +643,10 @@ class QECCircuit:
             # Used to determine if the cnot is placed downwards+right, or right+downwards, in order to completely
             # fill the grid optimally
             rotation_counter = 0
-            for x1 in range(n1):
+            for _ in range(n1):
                 placement_y = 0
 
-                for y1 in range(n2):
+                for _ in range(n2):
                     if rotation_counter%2 == 0:
                         # Place downwards+right
                         nodes = [
@@ -585,91 +730,115 @@ class QECCircuit:
                 manhattan_radius=2
             )
             
+            
+            patch_size = (2*distance_scale+1)*2 + 1
+
+
+            # Calculate number of rows for even and odd
+            num_even = n2*2*(2*distance_scale + 1 + 1)
+            num_odd = n2*2*(2*distance_scale + 1 + 1)-1
+            print(num_even)
+            print(num_odd)
+
+            # Iterate over column
+            num_col = (2 + (n1-1)*2 - 1)*((2*distance_scale+1)*2 + 1) + ((2 + (n1-1)*2 - 1) - 1)
+
+            row_counter = 0
+            qubit_index = 0
+            between_1 = True
+            perform_horizontal_skip = True
+
+            for nc in range(0, num_col):
+
+                # This has to be turned on and off every 7 columns or so
+                patch_down = False
+
+                if row_counter % 2 == 0:
+                    # Even
+                    for r in range(num_even):
+                        #print(qubit_index)
+                        qubit_index += 1
+                    
+                else:
+                    # Odd
+                    for r in range(num_odd):
+
+                        # Skip horizontal
+                        if patch_down:
+                            if (r+1)%(2*distance_scale + 2):
+                                continue
+
+
+                        # Skipping horizontal ancilla patch between non-connected patches. Here we need to skip one row 
+                        # Step where we move from one patch to another from top to bottom
+                        patch_move_down = [(2*(2*distance_scale+1) + 1)*(i+1) + i for i in range(n1)]
+                        if r in patch_move_down:
+                            continue
+
+
+                        # Horizontal skip
+                        
+                        if perform_horizontal_skip:
+                            if r in []:
+                                continue
+                            #pass
+
+                        
+                        # Step where we move from one patch to another from left to right
+                        patch_move_right = [patch_size*(i+1) + i for i in range(n1)]
+                        if nc in patch_move_right:
+                            perform_horizontal_skip = not perform_horizontal_skip
+
+                            skip = np.array(list(range(2*distance_scale + 2)))    
+                            vertical_skip = [skip+(i*((2*(2*distance_scale+1) + 2))) for i in range(n2)]
+                            # Convert to simple list
+                            vertical_skip = np.concatenate(vertical_skip)
+                            vertical_skip = vertical_skip.tolist()
+                            
+                            if between_1:
+                                if r in vertical_skip:
+                                    continue
+                            else:
+                                if r not in vertical_skip:
+                                    continue
+                        
+
+                        qubit_index += 1
+
+                row_counter += 1
+                        
+            # Iteate over y (38)
+            print(qubit_index)
+
+
+            partitions = []
             # Compute partitions
             # TODO: This needs to be fixed for multiple cnots
+            if distance_scale == 1:
+                # 3
+                #width = height = 4
+                # ancilla width/height = 3
+                patch_width = patch_height = 4
+                ancilla_size = 3
+                pass
             if distance_scale == 2:
-                partitions = [
-                    # Control patch
-                    {
-                        "indices": [
-                            0, 1, 2, 3, 4, 5,
-                            12, 13, 14, 15, 16,
-                            23, 24, 25, 26, 27, 28,
-                            35, 36, 37, 38, 39,
-                            46, 47, 48, 49, 50, 51,
-                            58, 59, 60, 61, 62,
-                            69, 70, 71, 72, 73, 74,
-                            81, 82, 83, 84, 85,
-                            92, 93, 94, 95, 96, 97,
-                            104, 105, 106, 107, 108,
-                            115, 116, 117, 118, 119, 120
-                        ],
-                        "width": 6,
-                        "height": 11,
-                        "distance": 5,
-                        "type": "rotated_surface_code"
-                    },
-                    # Ancilla Patch
-                    {
-                        "indices": [
-                            6, 7, 8, 9, 10, 11,
-                            18, 19, 20, 21, 22,
-                            29, 30, 31, 32, 33, 34,
-                            41, 42, 43, 44, 45,
-                            52, 53, 54, 55, 56, 57,
-                            64, 65, 66, 67, 68,
-                            75, 76, 77, 78, 79, 80,
-                            87, 88, 89, 90, 91,
-                            98, 99, 100, 101, 102, 103,
-                            110, 111, 112, 113, 114,
-                            121, 122, 123, 124, 125, 126
-                        ],
-                        "width": 6,
-                        "height": 11,
-                        "distance": 5,
-                        "type": "rotated_surface_code"
-                    },
-                    # Target Patch
-                    {
-                        "indices": [
-                            132, 133, 134, 135, 136, 137,
-                            138, 139, 140, 141, 142,
-                            143, 144, 145, 146, 147, 148,
-                            149, 150, 151, 152, 153,
-                            154, 155, 156, 157, 158, 159,
-                            160, 161, 162, 163, 164,
-                            165, 166, 167, 168, 169, 170,
-                            171, 172, 173, 174, 175,
-                            176, 177, 178, 179, 180, 181,
-                            182, 183, 184, 185, 186,
-                            187, 188, 189, 190, 191, 192
-                        ],
-                        "width": 6,
-                        "height": 11,
-                        "distance": 5,
-                        "type": "rotated_surface_code"
-                    },
-                    # CA_Patch
-                    {
-                        "indices": [17, 40, 63, 86, 109],
-                        "width": 6,
-                        "height": 1,
-                        "distance": 5,
-                        "type": "rotated_surface_code_ancilla"
-                    },
-                    # AT_Patch
-                    {
-                        "indices": [127, 128, 129, 130, 131],
-                        "width": 1,
-                        "height": 6,
-                        "distance": 5,
-                        "type": "rotated_surface_code_ancilla"
-                    }
-                ]
+                # 5
+                # width = height = 6
+                # ancilla width / height = 5
+                pass
+            if distance_scale == 3:
+                # 7
+                # width = height = 8
+                # ancilla width / height = 7
+                pass
+            if distance_scale == 4:
+                # 9
+                # width = height = 10
+                # ancilla width / height = 9
+                pass
             else:
                 partitions = None
         
-
         return stim_circuit, partitions
 
 
