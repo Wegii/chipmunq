@@ -111,7 +111,17 @@ def plot_interconnect_sweep(stats, filename):
     plt.close()
 
 
-def simulate_single_cnot_from_tqec() -> None:
+
+def inter_chiplet_routing_sweep() -> None:
+    # Use the basic router
+    
+    # The backend should have 
+
+    # Compare with the cost router for different weight values
+    pass
+
+
+def run_exp_distributed_inter_chiplet() -> None:
 
     # Reference circuit
     circuit, partitions = get_tqec_cnot_rotated()
@@ -209,4 +219,4 @@ def simulate_single_cnot_from_tqec() -> None:
 
 
 if __name__ == "__main__":
-    simulate_single_cnot_from_tqec()
+    run_exp_distributed_inter_chiplet()

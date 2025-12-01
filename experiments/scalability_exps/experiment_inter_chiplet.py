@@ -110,7 +110,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     
 
-def run_transpilation():
+def run_exp_inter_chiplet():
 
 
     low_error_depth = {}
@@ -188,4 +188,4 @@ def run_transpilation():
 
             
 if __name__ == "__main__":
-    run_transpilation()
+    run_exp_inter_chiplet()

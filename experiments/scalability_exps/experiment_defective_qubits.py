@@ -110,7 +110,7 @@ def plot_combined(custom_depth, custom_overhead, filename: str = ""):
 
 
 
-def run_transpilation():
+def run_exp_defective():
 
     # Backend configuration
     num_inter_chiplet_connections = 8
@@ -170,4 +170,4 @@ def run_transpilation():
 
             
 if __name__ == "__main__":
-    run_transpilation()
+    run_exp_defective()

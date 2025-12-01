@@ -65,7 +65,7 @@ def plot_evaluation(stat, filename, with_transpilation = False):
     fig.savefig(filename)
 
 
-def simulate_single_cnot_from_tqec() -> None:
+def run_exp_distributed_lattice_surgery() -> None:
 
     # Reference circuit
     circuit, partitions = get_tqec_cnot_rotated(distance_scale = 2,
@@ -169,4 +169,4 @@ def simulate_single_cnot_from_tqec() -> None:
     
 
 if __name__ == "__main__":
-    simulate_single_cnot_from_tqec()
+    run_exp_distributed_lattice_surgery()

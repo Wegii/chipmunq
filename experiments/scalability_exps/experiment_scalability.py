@@ -57,7 +57,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
 
     
 
-def run_transpilation():
+def run_exp_scalability():
 
     # Backend configuration
     num_inter_chiplet_connections = 8
@@ -130,4 +130,4 @@ def run_transpilation():
             
 
 if __name__ == "__main__":
-    run_transpilation()
+    run_exp_scalability()
