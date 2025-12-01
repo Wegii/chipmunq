@@ -67,11 +67,6 @@ def plot_evaluation(stat, filename, with_transpilation = False):
 
 def run_exp_distributed_lattice_surgery() -> None:
 
-    # Reference circuit
-    circuit, partitions = get_tqec_cnot_rotated(distance_scale = 2,
-                                                n1 = 4,
-                                                n2 = 0)
-    normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
 
     # Number of inter_chiplet_connections
     num_inter_chiplet_connections = [8]
@@ -83,22 +78,29 @@ def run_exp_distributed_lattice_surgery() -> None:
 
     # Transpilation
     ts = ["default"] + [str(i) for i in num_inter_chiplet_connections]
-    ks = [2]
+    ks = [1, 2, 3]
     
     transpiled_circuits = {}
 
-    def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str) -> StimCircuit:
+    def get_circuit(distance_scale: int, n_icc, p_icc, amp_icc, t: str, routing_type: str) -> StimCircuit:
+        # Reference circuit
+        circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
+                                                    n1 = 1,
+                                                    n2 = 0)
+        normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
+        
         if t == "default":
             return normal_circuit_stim
         else:
             backend = get_backend(n_icc = n_icc,
                                   p_icc = p_icc,
-                                  amp_icc = amp_icc)
+                                  amp_icc = amp_icc, 
+                                  d = distance_scale)
 
-            if (n_icc, p_icc, amp_icc, routing_type) in transpiled_circuits:
+            if (distance_scale, n_icc, p_icc, amp_icc, routing_type) in transpiled_circuits:
                 # Circuit does not need to be transpiled again
                 print("Found")
-                return transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type)]
+                return transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, routing_type)]
             else:
                 # Transpile circuit to backend
                 _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
@@ -110,7 +112,7 @@ def run_exp_distributed_lattice_surgery() -> None:
                 # Convert circuit to stim
                 custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
                 # Add circuit to dictionary, in order to not transpile this circuit configuration again
-                transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type)] = custom_circuit_stim
+                transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, routing_type)] = custom_circuit_stim
 
                 plot_circuit_layout(custom_circuit,
                                     backend,
@@ -118,12 +120,26 @@ def run_exp_distributed_lattice_surgery() -> None:
 
                 return custom_circuit_stim
 
-    def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "") -> BackendChipletV2:
+    def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "", d: int = -1) -> BackendChipletV2:
         if t == "default":
             return None
         else:
-            backend = BackendChipletV2(size = (6, 6, 15, 8),
-                                    n_inter = n_icc,
+            # Depending on the distance, each chiplet needs to be scaled
+            print(d)
+            if d == 1:
+                chiplet_size = (6, 6, 10, 6)
+                nic = 5
+            elif d == 2:
+                chiplet_size = (6, 6, 14, 8)
+                nic = 7
+            elif d == 3:
+                chiplet_size = (6, 6, 18, 10)
+                nic = 9
+            elif d == 4:
+                chiplet_size = (6, 6, 22, 12)
+                nic = 11
+            backend = BackendChipletV2(size=chiplet_size,#size = (6, 6, 15, 8),
+                                    n_inter = nic,
                                     connectivity = "nn",
                                     topology = "rotated_grid",
                                     inter_chiplet_noise = p_icc,
@@ -132,8 +148,8 @@ def run_exp_distributed_lattice_surgery() -> None:
                                     num_defective_qubits=0,
                                     )
 
-            plot_gate_map(backend = backend,
-                          filename = "experiments/evaluation/chiplet_evaluation/multi_chiplet_rotated_defective.png")
+            #plot_gate_map(backend = backend,
+            #              filename = "experiments/evaluation/chiplet_evaluation/multi_chiplet_rotated_defective.png")
             return backend
 
     def _get_sinter_task():
@@ -148,10 +164,19 @@ def run_exp_distributed_lattice_surgery() -> None:
                                  None,
                                  p,
                                  None, 
-                                 remote = None#(None if t == "default" else
-                                           #get_backend(int(t), p_icc, 1, t).inter_chiplet_connections)
+                                 remote = (None if t == "default" else
+                                           get_backend(d = k,
+                                                       n_icc = int(t),
+                                                       p_icc = p_icc,
+                                                       amp_icc = 1,
+                                                       t = t).inter_chiplet_connections)
                                  ).noisy_circuit(
-                                     get_circuit(-1 if t == "default" else int(t), p_icc, 1, t, routing_type="default")
+                                     get_circuit(distance_scale = k,
+                                                 n_icc = -1 if t == "default" else int(t),
+                                                 p_icc = p_icc,
+                                                 amp_icc = 1,
+                                                 t = t,
+                                                 routing_type = "cost")
                                      ), k, p, t)
                 
                 for p_icc in ps_inter
@@ -164,7 +189,7 @@ def run_exp_distributed_lattice_surgery() -> None:
     stats = run_sinter_simulation(_get_sinter_task, ks, ps)
 
     plot_evaluation(stats,
-                    filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated.png",
+                    filename = f"experiments/evaluation/qec_evaluation/single_cnot_rotated.png",
                     with_transpilation = True)
     
 

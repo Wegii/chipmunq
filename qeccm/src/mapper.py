@@ -261,15 +261,16 @@ class TrivialMapper(GenericMapper):
 
                         # Calculate starting row and column given the code distance
                         if code_distance == 3:
-                            pass
+                            start_row = local_y + 6
+                            column_length = 8
                         elif code_distance == 5:
                             #start_row = local_y + 8
                             start_row = local_y + 10
                             column_length = 12
                         elif code_distance == 7:
                             # TODO: Implement distance 7
-                            print("Distance 7 not implemented!")
-                            pass
+                            start_row = local_y + 14
+                            column_length = 16
                         elif code_distance == 9:
                             # TODO: Implement distance 9
                             print("Distance 9 not implemented!")

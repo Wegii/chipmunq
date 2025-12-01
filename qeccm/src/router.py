@@ -188,7 +188,7 @@ class CostRouter(GenericRouter):
                 # Check distance in coupling map
                 if not self.coupling_map.distance(q0, q1) == 1:
 
-                    if self.backend.get_chiplet_of_node(q0) == self.backend.get_chiplet_of_node(q0):
+                    if self.backend.get_chiplet_of_node(q0) == self.backend.get_chiplet_of_node(q1):
                         path = self.coupling_map.shortest_undirected_path(q0, q1)
                         new_dag = self._perform_routing_between_nodes(new_dag, path, node, "")
                     
@@ -215,7 +215,7 @@ class CostRouter(GenericRouter):
         :rtype: DAGCircuit
         """
 
-        print("Global routing")
+        print("Global cost routing")
 
         new_dag = DAGCircuit()
         for qreg in dag.qregs.values():
@@ -236,6 +236,7 @@ class CostRouter(GenericRouter):
                 if not self.coupling_map.distance(q0, q1) == 1:
                     if self.backend.get_chiplet_of_node(q0) != self.backend.get_chiplet_of_node(q1):
                         
+
                         # Assume that we only need one inter-chiplet connection from one chip to the next, and not 
                         # multiple inter-chiplet connections from the source to the target
 
@@ -263,29 +264,44 @@ class CostRouter(GenericRouter):
                                              self.beta * (inter_chiplet_utilization[inter_chiplet_nodes] + 1))
 
                         best_path = path
-                        # Iterate over inter-chiplet connections of this chip, and see if it is possible to generate 
-                        # a better routing
-                        # TODO: Add option to only select the k-nearest inter-chiplet connections
-                        for cicc in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
-                            # Route from source to inter-chiplet connection
-                            p0 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
-                            # Route from inter-chiplet connection to target
-                            p1 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
-                            # Combine into one full path
-                            p_combined = p0 + p1[1:]
+                        
+                        # In case the current node already is an inter_chiplet connection, skip
+                        if q0 not in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
+                            # Iterate over inter-chiplet connections of this chip, and see if it is possible to generate 
+                            # a better routing
+                            # TODO: Add option to only select the k-nearest inter-chiplet connections
+                            for cicc in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
+                                # Route from source to inter-chiplet connection
+                                p0 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
+                                # Route from inter-chiplet connection to target
+                                p1 = list(self.coupling_map.shortest_undirected_path(cicc, q1))
+                                # Combine into one full path
+                                p_combined = p0 + p1[1:]
 
-                            path_cost = (len(p_combined) +
-                                         self.alpha * inter_chiplet_connections[inter_chiplet_nodes] +
-                                         self.beta * (inter_chiplet_utilization[inter_chiplet_nodes] + 1))
-                            
-                            if path_cost < current_path_cost:
-                                current_path_cost = path_cost
-                                best_path = p_combined
+                                # Convert value to int, since this is a numpy int
+                                cicc = int(p1[0])
+                                cicc_2 = int(p1[1])
+                                new_inter_chiplet_nodes = (cicc, cicc_2)
+                                if not (new_inter_chiplet_nodes in inter_chiplet_connections):
+                                    new_inter_chiplet_nodes = (new_inter_chiplet_nodes[1], new_inter_chiplet_nodes[0])
 
+                                if not (new_inter_chiplet_nodes in inter_chiplet_connections):
+                                    # The inter-chiplet connection does not exist
+                                    continue
+
+                                path_cost = (len(p_combined) +
+                                            self.alpha * inter_chiplet_connections[new_inter_chiplet_nodes] +
+                                            self.beta * (inter_chiplet_utilization[new_inter_chiplet_nodes] + 1))
+                                
+                                if path_cost < current_path_cost:
+                                    current_path_cost = path_cost
+                                    best_path = p_combined
+                                    print("Chosen a better path")
+                        
                         # Route path with lowest cost
                         new_dag = self._perform_routing_between_nodes(new_dag = new_dag,
                                                                       path = best_path,
-                                                                      gate_operation = node.op,
+                                                                      gate_operation = node,
                                                                       method = "")
                         
 
@@ -419,7 +435,7 @@ class ParallelSwapRouter(GenericRouter):
         print("local routing")
         local_dag_instr = self._local_routing(dag, local_dag_nodes)
         # Global routing between chiplet
-        print("global routing")
+        print("global cost routing")
         global_dag_instr = self._global_routing(remote_dag_nodes)
 
         # Construct dag given local and global routing instructions
