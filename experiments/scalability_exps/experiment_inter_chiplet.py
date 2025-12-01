@@ -142,7 +142,7 @@ def run_exp_inter_chiplet():
                             topology = "rotated_grid",
                             inter_chiplet_noise = 1e-4,
                             inter_chiplet_amplification = 1,
-                            inter_chiplet_noise_type = "constant",
+                            inter_chiplet_noise_type = "random",
                             num_defective_qubits=0,
                         )
             
@@ -152,7 +152,7 @@ def run_exp_inter_chiplet():
                             topology = "rotated_grid",
                             inter_chiplet_noise = 1e-2,
                             inter_chiplet_amplification = 1,
-                            inter_chiplet_noise_type = "constant",
+                            inter_chiplet_noise_type = "random",
                             num_defective_qubits=0,
                         )
 
@@ -162,12 +162,16 @@ def run_exp_inter_chiplet():
             # Custom transpilation
             low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e4,
-                                                          pre_defined_partitions=partitions)
+                                                          pre_defined_partitions=partitions,
+                                                          routing_alpha = 10,##1e-4,
+                                                          routing_beta = 1)
 
             # Sabre transpilation
             high_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e2,
-                                                          pre_defined_partitions=partitions)
+                                                          pre_defined_partitions=partitions,
+                                                          routing_alpha = 0,##1e-4,
+                                                          routing_beta = 0)
 
             def num_2q_gates(circuit):
                 ops = circuit.count_ops()

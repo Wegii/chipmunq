@@ -51,7 +51,7 @@ def get_tqec_cnot_rotated(distance_scale: int = 2, n1: int = 1, n2: int = 0) -> 
                                                                          n1 = n1,
                                                                          n2 = n2)
 
-    with open("stim_circuit_cnot_multiple.stim", "w") as f:
+    with open(f"stim_cnot_d_{distance_scale}.stim", "w") as f:
         print(stim_circuit, file=f)
   
     return stim_circuit, partitions
@@ -388,106 +388,10 @@ class QECCircuit:
         return stim_to_qiskit(stim_circuit), stim_circuit
     
     def single_cnot_full_memory(self, distance_scale: int = 1, n1: int = 1, n2: int = 0):
-
-        if n1 == 1 and n2 == 0:
-            # Construct a single CNOT
-            g = cnot(Basis.Z)
-
-            compiled_graph = compile_block_graph(g)
-            stim_circuit = compiled_graph.generate_stim_circuit(
-                k = distance_scale,
-                manhattan_radius=2
-            )
-
-            if distance_scale == 2:
-                partitions = [
-                    # Control patch
-                    {
-                        "indices": [
-                            0, 1, 2, 3, 4, 5,
-                            12, 13, 14, 15, 16,
-                            23, 24, 25, 26, 27, 28,
-                            35, 36, 37, 38, 39,
-                            46, 47, 48, 49, 50, 51,
-                            58, 59, 60, 61, 62,
-                            69, 70, 71, 72, 73, 74,
-                            81, 82, 83, 84, 85,
-                            92, 93, 94, 95, 96, 97,
-                            104, 105, 106, 107, 108,
-                            115, 116, 117, 118, 119, 120
-                        ],
-                        "width": 6,
-                        "height": 11,
-                        "distance": 5,
-                        "type": "rotated_surface_code"
-                    },
-                    # Ancilla Patch
-                    {
-                        "indices": [
-                            6, 7, 8, 9, 10, 11,
-                            18, 19, 20, 21, 22,
-                            29, 30, 31, 32, 33, 34,
-                            41, 42, 43, 44, 45,
-                            52, 53, 54, 55, 56, 57,
-                            64, 65, 66, 67, 68,
-                            75, 76, 77, 78, 79, 80,
-                            87, 88, 89, 90, 91,
-                            98, 99, 100, 101, 102, 103,
-                            110, 111, 112, 113, 114,
-                            121, 122, 123, 124, 125, 126
-                        ],
-                        "width": 6,
-                        "height": 11,
-                        "distance": 5,
-                        "type": "rotated_surface_code"
-                    },
-                    # Target Patch
-                    {
-                        "indices": [
-                            132, 133, 134, 135, 136, 137,
-                            138, 139, 140, 141, 142,
-                            143, 144, 145, 146, 147, 148,
-                            149, 150, 151, 152, 153,
-                            154, 155, 156, 157, 158, 159,
-                            160, 161, 162, 163, 164,
-                            165, 166, 167, 168, 169, 170,
-                            171, 172, 173, 174, 175,
-                            176, 177, 178, 179, 180, 181,
-                            182, 183, 184, 185, 186,
-                            187, 188, 189, 190, 191, 192
-                        ],
-                        "width": 6,
-                        "height": 11,
-                        "distance": 5,
-                        "type": "rotated_surface_code"
-                    },
-                    # CA_Patch
-                    {
-                        "indices": [17, 40, 63, 86, 109],
-                        "width": 6,
-                        "height": 1,
-                        "distance": 5,
-                        "type": "rotated_surface_code_ancilla"
-                    },
-                    # AT_Patch
-                    {
-                        "indices": [127, 128, 129, 130, 131],
-                        "width": 1,
-                        "height": 6,
-                        "distance": 5,
-                        "type": "rotated_surface_code_ancilla"
-                    }
-                ]
-            elif distance_scale == 3:
-                # TODO: implement distance 7
-                pass
-            elif distance_scale == 4:
-                # TODO: implement distance 9
-                pass
         
-        elif n1 > 1 and n2 == 0:
+        if n1 >= 1 and n2 == 0:
             # go from left to right and place cnots
-
+            
             # Contains all patches and operations
             g = BlockGraph("Logical CNOT")
 
@@ -532,7 +436,58 @@ class QECCircuit:
             )
 
             # Utilize the patches from the first and add the qubit shift the every additional patch
-            if distance_scale == 2:
+            if distance_scale == 1:
+                single_partitions = [
+                    {
+                        "indices": [
+                            0, 1, 2, 3, 8, 9, 10, 15, 16, 17, 18, 23, 24, 25, 30, 31, 32, 33, 38, 39, 40, 45, 46, 47, 48
+                        ],
+                        "width": 4,
+                        "height": 7,
+                        "distance": 3,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            4, 5, 6, 7, 12, 13, 14, 19, 20, 21, 22, 27, 28, 29, 34, 35, 36, 37, 42, 43, 44, 49, 50, 51, 52
+                        ],
+                        "width": 4,
+                        "height": 7,
+                        "distance": 3,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80
+                        ],
+                        "width": 4,
+                        "height": 7,
+                        "distance": 3,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            11, 26, 41
+                        ],
+                        "width": 4,
+                        "height": 1,
+                        "distance": 3,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            53, 54, 55
+                        ],
+                        "width": 1,
+                        "height": 4,
+                        "distance": 3,
+                        "type": "rotated_surface_code"
+                    }
+                ]
+                max_qubit = 80
+                qubit_shift = max_qubit + 1
+
+            elif distance_scale == 2:
                 single_partitions = [
                     # Control patch
                     {
@@ -614,6 +569,127 @@ class QECCircuit:
                 max_qubit = 192
                 qubit_shift = max_qubit + 1
                 
+            elif distance_scale == 3:
+
+                single_partitions = [
+                    {
+                        "indices": [
+                           0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 31, 32, 33, 34, 35, 36, 37, 38, 47, 48,
+                           49, 50, 51, 52, 53, 62, 63, 64, 65, 66, 67, 68, 69, 78, 79, 80, 81, 82, 83, 84, 93, 94, 95,
+                           96, 97, 98, 99, 100, 109, 110, 111, 112, 113, 114, 115, 124, 125, 126, 127, 128, 129, 130,
+                           131, 140, 141, 142, 143, 144, 145, 146, 155, 156, 157, 158, 159, 160, 161, 162, 171, 172,
+                           173, 174, 175, 176, 177, 186, 187, 188, 189, 190, 191, 192, 193, 202, 203, 204, 205, 206,
+                           207, 208, 217, 218, 219, 220, 221, 222, 223, 224
+                        ],
+                        "width": 8,
+                        "height": 15,
+                        "distance": 7,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 42, 43, 44, 45, 46,
+                            55, 56, 57, 58, 59, 60, 61, 70, 71, 72, 73, 74, 75, 76, 77, 86, 87, 88, 89, 90, 91, 92, 101,
+                              102, 103, 104, 105, 106, 107, 108, 117, 118, 119, 120, 121, 122, 123, 132, 133, 134, 135,
+                              136, 137, 138, 139, 148, 149, 150, 151, 152, 153, 154, 163, 164, 165, 166, 167, 168, 169,
+                              170, 179, 180, 181, 182, 183, 184, 185, 194, 195, 196, 197, 198, 199, 200, 201, 210, 211,
+                              212, 213, 214, 215, 216, 225, 226, 227, 228, 229, 230, 231, 232
+                        ],
+                        "width": 8,
+                        "height": 15,
+                        "distance": 7,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257,
+                            258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275,
+                            276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293,
+                            294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311,
+                            312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329,
+                            330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347,
+                            348, 349, 350, 351, 352
+                        ],
+                        "width": 8,
+                        "height": 15,
+                        "distance": 7,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            23, 54, 85, 116, 147, 178, 209
+                        ],
+                        "width": 8,
+                        "height": 1,
+                        "distance": 7,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            233, 234, 235, 236, 237, 238, 239
+                        ],
+                        "width": 1,
+                        "height": 15,
+                        "distance": 7,
+                        "type": "rotated_surface_code"
+                    }
+                ]
+
+                max_qubit = 352
+                qubit_shift = max_qubit + 1
+
+            elif distance_scale == 4:
+
+                single_partitions = [
+                    {
+                        "indices": [
+                            
+                        ],
+                        "width": None,
+                        "height": None,
+                        "distance": 9,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            
+                        ],
+                        "width": None,
+                        "height": None,
+                        "distance": 9,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            
+                        ],
+                        "width": None,
+                        "height": None,
+                        "distance": 9,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            
+                        ],
+                        "width": None,
+                        "height": 1,
+                        "distance": 9,
+                        "type": "rotated_surface_code"
+                    },
+                    {
+                        "indices": [
+                            
+                        ],
+                        "width": 1,
+                        "height": None,
+                        "distance": 9,
+                        "type": "rotated_surface_code"
+                    }
+                ]
+                max_qubit = None
+                qubit_shift = max_qubit + 1
+                pass
             else:
                 pass
 
