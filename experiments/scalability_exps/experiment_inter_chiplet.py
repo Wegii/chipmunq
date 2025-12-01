@@ -30,18 +30,18 @@ import matplotlib.pyplot as plt
 
 
 
-def plot_combined(custom_depth, custom_overhead, sabre_depth, sabre_overhead, filename: str = ""):
-    ks = list(next(iter(custom_depth.values())).keys())[0]
-    np_values = sorted(custom_depth.keys())
+def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: str = ""):
+    ks = list(next(iter(low_depth.values())).keys())[0]
+    np_values = low_depth.keys()#sorted(low_depth.keys())
 
-    section_titles = ["Small", "Medium", "Big"]
+    section_titles = ["Full", "Limited"]
 
     # Extract values
-    custom_depth_vals = [custom_depth[np][ks] for np in np_values]
-    sabre_depth_vals = [sabre_depth[np][ks] for np in np_values]
+    low_depth_vals = [low_depth[np][ks] for np in np_values]
+    high_depth_vals = [high_depth[np][ks] for np in np_values]
 
-    custom_over_vals = [custom_overhead[np][ks] for np in np_values]
-    sabre_over_vals = [sabre_overhead[np][ks] for np in np_values]
+    low_over_vals = [low_overhead[np][ks] for np in np_values]
+    high_over_vals = [high_overhead[np][ks] for np in np_values]
 
     x = np.arange(len(np_values))
     width = 0.35
@@ -53,12 +53,12 @@ def plot_combined(custom_depth, custom_overhead, sabre_depth, sabre_overhead, fi
     # Create depth statistics
     fig, ax = plt.subplots(figsize=(5, 8))
 
-    ax.bar(x - width/2, custom_depth_vals, width,
-           label="Custom", color=pastel_blue,
+    ax.bar(x - width/2, low_depth_vals, width,
+           label="inter_chiplet_error = 1e-4", color=pastel_blue,
            hatch='/', edgecolor='black')
 
-    ax.bar(x + width/2, sabre_depth_vals, width,
-           label="SABRE", color=pastel_orange,
+    ax.bar(x + width/2, high_depth_vals, width,
+           label="inter_chiplet_error = 1e-2", color=pastel_orange,
            hatch='o', edgecolor='black')
 
     ax.set_xticks(x)
@@ -82,12 +82,12 @@ def plot_combined(custom_depth, custom_overhead, sabre_depth, sabre_overhead, fi
     # Create 2q gate overhead
     fig, ax = plt.subplots(figsize=(5, 8))
 
-    ax.bar(x - width/2, custom_over_vals, width,
-           label="Custom", color=pastel_blue,
+    ax.bar(x - width/2, low_over_vals, width,
+           label="inter_chiplet_error = 1e-4", color=pastel_blue,
            hatch='/', edgecolor='black')
 
-    ax.bar(x + width/2, sabre_over_vals, width,
-           label="SABRE", color=pastel_orange,
+    ax.bar(x + width/2, high_over_vals, width,
+           label="inter_chiplet_error = 1e-2", color=pastel_orange,
            hatch='o', edgecolor='black')
 
     ax.set_xticks(x)
@@ -111,25 +111,22 @@ def plot_combined(custom_depth, custom_overhead, sabre_depth, sabre_overhead, fi
 
 def run_transpilation():
 
-    # Backend configuration
-    num_inter_chiplet_connections = 8
-    ps_inter = 1e-4
 
-    custom_depth = {}
-    custom_overhead = {}
-    sabre_depth = {}
-    sabre_overhead = {}
+    low_error_depth = {}
+    low_error_overhead = {}
+    high_error_depth = {}
+    high_error_overhead = {}
 
-    n_patches = [1, 5, 10]
+    np = 4
+    num_inter_chiplet_connections = [8, 1]
     for ks in [2]:#[1, 2, 3, 4]
-        for np in n_patches:
+        for ni in num_inter_chiplet_connections:
 
-            if np not in custom_depth:
-
-                custom_depth[np] = {}
-                custom_overhead[np] = {}
-                sabre_depth[np] = {}
-                sabre_overhead[np] = {}
+            if ni not in low_error_depth:
+                low_error_depth[ni] = {}
+                low_error_overhead[ni] = {}
+                high_error_depth[ni] = {}
+                high_error_overhead[ni] = {}
 
             # TODO: Calculate necessary backend given number of patches
 
@@ -138,11 +135,21 @@ def run_transpilation():
                                                         n1 = np,
                                                         n2 = 0)
 
-            backend = BackendChipletV2(size = (np*2, np*2, 15, 8),
-                            n_inter = num_inter_chiplet_connections,
+            backend_1e4 = BackendChipletV2(size = (np*2, np*2, 15, 8),
+                            n_inter = ni,
                             connectivity = "nn",
                             topology = "rotated_grid",
-                            inter_chiplet_noise = ps_inter,
+                            inter_chiplet_noise = 1e-4,
+                            inter_chiplet_amplification = 1,
+                            inter_chiplet_noise_type = "constant",
+                            num_defective_qubits=0,
+                        )
+            
+            backend_1e2 = BackendChipletV2(size = (np*2, np*2, 15, 8),
+                            n_inter = ni,
+                            connectivity = "nn",
+                            topology = "rotated_grid",
+                            inter_chiplet_noise = 1e-2,
                             inter_chiplet_amplification = 1,
                             inter_chiplet_noise_type = "constant",
                             num_defective_qubits=0,
@@ -152,31 +159,31 @@ def run_transpilation():
             stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 
             # Custom transpilation
-            print("Custom")
-            custom_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                       backend,
-                                                       pre_defined_partitions=partitions)
+            low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                          backend_1e4,
+                                                          pre_defined_partitions=partitions)
 
             # Sabre transpilation
-            print("Sabre")
-            sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+            high_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                          backend_1e2,
+                                                          pre_defined_partitions=partitions)
 
             def num_2q_gates(circuit):
                 ops = circuit.count_ops()
                 two_qubit_gate_names = ["cx", "cz", "swap"]
                 return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
-            custom_depth[np][ks] = custom_circuit.depth() - (stim_code_circuit.qc).depth()
-            custom_overhead[np][ks] = num_2q_gates(custom_circuit) - num_2q_gates(stim_code_circuit.qc)
+            low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
+            low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-            sabre_depth[np][ks] = sabre_circuit.depth() - (stim_code_circuit.qc).depth()
-            sabre_overhead[np][ks] = num_2q_gates(sabre_circuit) - num_2q_gates(stim_code_circuit.qc)
+            high_error_depth[ni][ks] = high_error_circuit.depth() - (stim_code_circuit.qc).depth()
+            high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-    plot_combined(custom_depth,
-                  custom_overhead,
-                  sabre_depth,
-                  sabre_overhead,
-                  "experiments/evaluation/cnot_scaling_overhead")
+    plot_combined(low_error_depth,
+                  low_error_overhead,
+                  high_error_depth,
+                  high_error_overhead,
+                  "experiments/evaluation/cnot_inter_chiplet_overhead")
 
             
 if __name__ == "__main__":
