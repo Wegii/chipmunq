@@ -1,4 +1,5 @@
-# How do circuit depth and gate overhead scale as circuit size increases?
+# How does the number of inter-chiplet connections influence circuit routing?
+# How does the error of inter-chiplet connections influence circuit routing?
 
 
 from __future__ import annotations
