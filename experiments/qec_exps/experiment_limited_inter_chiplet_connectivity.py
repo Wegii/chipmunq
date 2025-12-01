@@ -36,7 +36,7 @@ def plot_evaluation(stat, filename, with_transpilation = False):
     if with_transpilation:
         grp_fc = lambda stat: (
             stat.json_metadata["d"],
-            stat.json_metadata["configuration"]
+            stat.json_metadata["run_name"],
             )
     else:
         grp_fc = lambda stat: (
@@ -57,6 +57,59 @@ def plot_evaluation(stat, filename, with_transpilation = False):
     ax.set_ylabel("Logical Error Rate")
     fig.savefig(filename)
 
+def plot_interconnect_sweep(stats, filename):
+    from collections import defaultdict
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Collect raw data points grouped by physical error rate
+    points_by_p = defaultdict(list)   # p → list of (p_inter, ler, d, config)
+    points_by_group = defaultdict(list)  # (p, run_name) -> list of (p_inter, ler)
+
+
+    fig = plt.figure(figsize=(10,7))
+    ax = fig.add_subplot(111, projection="3d")
+
+    for s in stats:
+        ler = s.errors / (s.shots - s.discards)
+
+        p        = s.json_metadata["p"]
+        p_inter  = s.json_metadata["p_inter"]
+        d        = s.json_metadata["d"]
+        config   = s.json_metadata["run_name"]
+
+        points_by_p[p].append((p_inter, ler, d, config))
+        points_by_group[(p, config)].append((p_inter, ler))
+
+
+        ax.scatter(p, p_inter, ler, marker='o')
+
+    for (p, run_name), plist in points_by_group.items():
+        # Sort so that connecting lines follow p_inter
+        plist_sorted = sorted(plist, key=lambda x: x[0])
+
+        p_inters = [pt[0] for pt in plist_sorted]
+        lers     = [pt[1] for pt in plist_sorted]
+        ps       = [p] * len(plist_sorted)
+
+        # Connect points
+        ax.plot(ps, p_inters, lers)#, label=f"{run_name}")
+
+
+
+    ax.set_xlabel("Physical Error Rate (p)")
+    ax.set_ylabel("Inter-Chiplet Error Rate (p_inter)")
+    ax.set_zlabel("Logical Error Rate (LER)")
+    ax.set_title("3D Scatter Plot with Lines Grouped by Physical Error Rate")
+    #ax.zaxis.set_ticks_position('left')
+    #ax.zaxis.set_label_position('left')
+
+    ax.legend()
+
+    plt.tight_layout()
+    plt.savefig(filename, bbox_inches="tight")
+    plt.close()
+
 
 def simulate_single_cnot_from_tqec() -> None:
 
@@ -65,21 +118,21 @@ def simulate_single_cnot_from_tqec() -> None:
     normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
 
     # Number of inter_chiplet_connections
-    num_inter_chiplet_connections = [8, 4]#, 2, 1]
+    num_inter_chiplet_connections = [8, 1]#[8, 4, 2, 1]
     
     # Noise level
-    ps = list(np.logspace(-4, -1, 10))
+    ps = list(np.logspace(-4, -1, 10))#list(np.logspace(-4, -1, 10))
     # Inter-chiplet noise level
-    ps_inter = [1e-3]
+    ps_inter = [1e-2]#[1e-3, 1e-2]
 
     # Transpilation
-    ts = ["default"] + [str(i) for i in num_inter_chiplet_connections]
+    ts = [str(i) for i in num_inter_chiplet_connections]
     ks = [2]
-    routing_types = ["cost", "default"]
+    routing_types = ["cost", "default"]#, ["default"]
 
     transpiled_circuits = {}
 
-    def get_circuit(n_icc, p_icc, amp_icc, t: str, routing_type: str) -> StimCircuit:
+    def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str) -> StimCircuit:
         if t == "default":
             return normal_circuit_stim
         else:
@@ -97,7 +150,7 @@ def simulate_single_cnot_from_tqec() -> None:
                                                                 backend,
                                                                 pre_defined_partitions = partitions,
                                                                 routing_type = routing_type,#"cost",
-                                                                routing_alpha = 1e3,
+                                                                routing_alpha = 1e4,
                                                                 routing_beta = 1.0)
                 # Convert circuit to stim
                 custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
@@ -124,33 +177,35 @@ def simulate_single_cnot_from_tqec() -> None:
         yield from (
             sinter.Task(
                 circuit=circuit,
-                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "configuration": t + rt},
+                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t + rt, "p_inter": p_icc},
             )
-            for circuit, k, p, t, rt in (
-                (get_noise_model("si1000",
+            for circuit, k, p, t, rt, p_icc in (
+                (get_noise_model("modsi1000",
                                  None,
                                  p,
                                  None, 
                                  remote = (None if t == "default" else
-                                           get_backend(n_icc, p_icc, 1, t).inter_chiplet_connections)
+                                           get_backend(int(t), p_icc, 1, t).inter_chiplet_connections)
                                  ).noisy_circuit(
-                                     get_circuit(n_icc, p_icc, 1, t, routing_type=rt)
-                                     ), k, p, t, rt)
+                                     get_circuit(-1 if t == "default" else int(t), p_icc, 1, t, routing_type=rt)
+                                     ), k, p, t, rt, p_icc)
                 
-                for k in ks
-                for p in ps
                 for p_icc in ps_inter
                 for t in ts
                 for rt in routing_types
-                for n_icc in num_inter_chiplet_connections
+                for k in ks
+                for p in ps
             )
         )
 
     stats = run_sinter_simulation(_get_sinter_task, ks, ps)
 
     plot_evaluation(stats,
-                    filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet.png",
+                    filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet{ps_inter[0]}.png",
                     with_transpilation = True)
+    
+    #plot_interconnect_sweep(stats,
+    #                        filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet_sweep.png")
 
 
 if __name__ == "__main__":

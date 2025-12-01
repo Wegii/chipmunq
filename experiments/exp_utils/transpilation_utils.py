@@ -11,8 +11,10 @@ from qeccm.src.mar import PartitionedMapRoutePlugin
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
 
 
-def custom_partitioned_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2, 
-                                     pre_defined_partitions: list = None) -> qiskit.QuantumCircuit:
+def custom_partitioned_transpilation(circuit: QuantumCircuit,
+                                     backend: BackendChipletV2, 
+                                     pre_defined_partitions: list = None
+                                     ) -> qiskit.QuantumCircuit:
     """Transpile circuit to a chiplet backend using custom mapping and routing.
 
     :param circuit: _description_

@@ -63,7 +63,7 @@ def run_sinter_simulation(tasks_fct, ks, ps):
         tasks=(tasks_fct()),
         save_resume_filepath = None,
         progress_callback=None,
-        max_shots=10_000_000, #10_000_000,
+        max_shots=100_000_000, #10_000_000,
         max_errors=5_000,
         decoders=["pymatching"],
         print_progress=True,

@@ -16,6 +16,8 @@ from experiments.exp_utils.circuit_utils import stim_to_qiskit
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 
+from glue.eccentric_bench.noise import get_noise_model
+
 from tqec.utils.noise_model import NoiseModel
 from tqec.computation.block_graph import BlockGraph
 from tqec.utils.enums import Basis
@@ -24,7 +26,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def _run_simulation(circuit: list) -> None:
+def _run_simulation(circuit: list, backend: BackendChipletV2 = None) -> None:
     """_summary_
 
     Circuit should be [compiled_circuit_stim, default_circuit_stim]
@@ -49,8 +51,6 @@ def _run_simulation(circuit: list) -> None:
 
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
-    # TODO: Change to noise model that takes remote gates into consideration
-    tqec_noise_model = NoiseModel.si1000
 
     # Transpilation
     ts = ["default", "deformed"]
@@ -64,7 +64,14 @@ def _run_simulation(circuit: list) -> None:
                 json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "transpilation": t},
             )
             for circuit, k, p, t in (
-                (tqec_noise_model(p).noisy_circuit(circuit[0 if t == "compiled" else 1]), k, p, t)
+                #(NoiseModel.si1000(p).noisy_circuit(circuit[0 if t == "compiled" else 1]), k, p, t)
+                (get_noise_model("si1000",
+                                 None,
+                                 p,
+                                 None, 
+                                 remote = backend.get_inter_chiplet(p, 10) if backend != None else None).noisy_circuit(
+                    circuit[0 if t == "compiled" else 1]
+                    ), k, p, t)
                 
                 for k, circuit in circuits.items()
                 for p in ps
@@ -166,7 +173,7 @@ def simulate_single_cnot_from_tqec() -> None:
     #    print(custom_circuit, file=f)
 
     print("Starting simulation")
-    stats = _run_simulation([custom_circuit_stim, normal_circuit_stim])
+    stats = _run_simulation([custom_circuit_stim, normal_circuit_stim], backend)
     plot_sinter_stats(stats,
                 filename = f"experiments/evaluation/single_cnot_rotated.png",
                 with_transpilation = True)

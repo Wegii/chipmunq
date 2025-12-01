@@ -449,6 +449,8 @@ class TrivialMapper(GenericMapper):
 
         print(connected_partitions)
 
+        print(width)
+        print(height)
         # Initialize all QPUs with their widht and height, as well as coordinates. The widht and height are used for
         # calculating which partitions (given their width and height) can be placed on this QPU.
         qpu_blocks = {(x, y): QPUBlock(self.backend.m, self.backend.n, (x, y))
@@ -480,18 +482,24 @@ class TrivialMapper(GenericMapper):
                     # For the grid layout is is either possible to fill the grid from the top to the right, or from the
                     # top to the bottom. The option implemented iterates from the top left to the bottom left
                     
+                    print("\n\n")
+                    print("placing new bfs")
                     current_x = 0
                     current_y = 0
-                    for y in range(height):
-                        for x in range(width):
+                    pos = None
+                    for x in range(0, width, 2):
+                        #if x != 0:
+                        #    x += 2
+                        for y in range(0, height, 2):
                             pos = qpu_blocks[(x, y)].place_partition(partition_id, pw, ph)
 
                             # QPU found
                             if pos != None:
-                                print(f"Placed partition on QPU {current_x}{current_y}")
-                                placement[partition_id] = pos
                                 current_x = x
                                 current_y = y
+
+                                print(f"Placed partition on QPU {current_x}{current_y}")
+                                placement[partition_id] = pos
                                 break
 
                         # QPU found
@@ -502,12 +510,13 @@ class TrivialMapper(GenericMapper):
                     partition_anchor = partitions[partition_bfs[li-1]]
                     # Partition that we want to place
                     partition_current = partitions[partition_id]
-                    print("anchor")
-                    print(min(partition_anchor))
-                    print(max(partition_anchor))
-                    print("current")
-                    print(min(partition_current))
-                    print(max(partition_current))
+                    #print("anchor")
+                    #print(min(partition_anchor))
+                    #print(max(partition_anchor))
+                    #print("current")
+                    #print(min(partition_current))
+                    #
+                    # print(max(partition_current))
                     ##min(partition_current) > min(partition_anchor) or max(partition_current) > max(partition_anchor):
                     #6 > 17
                     if min(partition_current) < max(partition_anchor):#min(partition_current) > min(partition_anchor) and min(partition_current) < max(partition_anchor):
@@ -522,12 +531,12 @@ class TrivialMapper(GenericMapper):
                                                                                 partition_bfs[li-1],
                                                                                 "above"
                                                                                 )
-
+                        print(pos)
                         if pos == None:
                             # If it is not possible to place the partition to the bottom on this QPU, select the QPU
                             # below the current one. This should always be possible
                             pos = qpu_blocks[(current_x, current_y+1)].place_partition(partition_id, pw, ph)
-                            
+                            print(pos)
                             if pos == None:
                                 ValueError(f"Something wrong for placement below!")
 
@@ -548,6 +557,7 @@ class TrivialMapper(GenericMapper):
                                                                                 partition_bfs[li-1],
                                                                                 "right"
                                                                                 )
+                        print(pos)
 
                         if pos == None:
                             # If it is not possible to place the partition to the bottom on this QPU, select the QPU

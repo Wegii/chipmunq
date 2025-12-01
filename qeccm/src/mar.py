@@ -154,7 +154,6 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
                 seed=42
                 )
         
-
         router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])
         
         return router_pm

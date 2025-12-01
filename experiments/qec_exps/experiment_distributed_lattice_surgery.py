@@ -68,12 +68,10 @@ def plot_evaluation(stat, filename, with_transpilation = False):
 def simulate_single_cnot_from_tqec() -> None:
 
     # Reference circuit
-    circuit, partitions = get_tqec_cnot_rotated(distance_scale = 1,
-                                                n1 = 1,
-                                                n2 = 1)
+    circuit, partitions = get_tqec_cnot_rotated(distance_scale = 2,
+                                                n1 = 4,
+                                                n2 = 0)
     normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
-
-    return
 
     # Number of inter_chiplet_connections
     num_inter_chiplet_connections = [8]
@@ -81,7 +79,7 @@ def simulate_single_cnot_from_tqec() -> None:
     # Noise level
     ps = list(np.logspace(-4, -1, 10))#list(np.logspace(-4, -1, 10))
     # Inter-chiplet noise level
-    ps_inter = [1e-6]#[1e-3, 1e-2]
+    ps_inter = [1e-4]#[1e-3, 1e-2]
 
     # Transpilation
     ts = ["default"] + [str(i) for i in num_inter_chiplet_connections]
@@ -124,7 +122,7 @@ def simulate_single_cnot_from_tqec() -> None:
         if t == "default":
             return None
         else:
-            backend = BackendChipletV2(size = (2, 3, 15, 8),
+            backend = BackendChipletV2(size = (6, 6, 15, 8),
                                     n_inter = n_icc,
                                     connectivity = "nn",
                                     topology = "rotated_grid",
