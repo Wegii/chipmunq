@@ -28,7 +28,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_combined(custom_depth, custom_overhead, title_left: str, filename: str = ""):
+def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left: str, filename: str = ""):
 
     # placement modes (outer keys)
     placement_modes = list(custom_depth.keys())  # ["default", "size_aware"]
@@ -52,7 +52,7 @@ def plot_combined(custom_depth, custom_overhead, title_left: str, filename: str 
 
     labels = placement_modes  # ["default", "size_aware"]
 
-    # ----------- DEPTH PLOT -------------
+    # ----------- Depth Overhead -------------
     fig, ax = plt.subplots(figsize=(5, 5))
 
     for i, mode in enumerate(placement_modes):
@@ -92,7 +92,7 @@ def plot_combined(custom_depth, custom_overhead, title_left: str, filename: str 
     fig.savefig(f"{filename}_depth.png", dpi=300)
     plt.show()
 
-    # ----------- 2Q GATE OVERHEAD -------------
+    # ----------- 2Q Gate Overhead -------------
     fig, ax = plt.subplots(figsize=(5, 5))
 
     for i, mode in enumerate(placement_modes):
@@ -133,8 +133,88 @@ def plot_combined(custom_depth, custom_overhead, title_left: str, filename: str 
     plt.show()
 
 
+    # ----------- Backend Utilization -------------
+    fig, ax = plt.subplots(figsize=(5, 5))
+
+    for i, mode in enumerate(placement_modes):
+        vals = [custom_utilization[mode][df][ks] for df in df_values]
+        ax.bar(
+            x + i * width - width/2,
+            vals,
+            width,
+            label=labels[i],
+            color=colors[i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(df) for df in df_values])
+    ax.set_xlabel("#Defective Qubits")
+    ax.set_ylabel("Utilization")
+    ax.legend()
+    ax.set_ylim(0, 1)
+
+    ax.text(
+        0, 1.02, title_left,
+        transform=ax.transAxes,
+        fontsize=9,
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.71, 1.02, "Higher is better ↑",
+        transform=ax.transAxes,
+        fontsize=9,
+        fontweight="bold",
+        color=pastel_blue,
+    )
+
+    fig.tight_layout()
+    fig.savefig(f"{filename}_utilization.png", dpi=300)
+    plt.show()
+
+
 def plot_utilization():
     pass
+
+
+def calculate_qpu_utilization(circuit, backend):
+
+    # Iterate over circuit
+    num_qubits_per_chiplet = backend.n * backend.m
+    utilized_chiplets = set()
+
+    num_qubits = backend.num_qubits
+    cmap = backend.coupling_map
+
+    qubits = []
+    qubit_labels = [""] * num_qubits
+
+    bit_locations = {
+        bit: {"register": register, "index": index}
+        for register in circuit._layout.initial_layout.get_registers()
+        for index, bit in enumerate(register)
+    }
+    for index, qubit in enumerate(circuit._layout.initial_layout.get_virtual_bits()):
+        if qubit not in bit_locations:
+            bit_locations[qubit] = {"register": None, "index": index}
+
+    for key, val in circuit._layout.initial_layout.get_virtual_bits().items():
+        bit_register = bit_locations[key]["register"]
+        if bit_register is None or bit_register.name != "ancilla":
+            qubits.append(val)
+            qubit_labels[val] = str(bit_locations[key]["index"])
+
+    utilized_qubits = 0
+    for qubit in qubits:
+        if qubit != '':
+            utilized_chiplets.add(backend.node_to_chiplet[int(qubit)])
+            utilized_qubits += 1
+
+    print(utilized_chiplets)
+    print(f"Calculated utilization of {utilized_qubits/(len(utilized_chiplets)*num_qubits_per_chiplet)    }")
+    return utilized_qubits/(len(utilized_chiplets)*num_qubits_per_chiplet)  
 
 
 def run_exp_defective():
@@ -158,6 +238,7 @@ def run_exp_defective():
 
         custom_depth = {pp: {} for pp in patch_placement}
         custom_overhead = {pp: {} for pp in patch_placement}
+        custom_utilization = {pp: {} for pp in patch_placement}
 
         np = 1
         defective_qubits = [1, 2, 3]
@@ -172,6 +253,7 @@ def run_exp_defective():
                     if df not in custom_depth[pp]:
                         custom_depth[pp][df] = {}
                         custom_overhead[pp][df] = {}
+                        custom_utilization[pp][df] = {}
                         
 
                     # Generate circuit
@@ -228,15 +310,15 @@ def run_exp_defective():
                                                                         pre_defined_partitions=partitions,
                                                                         patch_initialization = "center")
 
-                        plot_circuit_layout(defect_free_circuit,
-                                backend_non_defective,
-                                filename=f"experiments/evaluation/defective_qubits/{bc}_{pp}_layout_{df}_defect_free.png")
-                        defect_free_compilation = False
+                        #plot_circuit_layout(defect_free_circuit,
+                        #        backend_non_defective,
+                        #        filename=f"experiments/evaluation/defective_qubits/{bc}_{pp}_layout_{df}_defect_free.png")
+                        #defect_free_compilation = False
                     
                     
-                    plot_circuit_layout(defective_circuit,
-                                        backend,
-                                        filename=f"experiments/evaluation/defective_qubits/{bc}_{pp}_layout_{df}.png")
+                    #plot_circuit_layout(defective_circuit,
+                    #                    backend,
+                    #                    filename=f"experiments/evaluation/defective_qubits/{bc}_{pp}_layout_{df}.png")
                     
 
                     def num_2q_gates(circuit):
@@ -245,11 +327,16 @@ def run_exp_defective():
                         return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
                     
+                    # Calculate qpu utilization
+                    custom_utilization[pp][df][ks] = calculate_qpu_utilization(defective_circuit, backend)
+
                     custom_depth[pp][df][ks] = defective_circuit.depth() - (defect_free_circuit).depth()
                     custom_overhead[pp][df][ks] = num_2q_gates(defective_circuit) - num_2q_gates(defect_free_circuit)
 
+        print(custom_utilization)
         plot_combined(custom_depth,
                       custom_overhead,
+                      custom_utilization,
                       title_left = "b) Multi patch configuration" if bc == "multi_patch" else "a) Single patch configuration",
                       filename = f"experiments/evaluation/defective_qubits/{bc}_overhead")
 

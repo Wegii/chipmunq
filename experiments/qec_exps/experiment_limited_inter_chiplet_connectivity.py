@@ -128,92 +128,93 @@ def run_exp_distributed_inter_chiplet() -> None:
     normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
 
     # Number of inter_chiplet_connections
-    num_inter_chiplet_connections = [8, 1]#[8, 4, 2, 1]
+    num_inter_chiplet_connections = [8, 4, 1]
     
     # Noise level
-    ps = list(np.logspace(-4, -1, 10))#list(np.logspace(-4, -1, 10))
+    ps = list(np.logspace(-4, -1, 10))
+
     # Inter-chiplet noise level
-    ps_inter = [1e-2]#[1e-3, 1e-2]
+    inter_chiplet_noise = [1e-4, 1e-3, 1e-2]
+    for ps_inter in inter_chiplet_noise:
 
-    # Transpilation
-    ts = [str(i) for i in num_inter_chiplet_connections]
-    ks = [2]
-    routing_types = ["cost", "default"]#, ["default"]
+        # Transpilation
+        ts = [str(i) for i in num_inter_chiplet_connections]
+        ks = [2]
+        routing_types = ["cost", "default"]#, ["default"]
 
-    transpiled_circuits = {}
+        transpiled_circuits = {}
 
-    def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str) -> StimCircuit:
-        if t == "default":
-            return normal_circuit_stim
-        else:
-            backend = get_backend(n_icc = n_icc,
-                                  p_icc = p_icc,
-                                  amp_icc = amp_icc)
-
-            if (n_icc, p_icc, amp_icc, routing_type) in transpiled_circuits:
-                # Circuit does not need to be transpiled again
-                print("Found")
-                return transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type)]
+        def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str) -> StimCircuit:
+            if t == "default":
+                return normal_circuit_stim
             else:
-                # Transpile circuit to backend
-                _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
-                                                                backend,
-                                                                pre_defined_partitions = partitions,
-                                                                routing_type = routing_type,#"cost",
-                                                                routing_alpha = 1e4,
-                                                                routing_beta = 1.0)
-                # Convert circuit to stim
-                custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
-                # Add circuit to dictionary, in order to not transpile this circuit configuration again
-                transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type)] = custom_circuit_stim
+                backend = get_backend(n_icc = n_icc,
+                                    p_icc = p_icc,
+                                    amp_icc = amp_icc)
 
-                return custom_circuit_stim
+                if (n_icc, p_icc, amp_icc, routing_type) in transpiled_circuits:
+                    # Circuit does not need to be transpiled again
+                    print("Found")
+                    return transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type)]
+                else:
+                    # Transpile circuit to backend
+                    _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
+                                                                    backend,
+                                                                    pre_defined_partitions = partitions,
+                                                                    routing_type = routing_type,#"cost",
+                                                                    routing_alpha = 1.0,
+                                                                    routing_beta = 1.0)
+                    # Convert circuit to stim
+                    custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
+                    # Add circuit to dictionary, in order to not transpile this circuit configuration again
+                    transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type)] = custom_circuit_stim
 
-    def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "") -> BackendChipletV2:
-        if t == "default":
-            return None
-        else:
-            return BackendChipletV2(size = (2, 2, 15, 8),
-                                    n_inter = n_icc,
-                                    connectivity = "nn",
-                                    topology = "rotated_grid",
-                                    inter_chiplet_noise = p_icc,
-                                    inter_chiplet_amplification = amp_icc,
-                                    inter_chiplet_noise_type = "random"#"constant"
-                                    )
+                    return custom_circuit_stim
 
-    def _get_sinter_task():
-        # Construct sinter task for multiple code distances and noise levels
-        yield from (
-            sinter.Task(
-                circuit=circuit,
-                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t + rt, "p_inter": p_icc},
+        def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "") -> BackendChipletV2:
+            if t == "default":
+                return None
+            else:
+                return BackendChipletV2(size = (2, 2, 15, 8),
+                                        n_inter = n_icc,
+                                        connectivity = "nn",
+                                        topology = "rotated_grid",
+                                        inter_chiplet_noise = p_icc,
+                                        inter_chiplet_amplification = amp_icc,
+                                        inter_chiplet_noise_type = "random"#"constant"
+                                        )
+
+        def _get_sinter_task():
+            # Construct sinter task for multiple code distances and noise levels
+            yield from (
+                sinter.Task(
+                    circuit=circuit,
+                    json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t + rt, "p_inter": p_icc},
+                )
+                for circuit, k, p, t, rt, p_icc in (
+                    (get_noise_model("modsi1000",
+                                    None,
+                                    p,
+                                    None, 
+                                    remote = (None if t == "default" else
+                                            get_backend(int(t), ps_inter, 1, t).inter_chiplet_connections)
+                                    ).noisy_circuit(
+                                        get_circuit(-1 if t == "default" else int(t), ps_inter, 1, t, routing_type=rt)
+                                        ), k, p, t, rt, ps_inter)
+                    
+                    for t in ts
+                    for rt in routing_types
+                    for k in ks
+                    for p in ps
+                )
             )
-            for circuit, k, p, t, rt, p_icc in (
-                (get_noise_model("modsi1000",
-                                 None,
-                                 p,
-                                 None, 
-                                 remote = (None if t == "default" else
-                                           get_backend(int(t), p_icc, 1, t).inter_chiplet_connections)
-                                 ).noisy_circuit(
-                                     get_circuit(-1 if t == "default" else int(t), p_icc, 1, t, routing_type=rt)
-                                     ), k, p, t, rt, p_icc)
-                
-                for p_icc in ps_inter
-                for t in ts
-                for rt in routing_types
-                for k in ks
-                for p in ps
-            )
-        )
 
-    stats = run_sinter_simulation(_get_sinter_task, ks, ps)
+        stats = run_sinter_simulation(_get_sinter_task, ks, ps)
 
-    plot_evaluation(stats,
-                    filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet{ps_inter[0]}.png",
-                    with_transpilation = True)
-    
+        plot_evaluation(stats,
+                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.png",
+                        with_transpilation = True)
+        
     #plot_interconnect_sweep(stats,
     #                        filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet_sweep.png")
 

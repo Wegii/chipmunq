@@ -18,7 +18,7 @@ class QPUBlock:
         self.height = height
         self.coord = block_coord
 
-        print(f"block has width {width} and height {height}")
+        #print(f"block has width {width} and height {height}")
 
         # List of (x, y) points that cannot be used
         self.no_placement_zones = no_placement_zones if no_placement_zones is not None else []
