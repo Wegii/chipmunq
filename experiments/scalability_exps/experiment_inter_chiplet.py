@@ -163,15 +163,15 @@ def run_exp_inter_chiplet():
             low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e4,
                                                           pre_defined_partitions=partitions,
-                                                          routing_alpha = 10,##1e-4,
-                                                          routing_beta = 1)
+                                                          routing_alpha = 0,##1e-4,
+                                                          routing_beta = 0)
 
             # Sabre transpilation
             high_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e2,
                                                           pre_defined_partitions=partitions,
-                                                          routing_alpha = 0,##1e-4,
-                                                          routing_beta = 0)
+                                                          routing_alpha = 1,##1e-4,
+                                                          routing_beta = 1)
 
             def num_2q_gates(circuit):
                 ops = circuit.count_ops()

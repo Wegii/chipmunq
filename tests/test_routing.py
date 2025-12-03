@@ -182,6 +182,7 @@ def test_global_routing():
                                     filename="tests/data/figures/cost_routing_layout_utilization.png")
 
 
+
 if __name__ == "__main__":
     #test_surface_memory_circuit_to_hypergraph_partitioning_mapping_routing()
     

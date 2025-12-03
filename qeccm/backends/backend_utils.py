@@ -64,7 +64,7 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
         # Draw nodes
         for i, (x, y) in enumerate(qubit_coordinates):
 
-            plt.scatter(x, y, s=500, color=qubit_colors[i], marker=qubit_shapes[i], zorder=3)
+            plt.scatter(x, y, s=50, color=qubit_colors[i], marker=qubit_shapes[i], zorder=3)
             plt.text(
                 x, y,
                 str(i),
@@ -99,7 +99,7 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
                     color=color,
                     lw=1.5,
                     alpha=0.9,
-                    connectionstyle=f"arc3,rad={curvature}",  # 👈 add smooth curve
+                    connectionstyle=f"arc3,rad={curvature}",
                 ),
                 zorder=1,
             )

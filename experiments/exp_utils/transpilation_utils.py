@@ -46,7 +46,8 @@ def custom_cost_transpilation(circuit: QuantumCircuit,
                               backend: BackendChipletV2,
                               pre_defined_partitions: list = None,
                               routing_alpha: float = 0.0,
-                              routing_beta : float = 0.0
+                              routing_beta: float = 0.0,
+                              patch_initialization: str = ""
                               ) -> QuantumCircuit:
     
     # Initialize transpilation plugin in order to run the different passes
@@ -55,7 +56,8 @@ def custom_cost_transpilation(circuit: QuantumCircuit,
     init_pm = mar_pmsp._generate_initial_pass()
     # Pass to perform partition and mapping
     partitioning_pm = mar_pmsp._generate_layout_pass(backend,
-                                                     partitions = pre_defined_partitions)
+                                                     partitions = pre_defined_partitions,
+                                                     patch_initialization = patch_initialization)
     # Perform routing utilizing cost routing
     routing_pm = mar_pmsp._generate_routing_pass(backend,
                                                  routing_type="cost",

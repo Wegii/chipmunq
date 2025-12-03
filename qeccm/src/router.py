@@ -265,38 +265,45 @@ class CostRouter(GenericRouter):
 
                         best_path = path
                         
-                        # In case the current node already is an inter_chiplet connection, skip
-                        if q0 not in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
+                        
+                        inter_chiplet_connections_of_chiplet = self.backend.chiplet_to_inter_chiplet_connection[
+                            self.backend.node_to_chiplet[q0]]
+                        
+                        # In case the current node already is an inter_chiplet connection, skip.
+                        if q0 not in inter_chiplet_connections_of_chiplet:
                             # Iterate over inter-chiplet connections of this chip, and see if it is possible to generate 
                             # a better routing
+
                             # TODO: Add option to only select the k-nearest inter-chiplet connections
-                            for cicc in self.backend.chiplet_to_inter_chiplet_connection[self.backend.node_to_chiplet[q0]]:
-                                # Route from source to inter-chiplet connection
-                                p0 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
-                                # Route from inter-chiplet connection to target
-                                p1 = list(self.coupling_map.shortest_undirected_path(cicc, q1))
-                                # Combine into one full path
-                                p_combined = p0 + p1[1:]
+                            for cicc in inter_chiplet_connections_of_chiplet:
+                                # Check if the selected inter_chiplet connection is not flagged as defective
+                                if cicc not in self.backend.all_defective_qubits:
+                                    # Route from source to inter-chiplet connection
+                                    p0 = list(self.coupling_map.shortest_undirected_path(q0, cicc))
+                                    # Route from inter-chiplet connection to target
+                                    p1 = list(self.coupling_map.shortest_undirected_path(cicc, q1))
+                                    # Combine into one full path
+                                    p_combined = p0 + p1[1:]
 
-                                # Convert value to int, since this is a numpy int
-                                cicc = int(p1[0])
-                                cicc_2 = int(p1[1])
-                                new_inter_chiplet_nodes = (cicc, cicc_2)
-                                if not (new_inter_chiplet_nodes in inter_chiplet_connections):
-                                    new_inter_chiplet_nodes = (new_inter_chiplet_nodes[1], new_inter_chiplet_nodes[0])
+                                    # Convert value to int, since this is a numpy int
+                                    cicc = int(p1[0])
+                                    cicc_2 = int(p1[1])
+                                    new_inter_chiplet_nodes = (cicc, cicc_2)
+                                    if not (new_inter_chiplet_nodes in inter_chiplet_connections):
+                                        new_inter_chiplet_nodes = (new_inter_chiplet_nodes[1], new_inter_chiplet_nodes[0])
 
-                                if not (new_inter_chiplet_nodes in inter_chiplet_connections):
-                                    # The inter-chiplet connection does not exist
-                                    continue
+                                    if not (new_inter_chiplet_nodes in inter_chiplet_connections):
+                                        # The inter-chiplet connection does not exist
+                                        continue
 
-                                path_cost = (len(p_combined) +
-                                            self.alpha * inter_chiplet_connections[new_inter_chiplet_nodes] +
-                                            self.beta * (inter_chiplet_utilization[new_inter_chiplet_nodes] + 1))
-                                
-                                if path_cost < current_path_cost:
-                                    current_path_cost = path_cost
-                                    best_path = p_combined
-                                    print("Chosen a better path")
+                                    path_cost = (len(p_combined) +
+                                                self.alpha * inter_chiplet_connections[new_inter_chiplet_nodes] +
+                                                self.beta * (inter_chiplet_utilization[new_inter_chiplet_nodes] + 1))
+                                    
+                                    if path_cost < current_path_cost:
+                                        current_path_cost = path_cost
+                                        best_path = p_combined
+                                        #print("Chosen a better path")
                         
                         # Route path with lowest cost
                         new_dag = self._perform_routing_between_nodes(new_dag = new_dag,

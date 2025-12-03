@@ -66,131 +66,131 @@ def plot_evaluation(stat, filename, with_transpilation = False):
 
 
 def run_exp_distributed_lattice_surgery() -> None:
-
-
-    # Number of inter_chiplet_connections
-    num_inter_chiplet_connections = [8]
     
     # Noise level
-    ps = list(np.logspace(-4, -1, 10))#list(np.logspace(-4, -1, 10))
+    ps = list(np.logspace(-4, -1, 10))
+
     # Inter-chiplet noise level
-    ps_inter = [1e-4]#[1e-3, 1e-2]
+    inter_chiplet_noise = [1e-4, 1e-3, 1e-2]
+    for ps_inter in inter_chiplet_noise:
 
-    # Transpilation
-    ts = ["default"] + [str(i) for i in num_inter_chiplet_connections]
-    ks = [1, 2, 3]
-    
-    transpiled_circuits = {}
-
-    def get_circuit(distance_scale: int, n_icc, p_icc, amp_icc, t: str, routing_type: str) -> StimCircuit:
-        # Reference circuit
-        circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
-                                                    n1 = 1,
-                                                    n2 = 0)
-        normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
+        # Transpilation
+        ts = ["default", "compiled"]# + [str(i) for i in num_inter_chiplet_connections]
+        ks = [1, 2, 3]#[1, 2, 3]
         
-        if t == "default":
-            return normal_circuit_stim
-        else:
-            backend = get_backend(n_icc = n_icc,
-                                  p_icc = p_icc,
-                                  amp_icc = amp_icc, 
-                                  d = distance_scale)
+        transpiled_circuits = {}
 
-            if (distance_scale, n_icc, p_icc, amp_icc, routing_type) in transpiled_circuits:
-                # Circuit does not need to be transpiled again
-                print("Found")
-                return transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, routing_type)]
+        def get_circuit(distance_scale: int, p_icc, amp_icc, t: str) -> StimCircuit:
+            # Reference circuit
+            
+            if t == "default":
+                circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
+                                                            n1 = 1,
+                                                            n2 = 0)
+                normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
+                return normal_circuit_stim
             else:
-                # Transpile circuit to backend
-                _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
-                                                                backend,
-                                                                pre_defined_partitions = partitions,
-                                                                routing_type = routing_type,#"cost",
-                                                                routing_alpha = 1e4,
-                                                                routing_beta = 1.0)
-                # Convert circuit to stim
-                custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
-                # Add circuit to dictionary, in order to not transpile this circuit configuration again
-                transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, routing_type)] = custom_circuit_stim
+                n_icc, backend = get_backend(p_icc = p_icc,
+                                    amp_icc = amp_icc, 
+                                    d = distance_scale)
 
-                plot_circuit_layout(custom_circuit,
-                                    backend,
-                                    filename=f"experiments/evaluation/single_cnot_layout_mapping.png")
+                if (distance_scale, n_icc, p_icc, amp_icc) in transpiled_circuits:
+                    # Circuit does not need to be transpiled again
+                    print("Found")
+                    return transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc)]
+                else:
+                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
+                                                            n1 = 1,
+                                                            n2 = 0)
+                    
+                    # Transpile circuit to backend
+                    _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
+                                                                    backend,
+                                                                    pre_defined_partitions = partitions,
+                                                                    routing_type = "cost",
+                                                                    routing_alpha = 0,
+                                                                    routing_beta = 0)
+                    # Convert circuit to stim
+                    custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
+                    # Add circuit to dictionary, in order to not transpile this circuit configuration again
+                    transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc)] = custom_circuit_stim
 
-                return custom_circuit_stim
+                    plot_circuit_layout(custom_circuit,
+                                        backend,
+                                        filename=f"experiments/evaluation/qec_evaluation/backend_mapping/layout_{distance_scale}.png")
 
-    def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "", d: int = -1) -> BackendChipletV2:
-        if t == "default":
-            return None
-        else:
-            # Depending on the distance, each chiplet needs to be scaled
-            print(d)
-            if d == 1:
-                chiplet_size = (6, 6, 10, 6)
-                nic = 5
-            elif d == 2:
-                chiplet_size = (6, 6, 14, 8)
-                nic = 7
-            elif d == 3:
-                chiplet_size = (6, 6, 18, 10)
-                nic = 9
-            elif d == 4:
-                chiplet_size = (6, 6, 22, 12)
-                nic = 11
-            backend = BackendChipletV2(size=chiplet_size,#size = (6, 6, 15, 8),
-                                    n_inter = nic,
-                                    connectivity = "nn",
-                                    topology = "rotated_grid",
-                                    inter_chiplet_noise = p_icc,
-                                    inter_chiplet_amplification = amp_icc,
-                                    inter_chiplet_noise_type = "random",#"constant"
-                                    num_defective_qubits=0,
-                                    )
+                    return custom_circuit_stim
 
-            #plot_gate_map(backend = backend,
-            #              filename = "experiments/evaluation/chiplet_evaluation/multi_chiplet_rotated_defective.png")
-            return backend
+        def get_backend(p_icc: float, amp_icc: float, t: str = "", d: int = -1) -> BackendChipletV2:
+            if t == "default":
+                return None
+            else:
+                # Depending on the distance, each chiplet needs to be scaled
+                print(d)
 
-    def _get_sinter_task():
-        # Construct sinter task for multiple code distances and noise levels
-        yield from (
-            sinter.Task(
-                circuit=circuit,
-                json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t,},
+                if d == 1:
+                    chiplet_size = (6, 6, 11, 6)
+                    nic = 5
+                elif d == 2:
+                    chiplet_size = (6, 6, 15, 8)
+                    nic = 7
+                elif d == 3:
+                    chiplet_size = (6, 6, 19, 10)
+                    nic = 9
+                elif d == 4:
+                    chiplet_size = (6, 6, 23, 12)
+                    nic = 11
+
+                backend = BackendChipletV2(size=chiplet_size,#size = (6, 6, 15, 8),
+                                            n_inter = nic,
+                                            connectivity = "nn",
+                                            topology = "rotated_grid",
+                                            inter_chiplet_noise = p_icc,
+                                            inter_chiplet_amplification = amp_icc,
+                                            inter_chiplet_noise_type = "random",#"constant"
+                                            num_defective_qubits=0,
+                                            )
+
+                #plot_gate_map(backend = backend,
+                #              filename = f"experiments/evaluation/qec_evaluation/backend_mapping/{chiplet_size}.png")
+                return nic, backend
+
+        def _get_sinter_task():
+            # Construct sinter task for multiple code distances and noise levels
+            yield from (
+                sinter.Task(
+                    circuit=circuit,
+                    # TODO: the naming is incorrect
+                    json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t,},
+                )
+                for circuit, k, p, t in (
+                    (get_noise_model("modsi1000",
+                                    None,
+                                    p,
+                                    None, 
+                                    remote = (None if t == "default" else
+                                            get_backend(d = k,
+                                                        p_icc = ps_inter,
+                                                        amp_icc = 1,
+                                                        t = t)[1].inter_chiplet_connections)
+                                    ).noisy_circuit(
+                                        get_circuit(distance_scale = k,
+                                                    p_icc = ps_inter,
+                                                    amp_icc = 1,
+                                                    t = t)
+                                        ), k, p, t)
+                    
+                    for t in ts
+                    for k in ks
+                    for p in ps
+                )
             )
-            for circuit, k, p, t in (
-                (get_noise_model("modsi1000",
-                                 None,
-                                 p,
-                                 None, 
-                                 remote = (None if t == "default" else
-                                           get_backend(d = k,
-                                                       n_icc = int(t),
-                                                       p_icc = p_icc,
-                                                       amp_icc = 1,
-                                                       t = t).inter_chiplet_connections)
-                                 ).noisy_circuit(
-                                     get_circuit(distance_scale = k,
-                                                 n_icc = -1 if t == "default" else int(t),
-                                                 p_icc = p_icc,
-                                                 amp_icc = 1,
-                                                 t = t,
-                                                 routing_type = "cost")
-                                     ), k, p, t)
-                
-                for p_icc in ps_inter
-                for t in ts
-                for k in ks
-                for p in ps
-            )
-        )
 
-    stats = run_sinter_simulation(_get_sinter_task, ks, ps)
+        stats = run_sinter_simulation(_get_sinter_task, ks, ps)
 
-    plot_evaluation(stats,
-                    filename = f"experiments/evaluation/qec_evaluation/single_cnot_rotated.png",
-                    with_transpilation = True)
+        plot_evaluation(stats,
+                        filename = f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.png",
+                        with_transpilation = True)
     
 
 if __name__ == "__main__":

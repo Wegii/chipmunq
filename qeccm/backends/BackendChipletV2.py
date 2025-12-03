@@ -282,7 +282,10 @@ class BackendChipletV2(BackendV2):
             if (self.num_defective_qubits_per_chiplet > 0):
                 # Define which qubits should be defective
                 num_qubits_on_chip = self.n * self.m
-                rng = np.random.default_rng(seed=12345678942)
+                rng = np.random.default_rng(seed=12345678944)
+                defective_q = rng.choice(num_qubits_on_chip, size=self.num_defective_qubits_per_chiplet, replace=False).tolist()
+
+                """
                 defective_q = []
                 random_num = -1
                 # Select random qubit out of all qubits on the chiplet to be selected as defective   
@@ -291,6 +294,7 @@ class BackendChipletV2(BackendV2):
                         random_num = int(random.random()*num_qubits_on_chip)
     
                     defective_q.append(random_num)
+                """
             else:
                 defective_q = []
                 

@@ -76,7 +76,10 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         return init_pm
 
     #def _generate_layout_pass(self, backend: BackendV2, kp: int = None) -> PassManager:
-    def _generate_layout_pass(self, backend: BackendChipletV2 = None, partitions = None) -> PassManager:
+    def _generate_layout_pass(self,
+                              backend: BackendChipletV2 = None,
+                              partitions = None,
+                              patch_initialization: str = "") -> PassManager:
         # Consists of analysis and transformation passes
 
         # The hypergraph circuit has multiple edges, since multigraph=True
@@ -88,7 +91,8 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
         # Mapping pass
         # mapping_op = RandomMapper(backend)
-        mapping_op = TrivialMapper(backend)
+        mapping_op = TrivialMapper(backend, 
+                                   patch_initialization = patch_initialization)
         #mapping_op = TrivialLayout(pass_manager_config.coupling_map)
 
         # Extend the dag with ancillas and idling qubits

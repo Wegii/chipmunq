@@ -19,8 +19,8 @@ from qeccm.circuit.hypergraph_circuit import PartitionedHyperGraph
 from collections import deque
 from itertools import product
 
-# Visualization
-import matplotlib.pyplot as plt
+from qeccm.src.qpublock import QPUBlock, plot_block_counts, dimension_to_linear_index, linear_index_to_dimension
+
 
 
 class GenericMapper(AnalysisPass):
@@ -119,14 +119,23 @@ class TrivialMapper(GenericMapper):
     TODO: Description
     """
 
-    def __init__(self, backend):
-        """ TrivialMapper initializer """        
+    def __init__(self, backend, patch_initialization: str = ""):
+        """ TrivialMapper initializer
 
+        :param backend: _description_
+        :type backend: _type_
+        :param patch_initialization: _description_, defaults to "center"
+        :type patch_initialization: str, optional
+        """
+        
         super().__init__()
 
         # Coupling map to map the dag to
         self.coupling_map = backend.coupling_map
         self.backend = backend
+
+        # Initialization location of patches on chiplets. More information in the documentation of QPUBlock
+        self.patch_initialization = patch_initialization
 
     def run(self,
             dag: DAGCircuit
@@ -211,12 +220,6 @@ class TrivialMapper(GenericMapper):
             partitions[int(partition_key[2:])] = nodes
 
         pre_defined_partitions = self.property_set["pre_defined_partitions"]
-            
-        def dimension_to_linear_index(x, w, h):
-            x1, x2 = x  # unpack coordinates
-
-            idx = x2 * h + x1
-            return idx
             
         # Dictionary with virtual_qubit to physical_qubit mapping
         placement = {}
@@ -360,7 +363,7 @@ class TrivialMapper(GenericMapper):
                                                             )
 
         # Plot the assignment of partitions to QPU
-        self.plot_block_counts(width = self.backend.c2,
+        plot_block_counts(width = self.backend.c2,
                                height = self.backend.c1,
                                block_assignments = blocks,
                                filename="tests/data/figures/partition_to_qpu_2.png")
@@ -447,22 +450,48 @@ class TrivialMapper(GenericMapper):
                         
             # Add all partitions that are connected with each other
             connected_partitions.append(current_connected_partition)
+        
+        # Calculate defective qubit positions for the QPUs
+        defective_qubits_coordinates = {}
+        for x, y in product(range(width), range(height)):
+            # Get linear index of defective qubits
+            qpu_pos = dimension_to_linear_index((x, y), self.backend.c1, self.backend.c2)
+            qpu_defective_qubits = self.backend.chiplet_to_defective_qubits[qpu_pos]
 
-        print(connected_partitions)
+            # Calculate (x, y) index given linear index of defective qubits
+            qpu_defective_qubits_coords = []
+            for qi in qpu_defective_qubits:
+                x_i, y_i = linear_index_to_dimension(qi, self.backend.m)
+                qpu_defective_qubits_coords.append((x_i, y_i))
 
-        print(width)
-        print(height)
+            # Assign coordinates of defective qubit to every qpu
+            defective_qubits_coordinates[(x, y)] = qpu_defective_qubits_coords
+
+            #print(f"{x}, {y} has defective qubits at {qpu_defective_qubits_coords}")
+
         # Initialize all QPUs with their widht and height, as well as coordinates. The widht and height are used for
         # calculating which partitions (given their width and height) can be placed on this QPU.
-        qpu_blocks = {(x, y): QPUBlock(self.backend.m, self.backend.n, (x, y))
-              for x, y in product(range(width), range(height))}
+        qpu_blocks = {(x, y): QPUBlock(self.backend.m,
+                                       self.backend.n,
+                                       (x, y),
+                                       no_placement_zones = defective_qubits_coordinates[(x, y)],
+                                       patch_initialization = self.patch_initialization
+                                       ) 
+                                       for x, y in product(range(width), range(height))
+                                       }
         
-        print(qpu_blocks)
+
         placement = {}
         pre_defined_partitions = self.property_set["pre_defined_partitions"]
 
+        # Place the first partition at the "top left" (depending on the chiplet layout) chiplet 
+        current_x = 0
+        current_y = 0
+
         # Iterate over all connected partitions
         for partition_bfs in connected_partitions:
+            print(partition_bfs)
+            
             # Iterate over all partitions that are connected with each other
             for li, partition_id in enumerate(partition_bfs):
                 #print(partition_id)
@@ -482,45 +511,30 @@ class TrivialMapper(GenericMapper):
                     # the chiplet layout. For now we assume the grid layout.
                     # For the grid layout is is either possible to fill the grid from the top to the right, or from the
                     # top to the bottom. The option implemented iterates from the top left to the bottom left
-                    
-                    print("\n\n")
-                    print("placing new bfs")
-                    current_x = 0
-                    current_y = 0
-                    pos = None
-                    for x in range(0, width, 2):
-                        #if x != 0:
-                        #    x += 2
-                        for y in range(0, height, 2):
-                            pos = qpu_blocks[(x, y)].place_partition(partition_id, pw, ph)
+                
 
-                            # QPU found
-                            if pos != None:
-                                current_x = x
-                                current_y = y
+                    # Find placement for the first partition in this bfs
+                    while True:
+                        pos = qpu_blocks[(current_x, current_y)].place_partition(partition_id, pw, ph)
 
-                                print(f"Placed partition on QPU {current_x}{current_y}")
-                                placement[partition_id] = pos
-                                break
-
-                        # QPU found
                         if pos != None:
+                            print(f"Placed partition on QPU {current_x}{current_y}")
+                            placement[partition_id] = pos
+                            break
+
+                        current_y += 1
+                        if current_y == height:
+                            current_x += 1
+                            current_y = 0
+                        if current_x == width:
                             break
                 else:
                     # Partition which the current partition should be placed relative to
                     partition_anchor = partitions[partition_bfs[li-1]]
                     # Partition that we want to place
                     partition_current = partitions[partition_id]
-                    #print("anchor")
-                    #print(min(partition_anchor))
-                    #print(max(partition_anchor))
-                    #print("current")
-                    #print(min(partition_current))
-                    #
-                    # print(max(partition_current))
-                    ##min(partition_current) > min(partition_anchor) or max(partition_current) > max(partition_anchor):
-                    #6 > 17
-                    if min(partition_current) < max(partition_anchor):#min(partition_current) > min(partition_anchor) and min(partition_current) < max(partition_anchor):
+                    
+                    if min(partition_current) < max(partition_anchor):
                         # Place at the bottom
                         print(f"Place {partition_id} below {partition_bfs[li-1]}")
 
@@ -534,16 +548,20 @@ class TrivialMapper(GenericMapper):
                                                                                 )
                         print(pos)
                         if pos == None:
-                            # If it is not possible to place the partition to the bottom on this QPU, select the QPU
-                            # below the current one. This should always be possible
-                            pos = qpu_blocks[(current_x, current_y+1)].place_partition(partition_id, pw, ph)
-                            print(pos)
-                            if pos == None:
-                                ValueError(f"Something wrong for placement below!")
+                            # If it is not possible to place the partition to the bottom on this QPU, try to place it 
+                            # on the QPU below
+                            for new_x in range(current_x, width):
+                                for new_y in range(current_y+1, height):
+                                    pos = qpu_blocks[(new_x, new_y)].place_partition(partition_id, pw, ph)
 
-                            # Update index of utilized QPU
-                            current_y += 1
-
+                                    if pos != None:
+                                        current_y = new_y
+                                        break
+                                if pos != None:
+                                    current_x = new_x
+                                    break
+                                
+                            
                         print(f"Placed partition {partition_id} on QPU {current_x}{current_y}")
                         placement[partition_id] = pos
                     else:
@@ -558,227 +576,40 @@ class TrivialMapper(GenericMapper):
                                                                                 partition_bfs[li-1],
                                                                                 "right"
                                                                                 )
-                        print(pos)
 
                         if pos == None:
-                            # If it is not possible to place the partition to the bottom on this QPU, select the QPU
-                            # below the current one. This should always be possible
-                            pos = qpu_blocks[(current_x+1, current_y)].place_partition(partition_id, pw, ph)
-                            
-                            if pos == None:
-                                ValueError(f"Something wrong for placement below!")
+                            # If it is not possible to place the partition to the right on this QPU, select the QPU
+                            # to the right of the current one.
+                            for new_y in range(current_y, height):
+                                for new_x in range(current_x+1, width):
+                                    pos = qpu_blocks[(new_x, new_y)].place_partition(partition_id, pw, ph)
 
-                            # Update index of utilized QPU
-                            current_x += 1
+                                    if pos != None:
+                                        current_x = new_x
+                                        break
+                                if pos != None:
+                                    current_y = new_y
+                                    break
+                            
+
+                            ## Update index of utilized QPU
+                            #current_x += 1
 
                         print(f"Placed partition {partition_id} on QPU {current_x}{current_y}")
                         placement[partition_id] = pos
         
+            print("\n\n")
+            print("placing new bfs")
+            # Try to place the partition below the last bfs_partition
+            current_y += 1
+
+            if current_y == height:
+                # If this is not possible, place at the top of the chiplet layout
+                current_y = 0
+                current_x += 1
+            else:
+                # If it is possible to place the partition below, place it to the left
+                current_x -= 1
+        
         
         return placement, qpu_blocks
-
-    def plot_block_counts(self,
-                          width: int,
-                          height: int,
-                          block_assignments: dict,
-                          filename: str
-                          ) -> None:
-        """Plot 2D grid of QPUs with the number of assigned partitions shown
-
-        :param width: _description_
-        :type width: int
-        :param height: _description_
-        :type height: int
-        :param block_assignments: _description_
-        :type block_assignments: dict
-        :param filename: _description_
-        :type filename: str
-        """
-
-        fig, ax = plt.subplots(figsize=(width, height))
-
-        # Loop through each grid block and get number of partitions per QPU
-        for y in range(height):
-            for x in range(width):
-                count = len(block_assignments.get((x, y), []).placed_partitions)
-                ax.text(x + 0.5, height - y - 0.5, str(count),
-                        ha='center', va='center', fontsize=12)
-
-        # Draw grid lines
-        ax.set_xticks(np.arange(0, width + 1, 1))
-        ax.set_yticks(np.arange(0, height + 1, 1))
-        ax.grid(True)
-        ax.set_xlim(0, width)
-        ax.set_ylim(0, height)
-        ax.set_aspect('equal')
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-
-        # Save figure
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
-        plt.close(fig)
-    
-
-class QPUBlock:
-    """Class representing a QPU chiplet with no-placement zones"""
-
-    def __init__(self, width: int, height: int, block_coord: tuple, no_placement_zones: list[tuple] = None):
-        self.width = width
-        self.height = height
-        self.coord = block_coord
-
-        print(f"block has width {width} and height {height}")
-
-        # List of (x, y, w, h) for forbidden areas
-        self.no_placement_zones = no_placement_zones if no_placement_zones is not None else []
-        
-        # free rectangles inside block
-        self.free_rects = [(0, 0, width, height)]
-        # list of (partition_id, x, y, w, h)
-        self.placed_partitions = []
-
-    # --- Helper methods (_overlaps, _find_covering_free_rect, _split_free_rect, place_partition) remain as before ---
-    
-    def _overlaps_partitions(self, x, y, w, h):
-        for pid, px, py, pw, ph in self.placed_partitions:
-            if not (x + w <= px or px + pw <= x or y + h <= py or py + ph <= y):
-                return True
-        return False
-
-    def _overlaps_forbidden(self, x, y, w, h):
-        for fx, fy, fw, fh in self.no_placement_zones:
-            if not (x + w <= fx or fx + fw <= x or y + h <= fy or fy + fh <= y):
-                return True
-        return False
-
-    def _overlaps(self, x, y, w, h):
-        return self._overlaps_partitions(x, y, w, h) or self._overlaps_forbidden(x, y, w, h)
-
-    def _find_covering_free_rect(self, x, y, w, h):
-        for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
-            if (x >= fx and y >= fy and 
-                x + w <= fx + fw and 
-                y + h <= fy + fh):
-                return i, (fx, fy, fw, fh)
-        return None, None
-
-    def _split_free_rect(self, index, fx, fy, fw, fh, x, y, w, h):
-        del self.free_rects[index]
-
-        # left side
-        if x > fx:
-            self.free_rects.append((fx, fy, x - fx, fh))
-
-        # right side
-        if x + w < fx + fw:
-            self.free_rects.append((x + w, fy, (fx + fw) - (x + w), fh))
-
-        # top side (above the partition) - constrained to partition's width
-        if y > fy:
-            self.free_rects.append((x, fy, w, y - fy))
-
-        # bottom side (below the partition) - constrained to partition's width
-        if y + h < fy + fh:
-            self.free_rects.append((x, y + h, w, (fy + fh) - (y + h)))
-    
-    def place_partition(self, partition_id, pw, ph):
-        # Preferred y: center vertically in the WHOLE block
-        preferred_y = (self.height - ph) // 2
-
-        for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
-            if pw <= fw and ph <= fh:
-                
-                if fy <= preferred_y and preferred_y + ph <= fy + fh:
-                    y_to_check = preferred_y
-                else:
-                    y_to_check = fy
-                
-                x_to_check = fx
-
-                if not self._overlaps(x_to_check, y_to_check, pw, ph):
-                    x, y = x_to_check, y_to_check
-                    
-                    self.placed_partitions.append((partition_id, x, y, pw, ph))
-                    self._split_free_rect(i, fx, fy, fw, fh, x, y, pw, ph)
-
-                    print(f"Placed {partition_id} at ({x}, {y})")
-
-                    return (self.coord[0] + x, self.coord[1] + y)
-
-        return None
-
-    # ----------------------------------------------------------
-    # MODIFIED: Relative placement with iterative search (shift)
-    # ----------------------------------------------------------
-    def place_relative(self, partition_id, pw, ph, anchor_id, direction, max_shift=5):
-        anchor = next((p for p in self.placed_partitions if p[0] == anchor_id), None)
-        if anchor is None:
-            raise ValueError(f"Anchor partition {anchor_id} not found.")
-
-        _, ax, ay, aw, ah = anchor
-        
-        # Initial target position (shift=0)
-        if direction == "right":
-            base_x, base_y = ax + aw, ay
-        elif direction == "left":
-            base_x, base_y = ax - pw, ay
-        elif direction == "below":
-            base_x, base_y = ax, ay + ah
-        elif direction == "above":
-            base_x, base_y = ax, ay - ph
-        else:
-            raise ValueError("Direction must be one of: right/left/above/below")
-
-        # --- Search Loop ---
-        # Search starting from 0 shift up to max_shift
-        for shift in range(max_shift + 1):
-            
-            # Calculate current placement attempt (x, y) based on shift
-            x, y = base_x, base_y
-            
-            if shift > 0:
-                if direction in ("right", "left"):
-                    # Shift vertically
-                    y += shift # Try shifting 'up' first (lower y value is higher on screen/chip)
-                    
-                    # NOTE: You could also implement a strategy to try shifting in the
-                    # opposite direction (e.g., y -= shift) or both, but a single
-                    # incremental shift is a common simple heuristic.
-                
-                elif direction in ("below", "above"):
-                    # Shift horizontally
-                    x += shift # Try shifting 'right' first
-                    
-                    # NOTE: As above, a strategy could include x -= shift
-
-            # 1. Bounds check
-            if x < 0 or y < 0 or x + pw > self.width or y + ph > self.height:
-                # If even the base position (shift=0) is out of bounds, we fail immediately.
-                # For shift > 0, we simply stop this iteration.
-                continue
-
-            # 2. Overlap check (with partitions AND forbidden zones)
-            if self._overlaps(x, y, pw, ph):
-                continue # Try next shift
-
-            # 3. Find free rect that fully contains this placement
-            idx, rect = self._find_covering_free_rect(x, y, pw, ph)
-            if idx is None:
-                continue # Try next shift
-
-            # If all checks pass, we have found a valid placement!
-            fx, fy, fw, fh = rect
-
-            # Place partition
-            self.placed_partitions.append((partition_id, x, y, pw, ph))
-
-            # Split the free rectangle
-            self._split_free_rect(idx, fx, fy, fw, fh, x, y, pw, ph)
-            
-            print(f"Placed {partition_id} at ({x}, {y}) with shift {shift} (Direction: {direction})")
-
-            return (self.coord[0] + x, self.coord[1] + y)
-
-        # If the loop finishes without finding a valid position
-        print(f"Placement for {partition_id} failed: No valid position found within {max_shift} units of shift.")
-        return None
