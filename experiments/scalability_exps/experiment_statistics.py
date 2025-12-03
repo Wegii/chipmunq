@@ -51,7 +51,7 @@ def plot_combined(custom_depth, custom_overhead, sabre_depth, sabre_overhead, fi
     pastel_orange = "#ef8d38"
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(5, 8))
+    fig, ax = plt.subplots(figsize=(5, 5))
 
     ax.bar(x - width/2, custom_depth_vals, width,
            label="Custom", color=pastel_blue,
@@ -80,7 +80,7 @@ def plot_combined(custom_depth, custom_overhead, sabre_depth, sabre_overhead, fi
     plt.show()
 
     # Create 2q gate overhead
-    fig, ax = plt.subplots(figsize=(5, 8))
+    fig, ax = plt.subplots(figsize=(5, 5))
 
     ax.bar(x - width/2, custom_over_vals, width,
            label="Custom", color=pastel_blue,

@@ -52,7 +52,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     pastel_orange = "#ef8d38"
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(5, 8))
+    fig, ax = plt.subplots(figsize=(5, 5))
 
     ax.bar(x - width/2, low_depth_vals, width,
            label="inter_chiplet_error = 1e-4", color=pastel_blue,
@@ -81,7 +81,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     plt.show()
 
     # Create 2q gate overhead
-    fig, ax = plt.subplots(figsize=(5, 8))
+    fig, ax = plt.subplots(figsize=(5, 5))
 
     ax.bar(x - width/2, low_over_vals, width,
            label="inter_chiplet_error = 1e-4", color=pastel_blue,
@@ -159,14 +159,14 @@ def run_exp_inter_chiplet():
             # Stim to qiskit
             stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 
-            # Custom transpilation
+            # Low error transpilation
             low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e4,
                                                           pre_defined_partitions=partitions,
                                                           routing_alpha = 0,##1e-4,
                                                           routing_beta = 0)
 
-            # Sabre transpilation
+            # High error transpilation
             high_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e2,
                                                           pre_defined_partitions=partitions,
