@@ -12,23 +12,10 @@ import time
 
 # Custom utils
 from experiments.exp_utils.transpilation_utils import *
-from experiments.exp_utils.circuit_generator import QECMemory, QECCircuit, get_tqec_cnot_rotated
-from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
-from qeccm.src.reference_partitions import memory_d5
-from experiments.exp_utils.simulation_utils import *
-from qeccm.backends.backend_utils import plot_gate_map
-
-from experiments.exp_utils.circuit_utils import stim_to_qiskit
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
-from stim import Circuit as StimCircuit
-
-from glue.eccentric_bench.noise import get_noise_model
-
-
 import numpy as np
 import matplotlib.pyplot as plt
-
 
 
 def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: str = ""):
@@ -188,7 +175,7 @@ def run_exp_inter_chiplet():
                   low_error_overhead,
                   high_error_depth,
                   high_error_overhead,
-                  "experiments/evaluation/cnot_inter_chiplet_overhead")
+                  "experiments/evaluation/inter_chiplet/cnot_inter_chiplet_overhead")
 
             
 if __name__ == "__main__":

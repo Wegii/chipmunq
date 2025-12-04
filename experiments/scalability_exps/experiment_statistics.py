@@ -1,30 +1,14 @@
-# How do circuit depth and gate overhead scale as circuit size increases?
-
-
 from __future__ import annotations
 
 import sys
 import os
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-import time
 
 # Custom utils
 from experiments.exp_utils.transpilation_utils import *
-from experiments.exp_utils.circuit_generator import QECMemory, QECCircuit, get_tqec_cnot_rotated
-from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
-from qeccm.src.reference_partitions import memory_d5
-from experiments.exp_utils.simulation_utils import *
-from qeccm.backends.backend_utils import plot_gate_map
-
-from experiments.exp_utils.circuit_utils import stim_to_qiskit
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
-from stim import Circuit as StimCircuit
-
-from glue.eccentric_bench.noise import get_noise_model
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -176,7 +160,7 @@ def run_exp_statistics():
                   custom_overhead,
                   sabre_depth,
                   sabre_overhead,
-                  "experiments/evaluation/cnot_scaling_overhead")
+                  "experiments/evaluation/scalability/cnot_scaling_overhead")
 
             
 if __name__ == "__main__":
