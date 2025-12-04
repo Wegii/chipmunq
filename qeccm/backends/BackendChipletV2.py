@@ -43,6 +43,7 @@ class BackendChipletV2(BackendV2):
                  inter_chiplet_noise: float = None,
                  inter_chiplet_amplification: float = None,
                  inter_chiplet_noise_type: str = "",
+                 inter_chiplet_rfactor : int = 10,
                  num_defective_qubits: int = 0
                  ) -> None:
         """Instantiate new multi-chip backend.
@@ -124,7 +125,8 @@ class BackendChipletV2(BackendV2):
         # Generate inter-chiplet noise
         self.inter_chiplet_connections = self.get_inter_chiplet_mapping(noise = inter_chiplet_noise,
                                                                         amplification = inter_chiplet_amplification,
-                                                                        noise_type = inter_chiplet_noise_type)
+                                                                        noise_type = inter_chiplet_noise_type,
+                                                                        rfactor = inter_chiplet_rfactor)
         
         # Build coupling map for defective_target
         self.defective_coupling_map = self._defective_target.build_coupling_map()
@@ -470,7 +472,8 @@ class BackendChipletV2(BackendV2):
     def get_inter_chiplet_mapping(self,
                                   noise: float = None,
                                   amplification: float = None,
-                                  noise_type: str = "constant"
+                                  noise_type: str = "constant",
+                                  rfactor: int = 10
                                   ) -> dict:
         """Generate dictionary containing inter_chiplet connections and their noise level
 
@@ -499,8 +502,9 @@ class BackendChipletV2(BackendV2):
                 d[(int(k), int(v))] = min(0.9, amplification * noise)
             elif noise_type == "random":
                 # Sample a random factor in the range [1, 10]
-                random_factor = min(max(1, random.random()*10), 10)
+                random_factor = min(max(1, random.random()*rfactor), rfactor)
                 d[(int(k), int(v))] = min(0.9, random_factor * amplification * noise)
+                # print(f"{random_factor} resulting in {d[(int(k), int(v))]}")
 
         d = dict(d)
         return d
