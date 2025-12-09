@@ -53,13 +53,13 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     ax.grid(True, which='both', linestyle='--', alpha=0.5)
     ax.legend()
     ax.loglog()
-    #ax.set_title("Logical Error Rate")
+    ax.set_title("Logical Error Rate")
     ax.set_xlabel("Physical Error Rate")
     ax.set_ylabel("Logical Error Rate")
 
-    ax.set_xlabel("")        # hide x-axis label
-    ax.set_xticks([])        # hide tick locations
-    ax.set_xticklabels([])   # hide tick labels
+    #ax.set_xlabel("")        # hide x-axis label
+    #ax.set_xticks([])        # hide tick locations
+    #ax.set_xticklabels([])   # hide tick labels
 
     fig.savefig(filename)
 
@@ -81,6 +81,8 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         physical_error_rates.add(p)
         d_values.add(d)
 
+    physical_error_rates = sorted(physical_error_rates)
+
     diff_low_cost = defaultdict(dict)
     diff_high_cost = defaultdict(dict)
     diff_low_cost_tradeoff = defaultdict(dict)
@@ -96,7 +98,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
 
     fig, ax = plt.subplots(figsize=(8, 3))
 
-    ax.axhline(0.0, color='black', linestyle='-', linewidth=2, alpha=0.6)
+    ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
 
     ps_rates = sorted(diff_low_cost[5].keys())
     ys_custom = [diff_low_cost[5][p] for p in physical_error_rates]
@@ -136,14 +138,14 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         color="#5c79bd",
     )
     
-    
+    plt.ylim(-1e-1, 0.5)
     plt.xscale('log')
     #plt.yscale('log')
     plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
 
     plt.xlabel("Physical Error Rate")
     plt.ylabel(r"Δ($LER_{Routing Method} - LER_{Basic}$)")
-    plt.legend()
+    plt.legend(loc="lower right")
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.savefig(filename, bbox_inches='tight')
