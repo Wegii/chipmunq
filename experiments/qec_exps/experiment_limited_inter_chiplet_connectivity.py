@@ -27,7 +27,8 @@ from tqec.utils.enums import Basis
 from tqec.utils.position import Position3D
 import numpy as np
 import matplotlib.pyplot as plt
-
+from collections import defaultdict
+import pickle
 
 
 def plot_evaluation(stat, filename, with_transpilation = False):
@@ -57,68 +58,82 @@ def plot_evaluation(stat, filename, with_transpilation = False):
     ax.set_ylabel("Logical Error Rate")
     fig.savefig(filename)
 
-def plot_interconnect_sweep(stats, filename):
-    from collections import defaultdict
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
+def plot_difference(stats, filename, inter_chiplet_noise):
+    # TODO: Plot difference
 
-    # Collect raw data points grouped by physical error rate
-    points_by_p = defaultdict(list)   # p → list of (p_inter, ler, d, config)
-    points_by_group = defaultdict(list)  # (p, run_name) -> list of (p_inter, ler)
+    # TODO: Get run with run_name = 8
 
+    # Difference between maximum inter chiplet connections and limited ones
 
-    fig = plt.figure(figsize=(10,7))
-    ax = fig.add_subplot(111, projection="3d")
-
+    # Calculate error rate and group
+    error_rates = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    physical_error_rates = set()
+    d_values = set()
     for s in stats:
         ler = s.errors / (s.shots - s.discards)
+        p = s.json_metadata['p']
+        t = str(s.json_metadata['run_name'])
+        d = str(s.json_metadata['d'])
+        
+        error_rates[t][d][p].append(ler)
+        physical_error_rates.add(p)
+        d_values.add(d)
 
-        p        = s.json_metadata["p"]
-        p_inter  = s.json_metadata["p_inter"]
-        d        = s.json_metadata["d"]
-        config   = s.json_metadata["run_name"]
+    physical_error_rates = sorted(list(physical_error_rates)) #sorted(physical_error_rates)
+    #print(physical_error_rates)
 
-        points_by_p[p].append((p_inter, ler, d, config))
-        points_by_group[(p, config)].append((p_inter, ler))
+    diff_1 = defaultdict(dict)
+    diff_4 = defaultdict(dict)
 
+    for d in d_values:
+        for p in physical_error_rates:
+            diff_1[d][p] = error_rates['1'][d][p][0] - error_rates['8'][d][p][0]
+            diff_4[d][p] = error_rates['4'][d][p][0] - error_rates['8'][d][p][0]
 
-        ax.scatter(p, p_inter, ler, marker='o')
+    fig, ax = plt.subplots(figsize=(8, 3))
+  
+    ys_custom = [diff_1['5'][p] for p in physical_error_rates]
+    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color='#ff8c00', label=f'(d=5, n_inter = 1)')
 
-    for (p, run_name), plist in points_by_group.items():
-        # Sort so that connecting lines follow p_inter
-        plist_sorted = sorted(plist, key=lambda x: x[0])
+    ys_custom = [diff_4['5'][p] for p in physical_error_rates]
+    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color="#5c79bd", label=f'(d=5, n_inter = 4)')
 
-        p_inters = [pt[0] for pt in plist_sorted]
-        lers     = [pt[1] for pt in plist_sorted]
-        ps       = [p] * len(plist_sorted)
+    description = (r"$p_{inter}$ = " + f"{inter_chiplet_noise}")
 
-        # Connect points
-        ax.plot(ps, p_inters, lers)#, label=f"{run_name}")
+    ax.text(
+        0, 1.02, description,
+        transform=ax.transAxes,
+        fontsize=9,
+        #fontweight="bold"
+    )
+    #ax.text(
+    #    0, 1.02, description,
+    #    transform=ax.transAxes,
+    #    fontsize=9,
+    #    fontweight="bold"
+    #)
 
+    ax.text(
+        0.81, 1.02, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontsize=9,
+        fontweight="bold",
+        color="#5c79bd",
+    )
+    
+    plt.ylim(-0.01, 0.9)
+    plt.xscale('log')
+    #plt.yscale('log')
+    plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
 
-
-    ax.set_xlabel("Physical Error Rate (p)")
-    ax.set_ylabel("Inter-Chiplet Error Rate (p_inter)")
-    ax.set_zlabel("Logical Error Rate (LER)")
-    ax.set_title("3D Scatter Plot with Lines Grouped by Physical Error Rate")
-    #ax.zaxis.set_ticks_position('left')
-    #ax.zaxis.set_label_position('left')
-
-    ax.legend()
-
+    plt.xlabel("Physical Error Rate")
+    plt.ylabel(r"Δ($LER_{Reduced} - LER_{Full}$)")
+    plt.legend(loc="lower right")
+    plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.savefig(filename, bbox_inches="tight")
+    plt.savefig(filename, bbox_inches='tight')
     plt.close()
 
-
-
-def inter_chiplet_routing_sweep() -> None:
-    # Use the basic router
-    
-    # The backend should have 
-
-    # Compare with the cost router for different weight values
-    pass
 
 
 def run_exp_distributed_inter_chiplet() -> None:
@@ -140,10 +155,11 @@ def run_exp_distributed_inter_chiplet() -> None:
         # Transpilation
         ts = [str(i) for i in num_inter_chiplet_connections]
         ks = [2]
-        routing_types = ["cost", "default"]#, ["default"]
+        routing_types = ["default"] #["cost", "default"]
 
         transpiled_circuits = {}
-
+        """
+        
         def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str) -> StimCircuit:
             if t == "default":
                 return normal_circuit_stim
@@ -181,7 +197,7 @@ def run_exp_distributed_inter_chiplet() -> None:
                                         topology = "rotated_grid",
                                         inter_chiplet_noise = p_icc,
                                         inter_chiplet_amplification = amp_icc,
-                                        inter_chiplet_noise_type = "random"#"constant"
+                                        inter_chiplet_noise_type = "constant"#"random"#"constant"
                                         )
 
         def _get_sinter_task():
@@ -189,7 +205,7 @@ def run_exp_distributed_inter_chiplet() -> None:
             yield from (
                 sinter.Task(
                     circuit=circuit,
-                    json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t + rt, "p_inter": p_icc},
+                    json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t, "p_inter": p_icc},
                 )
                 for circuit, k, p, t, rt, p_icc in (
                     (get_noise_model("modsi1000",
@@ -211,9 +227,22 @@ def run_exp_distributed_inter_chiplet() -> None:
 
         stats = run_sinter_simulation(_get_sinter_task, ks, ps)
 
+        with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "wb") as f:
+            pickle.dump(stats, f)
+
+        """
+        with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "rb") as f:
+            stats = pickle.load(f)
+
         plot_evaluation(stats,
                         filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.png",
                         with_transpilation = True)
+        
+        plot_difference(stats,
+                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_difference.png",
+                        inter_chiplet_noise = ps_inter)
+        
+        
         
     #plot_interconnect_sweep(stats,
     #                        filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet_sweep.png")

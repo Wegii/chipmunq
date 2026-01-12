@@ -29,10 +29,10 @@ mkShell rec {
     fc-cache -f ${dejavu_fonts}/share/fonts
 
     # Activate virtualenv if it exists
-    if [ -d ".venv" ]; then
-      source .venv/bin/activate
-    else
-      echo "No virtual environment found, create it using python -m venv .venv"
-    fi
+    #if [ -d ".venv" ]; then
+    source ../venv/qeccm/bin/activate
+    #else
+    #  echo "No virtual environment found, create it using python -m venv .venv"
+    #fi
   '';
 }

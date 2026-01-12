@@ -1,0 +1,14 @@
+qiskit
+qiskit-ibm-runtime
+
+stim
+dill
+hypernetx
+networkx
+numpy
+pandas
+pillow
+seaborn
+kahypar
+matplotlib
+fastjsonschema
