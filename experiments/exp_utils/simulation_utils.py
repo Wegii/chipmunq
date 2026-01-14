@@ -48,11 +48,11 @@ def transpile_stim_circuit(circuit: StimCodeCircuit,
                                                    routing_beta = routing_beta)
         
     # Transpile using standard SABRE
-    sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+    sabre_circuit = None#sabre_transpilation(stim_code_circuit.qc, backend)
 
     # Qiskit to stim
     custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
-    sabre_circuit_stim = get_stim_circuits_with_detectors(sabre_circuit)[0][0]
+    sabre_circuit_stim = None#get_stim_circuits_with_detectors(sabre_circuit)[0][0]
 
     return custom_circuit_stim, custom_circuit, sabre_circuit_stim, sabre_circuit
 

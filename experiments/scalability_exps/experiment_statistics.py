@@ -149,7 +149,7 @@ def plot_combined_split(custom_depth,
 
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(6, 8))
     
     ax.bar(x-width, general_depth_vals, width,
            label="Default", color="lightcoral",
@@ -170,7 +170,7 @@ def plot_combined_split(custom_depth,
     ax.legend()
 
     # Add annotation
-    ax.text(0.8, 1.03, 'Lower is better ↓',
+    ax.text(0.7, 1.03, 'Lower is better ↓',
             transform=ax.transAxes,
             fontsize=10,
             fontweight='bold',
@@ -180,7 +180,7 @@ def plot_combined_split(custom_depth,
     
 
 
-    fig.tight_layout()
+    #fig.tight_layout()
     fig.savefig(f"{filename}_depth.png", dpi=300)
     plt.show()
 
@@ -192,7 +192,7 @@ def plot_combined_split(custom_depth,
     # Add a small padding to the upper y-limit for better visualization
     upper_ylim = max_overall_val*1.001
 
-    fig = plt.figure(figsize=(8, 6)) # Adjust figure size as needed
+    fig = plt.figure(figsize=(6, 8)) # Adjust figure size as needed
     gs = gridspec.GridSpec(2, 1, height_ratios=[5, 20], hspace=0.1) # Swapped height_ratios
 
     # Top subplot (for values above the break, e.g., 60,000 to max)
@@ -254,9 +254,9 @@ def plot_combined_split(custom_depth,
     ax_top.plot((1 - d, 1 + d), (0, 0), **kwargs)
 
 
-    fig.text(0.02, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=12)
+    fig.text(0.0, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=12)
     fig.text(0.45, 0.05, "Circuit Size", va='center', rotation='horizontal', fontsize=12)
-    ax_top.text(0.78, 1.2, 'Lower is better ↓',
+    ax_top.text(0.7, 1.2, 'Lower is better ↓',
                 transform=ax_top.transAxes,
                 fontsize=10,
                 fontweight='bold',
@@ -266,7 +266,7 @@ def plot_combined_split(custom_depth,
 
     ax_top.legend(loc='upper left')
 
-    fig.tight_layout()
+    #fig.tight_layout()
     fig.savefig(f"{filename}_overhead.png", dpi=300)
     plt.show()
     
