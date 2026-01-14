@@ -115,7 +115,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
 
     def _generate_routing_pass(self,
                                backend,
-                               routing_type: str = "basic",
+                               routing_type: str = "basic_optimized",
                                alpha: float = 0.0,
                                beta: float = 0.0) -> PassManager:
         """_summary_
