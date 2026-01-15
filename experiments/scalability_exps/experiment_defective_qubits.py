@@ -26,6 +26,7 @@ from glue.eccentric_bench.noise import get_noise_model
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 
 def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left: str, filename: str = ""):
@@ -45,8 +46,9 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     width = 0.35
 
     # Colors
-    pastel_blue   = "#5c79bd"
-    pastel_orange = "#ef8d38"
+    pastel_blue = '#A7D9ED'
+    pastel_orange = '#F7C6A2'
+
     colors = [pastel_blue, pastel_orange]
     hatches = ['/', '\\']  # one hatch per placement mode
 
@@ -241,7 +243,7 @@ def run_exp_defective():
         custom_utilization = {pp: {} for pp in patch_placement}
 
         np = 1
-        defective_qubits = [1, 2, 3]
+        defective_qubits = [0, 1, 2, 3]
 
         # Compile a circuit to the defect free backend during the first iteration
         defect_free_compilation = True
@@ -312,13 +314,13 @@ def run_exp_defective():
 
                         #plot_circuit_layout(defect_free_circuit,
                         #        backend_non_defective,
-                        #        filename=f"experiments/evaluation/defective_qubits/{bc}_{pp}_layout_{df}_defect_free.png")
+                        #        filename=f"experiments/evaluation/defective_qubits/backend/{bc}_{pp}_layout_{df}_defect_free.png")
                         #defect_free_compilation = False
                     
                     
                     #plot_circuit_layout(defective_circuit,
                     #                    backend,
-                    #                    filename=f"experiments/evaluation/defective_qubits/{bc}_{pp}_layout_{df}.png")
+                    #                    filename=f"experiments/evaluation/defective_qubits/backend/{bc}_{pp}_layout_{df}.png")
                     
 
                     def num_2q_gates(circuit):
@@ -330,14 +332,29 @@ def run_exp_defective():
                     # Calculate qpu utilization
                     custom_utilization[pp][df][ks] = calculate_qpu_utilization(defective_circuit, backend)
 
-                    custom_depth[pp][df][ks] = defective_circuit.depth() - (defect_free_circuit).depth()
-                    custom_overhead[pp][df][ks] = num_2q_gates(defective_circuit) - num_2q_gates(defect_free_circuit)
+                    custom_depth[pp][df][ks] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
+                    custom_overhead[pp][df][ks] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-        print(custom_utilization)
+    
+        with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "wb") as f:
+            pickle.dump(custom_depth, f)
+        with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "wb") as f:
+            pickle.dump(custom_overhead, f)
+        with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "wb") as f:
+            pickle.dump(custom_utilization, f)
+
+        with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
+            custom_depth = pickle.load(f)
+        with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "rb") as f:
+            custom_overhead = pickle.load(f)
+        with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "rb") as f:
+            custom_utilization = pickle.load(f)
+
         plot_combined(custom_depth,
                       custom_overhead,
                       custom_utilization,
-                      title_left = "b) Multi patch configuration" if bc == "multi_patch" else "a) Single patch configuration",
+                      title_left = ("b) Multi patch configuration" if bc == "multi_patch"
+                                    else "a) Single patch configuration"),
                       filename = f"experiments/evaluation/defective_qubits/{bc}_overhead")
 
             

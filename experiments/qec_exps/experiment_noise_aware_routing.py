@@ -19,49 +19,98 @@ import pickle
 
 
 def plot_evaluation(stat, filename, inter_chiplet_noise):
-    fig, ax = plt.subplots()
-    fig, ax = plt.subplots(figsize=(8, 8))
+    error_rates = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    physical_error_rates = set()
+    d_values = set()
+    for s in stats:
+        ler = s.errors / (s.shots - s.discards)
+        p = s.json_metadata['p']
+        t = str(s.json_metadata['run_name'])
+        d = str(s.json_metadata['d'])
+        
+        error_rates[t][d][p].append(ler)
+        physical_error_rates.add(p)
+        d_values.add(d)
 
-    grp_fc = lambda stat: (
-        stat.json_metadata["d"],
-        stat.json_metadata["run_name"],
-        )
+    d_values = sorted(d_values)
+    physical_error_rates = sorted(list(physical_error_rates))
 
-    sinter.plot_error_rate(
-        ax=ax,
-        stats=stat,
-        x_func=lambda stat: stat.json_metadata["p"],
-        group_func=grp_fc,
-    )
+    fig, ax = plt.subplots(figsize=(6, 5))
+    # Plot identity (x = y)
+    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
+
+    colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
+    colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
+    color_list = [colors_default, colors_transpiled]
+
+    inter_markers = ['x', 'o', 's']
+    plot_label = ["Basic, Low Variance", "Basic, High Variance", "Cost, Low Variance", "Cost, High Variance", "Tradeoff, High Variance", "Tradeoff, High Variance"]
+    for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
+        for i, d in enumerate(d_values):
+            errors = defaultdict(dict)
+
+            for p in physical_error_rates:
+                errors[p] = error_rates[t][d][p][0]
+                
+            ys_custom = [errors[p] for p in physical_error_rates]
+
+            line_color = ("#2A5687" if (t in ["basic10", "cost_inter10", "cost_tradeoff10"])
+                          else "#7F2E2A")
+            line_style = ("-" if (t in ["basic10", "basic100"])
+                          else "--")
+            if t in ["cost_inter10", "cost_inter100"]:
+                marker = "x"
+            elif t in ["cost_tradeoff10", "cost_tradeoff100"]:
+                marker = "o"
+            else:
+                marker = ""
+            plt.plot(physical_error_rates,
+                        ys_custom,
+                        linewidth = 1.5,
+                        marker = marker,
+                        markersize = 4,
+                        markerfacecolor="none",
+                        linestyle= line_style,
+                        color = line_color,
+                        label = plot_label[ti])
+            
+    if inter_chiplet_noise == 0.0001:
+        ps_inter_text = r"$1e^{-4}$"
+    elif inter_chiplet_noise == 0.001:
+        ps_inter_text = r"$1e^{-3}$"
+    elif inter_chiplet_noise == 0.01:
+        ps_inter_text = r"$1e^{-2}$"
+    description = (r"$p_{inter}$ = " + f"{ps_inter_text}, d = 5")
 
     ax.text(
-        0, 1.02, r"$p_{inter}$ = " + f"{inter_chiplet_noise}",
+        0, 1.02, description,
         transform=ax.transAxes,
         fontsize=9,
-        fontweight="bold"
+        #fontweight="bold"
     )
 
     ax.text(
-        0.81, 1.02, "Lower is better ↓",
+        0.75, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
         fontsize=9,
         fontweight="bold",
         color="#5c79bd",
     )
+    
+    #plt.ylim(-0.01, 0.9)
+    plt.ylim(1e-6, 1e0)
+    plt.xscale('log')
+    plt.yscale('log')
 
-    ax.grid(axis="both")
-    ax.grid(True, which='both', linestyle='--', alpha=0.5)
-    ax.legend()
-    ax.loglog()
-    ax.set_title("Logical Error Rate")
-    ax.set_xlabel("Physical Error Rate")
-    ax.set_ylabel("Logical Error Rate")
 
-    #ax.set_xlabel("")        # hide x-axis label
-    #ax.set_xticks([])        # hide tick locations
-    #ax.set_xticklabels([])   # hide tick labels
+    plt.xlabel("Physical error rate")
+    plt.ylabel("Logical error rate")
+    plt.legend(loc="lower right", ncol=2)
+    #plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename, bbox_inches='tight', dpi=300)
+    plt.close()
 
-    fig.savefig(filename)
 
 
 def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
@@ -102,19 +151,19 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
 
     ps_rates = sorted(diff_low_cost[5].keys())
     ys_custom = [diff_low_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', linewidth=2, color='#ff8c00', label=f'(cost, Low Variance)')
+    plt.plot(ps_rates, ys_custom, marker='x', linewidth=2, color='#2A5687', linestyle='--', label=f'Cost, Low Variance')
 
     ps_rates = sorted(diff_low_cost_tradeoff[5].keys())
     ys_custom = [diff_low_cost_tradeoff[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='o', linewidth=2, color='#ff8c00',linestyle='--', label=f'(tradeoff, Low Variance)')
+    plt.plot(ps_rates, ys_custom, marker='o', linewidth=2, color='#2A5687', linestyle='--', label=f'Tradeoff, Low Variance')
 
     ps_rates = sorted(diff_high_cost[5].keys())
     ys_custom = [diff_high_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', linewidth=2, color="#5c79bd",label=f'(cost, High Variance)')
+    plt.plot(ps_rates, ys_custom, marker='x', linewidth=2, color="#7F2E2A", linestyle='--', label=f'Cost, High Variance')
 
     ps_rates = sorted(diff_high_cost_tradeoff[5].keys())
     ys_custom = [diff_high_cost_tradeoff[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='o', linewidth=2, color='#5c79bd',linestyle='--', label=f'(tradeoff, High Variance)')
+    plt.plot(ps_rates, ys_custom, marker='o', linewidth=2, color='#7F2E2A', linestyle='--', label=f'Tradeoff, High Variance')
 
     description = (r"$p_{inter}$ = " +
                    f"{inter_chiplet_noise}, " +
@@ -314,7 +363,7 @@ if __name__ == "__main__":
             with open(f"experiments/evaluation/qec_routing/routing_{ra}_{ps}_sweep.pkl", "rb") as f:
                 stats = pickle.load(f)
 
-            plot_evaluation(stats, f"experiments/evaluation/qec_routing/routing_{ra}_{ps}.png", ps_inter_text)
+            plot_evaluation(stats, f"experiments/evaluation/qec_routing/routing_{ra}_{ps}.png", ps)
 
             plot_error_improvement(stats,
                                    f"experiments/evaluation/qec_routing/routing_difference_{ra}_{ps}.png",
