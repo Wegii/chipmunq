@@ -52,12 +52,10 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     # Plot identity (x = y)
     plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
 
-    #colors_5 = [ "#8FB7E1", "#5E97CC", "#3B6FA8"]
-    #colors_7 = [ "#E38E8A", "#C85E59", "#9F3B36"]
     colors_5 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
     colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
 
-
+    inter_markers = ['', 'x', 'o', 's','^']
     color_list = [colors_5, colors_7]
 
     for i, d in enumerate(d_values):
@@ -69,10 +67,14 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
             ys_custom = [errors[p] for p in physical_error_rates]
             plt.plot(physical_error_rates,
                      ys_custom,
-                     linewidth=2,
+                     linewidth = 1,
+                     marker = inter_markers[ni],
+                     markersize = 3,
+                     markerfacecolor="none",
                      linestyle= "solid" if d == "5" else "solid",
                      color = color_list[i][ni],
-                     label = f'{d}, {n}')
+                     label = f'({d}, {n})')
+            
 
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
@@ -108,7 +110,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     plt.legend(loc="lower right", ncol=2)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight')
+    plt.savefig(filename, bbox_inches='tight', dpi=300)
     plt.close()
 
 
@@ -151,32 +153,32 @@ def plot_difference(stats, filename, inter_chiplet_noise):
             diff_4[d][p] = (error_rates['4'][d][p][0] / error_rates['8'][d][p][0])
             diff_6[d][p] = (error_rates['6'][d][p][0] / error_rates['8'][d][p][0])
 
-    fig, ax = plt.subplots(figsize=(8, 3))
+    fig, ax = plt.subplots(figsize=(8, 3)) 
 
     ys_custom = [diff_1['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_5[0], label=f'(d=5, n_inter = 1)')
+    plt.plot(physical_error_rates, ys_custom, marker='x', markerfacecolor="none", linewidth=1.5, color=colors_5[0], label=f'(5, 1)')
 
     ys_custom = [diff_2['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_5[1], label=f'(d=5, n_inter = 2)')
+    plt.plot(physical_error_rates, ys_custom, marker='o', markerfacecolor="none", linewidth=1.5, color=colors_5[1], label=f'(5, 2)')
 
     ys_custom = [diff_4['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_5[2], label=f'(d=5, n_inter = 4)')
+    plt.plot(physical_error_rates, ys_custom, marker='s', markerfacecolor="none", linewidth=1.5, color=colors_5[2], label=f'(5, 4)')
 
     ys_custom = [diff_6['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_5[3], label=f'(d=5, n_inter = 6)')
+    plt.plot(physical_error_rates, ys_custom, marker='^', markerfacecolor="none", linewidth=1.5, color=colors_5[3], label=f'(5, 6)')
 
 
     ys_custom = [diff_1['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_7[0], label=f'(d=7, n_inter = 1)')
+    plt.plot(physical_error_rates, ys_custom, marker='x', markerfacecolor="none", linewidth=1.5, color=colors_7[0], label=f'(7, 1)')
 
     ys_custom = [diff_2['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_7[1], label=f'(d=7, n_inter = 2)')
+    plt.plot(physical_error_rates, ys_custom, marker='o', markerfacecolor="none", linewidth=1.5, color=colors_7[1], label=f'(7, 2)')
 
     ys_custom = [diff_4['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_7[2], label=f'(d=7, n_inter = 4)')
+    plt.plot(physical_error_rates, ys_custom, marker='s', markerfacecolor="none", linewidth=1.5, color=colors_7[2], label=f'(7, 4)')
 
     ys_custom = [diff_6['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', linewidth=2, color=colors_7[3], label=f'(d=7, n_inter = 6)')
+    plt.plot(physical_error_rates, ys_custom, marker='^', markerfacecolor="none", linewidth=1.5, color=colors_7[3], label=f'(7, 6)')
 
 
     if inter_chiplet_noise == 0.0001:
@@ -212,7 +214,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     plt.legend(loc="lower right")
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight')
+    plt.savefig(filename, bbox_inches='tight', dpi=300)
     plt.close()
 
 
@@ -236,7 +238,7 @@ def run_exp_distributed_inter_chiplet() -> None:
         routing_types = ["default"] #["cost", "default"]
 
         transpiled_circuits = {}
-        
+        """
         def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str, k: int = 1) -> StimCircuit:
             if (n_icc, p_icc, amp_icc, routing_type, k) in transpiled_circuits:
                 # Circuit does not need to be transpiled again
@@ -325,7 +327,7 @@ def run_exp_distributed_inter_chiplet() -> None:
         with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "wb") as f:
             pickle.dump(stats, f)
         
-        
+        """
         with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "rb") as f:
             stats = pickle.load(f)
 

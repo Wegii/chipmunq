@@ -33,40 +33,146 @@ from tqec.utils.enums import Basis
 from tqec.utils.position import Position3D
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
+from collections import defaultdict
 
 
+def plot_evaluation(stats, filename, inter_chiplet_noise):
+    error_rates = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    physical_error_rates = set()
+    d_values = set()
+    for s in stats:
+        ler = s.errors / (s.shots - s.discards)
+        p = s.json_metadata['p']
+        t = str(s.json_metadata['run_name'])
+        d = str(s.json_metadata['d'])
+        
+        error_rates[t][d][p].append(ler)
+        physical_error_rates.add(p)
+        d_values.add(d)
 
-def plot_evaluation(stat, filename, with_transpilation = False):
-    fig, ax = plt.subplots()
+    d_values = sorted(d_values)
+    physical_error_rates = sorted(list(physical_error_rates))
 
-    if with_transpilation:
-        grp_fc = lambda stat: (
-            stat.json_metadata["d"],
-            stat.json_metadata["run_name"],
-            )
-    else:
-        grp_fc = lambda stat: (
-            stat.json_metadata["d"]
-            )
-    sinter.plot_error_rate(
-        ax=ax,
-        stats=stat,
-        x_func=lambda stat: stat.json_metadata["p"],
-        group_func=grp_fc,
+    fig, ax = plt.subplots(figsize=(6, 5))
+    # Plot identity (x = y)
+    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
+
+    colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
+    colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
+    color_list = [colors_default, colors_transpiled]
+
+    inter_markers = ['x', 'o', 's']
+    for ti, t in enumerate(["default", "compiled"]):
+        for i, d in enumerate(d_values):
+            errors = defaultdict(dict)
+
+            for p in physical_error_rates:
+                errors[p] = error_rates[t][d][p][0]
+                
+            ys_custom = [errors[p] for p in physical_error_rates]
+            plt.plot(physical_error_rates,
+                        ys_custom,
+                        linewidth = 1,
+                        marker = inter_markers[i],
+                        markersize = 3,
+                        markerfacecolor="none",
+                        linestyle= "solid" if t == "default" else "--",
+                        color = color_list[ti][i],
+                        label = f'({t}, {d})')
+            
+    if inter_chiplet_noise == 0.0001:
+        ps_inter_text = r"$1e^{-4}$"
+    elif inter_chiplet_noise == 0.001:
+        ps_inter_text = r"$1e^{-3}$"
+    elif inter_chiplet_noise == 0.01:
+        ps_inter_text = r"$1e^{-2}$"
+    description = (r"$p_{inter}$ = " + f"{ps_inter_text}")
+
+    ax.text(
+        0, 1.02, description,
+        transform=ax.transAxes,
+        fontsize=9,
+        #fontweight="bold"
     )
-    #plot_observable_as_inset(ax, zx_graph, correlation_surfaces[i])
-    ax.grid(axis="both")
-    ax.legend()
-    ax.loglog()
-    ax.set_title("Logical Error Rate")
-    ax.set_xlabel("Physical Error Rate")
-    ax.set_ylabel("Logical Error Rate")
 
-    fig.savefig(filename)
+    ax.text(
+        0.75, 1.02, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontsize=9,
+        fontweight="bold",
+        color="#5c79bd",
+    )
+    
+    #plt.ylim(-0.01, 0.9)
+    plt.ylim(5e-9, 1e0)
+    plt.xscale('log')
+    plt.yscale('log')
+
+
+    plt.xlabel("Physical error rate")
+    plt.ylabel("Logical error rate")
+    plt.legend(loc="lower right", ncol=2)
+    #plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename + ".png", bbox_inches='tight', dpi=300)
+    plt.close()
+
+
+
+    fig, ax = plt.subplots(figsize=(4, 5))
+    for i, d in enumerate(d_values):
+        errors = defaultdict(dict)
+
+        for p in physical_error_rates:
+            errors[p] = error_rates["default"][d][p][0] / error_rates["compiled"][d][p][0]
+                
+        ys_custom = [errors[p] for p in physical_error_rates]
+        plt.plot(physical_error_rates,
+                    ys_custom,
+                    linewidth = 1.5,
+                    marker = inter_markers[i],
+                    markersize = 5,
+                    markerfacecolor = "none",
+                    linestyle= "--",
+                    color = colors_transpiled[i],
+                    label = f'({d})')
+            
+    
+    ax.text(
+        0, 1.02, description,
+        transform=ax.transAxes,
+        fontsize=9,
+        #fontweight="bold"
+    )
+
+    ax.text(
+        0.62, 1.02, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontsize=9,
+        fontweight="bold",
+        color="#5c79bd",
+    )
+    
+    #plt.ylim(-0.01, 0.9)
+    #plt.ylim(5e-9, 1e0)
+    plt.xscale('log')
+    #plt.yscale('log')
+
+
+    plt.xlabel("Physical error rate")
+    plt.ylabel(r"$LER_{Default} / LER_{Compiled}$")
+    plt.legend(loc="lower right", ncol=1)
+    #plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename + "_relative.png", bbox_inches='tight', dpi=300)
+    plt.close()
+
+    
+
 
 
 def run_exp_distributed_lattice_surgery() -> None:
-    
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
 
@@ -76,10 +182,10 @@ def run_exp_distributed_lattice_surgery() -> None:
 
         # Transpilation
         ts = ["default", "compiled"]# + [str(i) for i in num_inter_chiplet_connections]
-        ks = [1, 2, 3]#[1, 2, 3]
+        ks = [1, 2, 3]
         
         transpiled_circuits = {}
-
+        """
         def get_circuit(distance_scale: int, p_icc, amp_icc, t: str) -> StimCircuit:
             # Reference circuit
             
@@ -118,6 +224,10 @@ def run_exp_distributed_lattice_surgery() -> None:
                     plot_circuit_layout(custom_circuit,
                                         backend,
                                         filename=f"experiments/evaluation/qec_evaluation/backend_mapping/layout_{distance_scale}.png")
+                    
+                    plot_circuit_layout_utilization(custom_circuit,
+                                                    backend,
+                                                    filename=f"experiments/evaluation/qec_evaluation/backend_mapping/mapping_{distance_scale}.png")
 
                     return custom_circuit_stim
 
@@ -147,7 +257,7 @@ def run_exp_distributed_lattice_surgery() -> None:
                                             topology = "rotated_grid",
                                             inter_chiplet_noise = p_icc,
                                             inter_chiplet_amplification = amp_icc,
-                                            inter_chiplet_noise_type = "random",#"constant"
+                                            inter_chiplet_noise_type = "constant",#"constant"
                                             num_defective_qubits=0,
                                             )
 
@@ -188,9 +298,16 @@ def run_exp_distributed_lattice_surgery() -> None:
 
         stats = run_sinter_simulation(_get_sinter_task, ks, ps)
 
+        with open(f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.pkl", "wb") as f:
+            pickle.dump(stats, f)
+        """
+        
+        with open(f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.pkl", "rb") as f:
+            stats = pickle.load(f)
+
         plot_evaluation(stats,
-                        filename = f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.png",
-                        with_transpilation = True)
+                        filename = f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}",
+                        inter_chiplet_noise=ps_inter)
     
 
 if __name__ == "__main__":
