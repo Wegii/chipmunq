@@ -1,6 +1,5 @@
 # Visualization
 import matplotlib.pyplot as plt
-
 import numpy as np
 
 
@@ -106,9 +105,7 @@ class QPUBlock:
             preferred_x = 0
             preferred_y = (self.height - ph)
 
-        # ------------------------------------------------
-        # 1. Try fully centered placement (preferred_x, preferred_y)
-        # ------------------------------------------------
+
         idx, rect = self._find_covering_free_rect(preferred_x, preferred_y, pw, ph)
         if idx is not None and not self._overlaps(preferred_x, preferred_y, pw, ph):
             fx, fy, fw, fh = rect
@@ -118,9 +115,7 @@ class QPUBlock:
             print(f"Placed {partition_id} at centered ({preferred_x}, {preferred_y})")
             return (self.coord[0] + preferred_x, self.coord[1] + preferred_y)
 
-        # ------------------------------------------------
-        # 2. Try the original free-rectangle-based heuristic
-        # ------------------------------------------------
+        # Iterate over free rectangles to search for a free place
         for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
             if pw <= fw and ph <= fh:
 
@@ -145,15 +140,13 @@ class QPUBlock:
                     print(f"Placed {partition_id} at ({x}, {y}) using heuristic")
                     return (self.coord[0] + x, self.coord[1] + y)
 
-        # ------------------------------------------------
-        # 3. Fallback: full-grid brute-force search
-        # ------------------------------------------------
+        # Brute-force search over the whole block
         print(f"Standard placement failed for {partition_id}, performing grid search...")
 
         for y in range(0, self.height - ph + 1):
             for x in range(0, self.width - pw + 1):
 
-                # Overlaps forbidden/partitions?
+                # Check for overlaps
                 if self._overlaps(x, y, pw, ph):
                     continue
 
@@ -171,9 +164,6 @@ class QPUBlock:
         print(f"Placement for {partition_id} failed: no free slot available.")
         return None
 
-    # ----------------------------------------------------------
-    # MODIFIED: Relative placement with iterative search (shift)
-    # ----------------------------------------------------------
     def place_relative(self, partition_id, pw, ph, anchor_id, direction, max_shift=5):
         anchor = next((p for p in self.placed_partitions if p[0] == anchor_id), None)
         if anchor is None:
@@ -193,7 +183,6 @@ class QPUBlock:
         else:
             raise ValueError("Direction must be one of: right/left/above/below")
 
-        # --- Search Loop ---
         # Search starting from 0 shift up to max_shift
         for shift in range(max_shift + 1):
             
@@ -202,35 +191,28 @@ class QPUBlock:
             
             if shift > 0:
                 if direction in ("below", "above"):#("right", "left"):
-                    # Shift vertically
-                    y += shift # Try shifting 'up' first (lower y value is higher on screen/chip)
+                    # Shift vertically (up first)
+                    y += shift 
                     
-                    # NOTE: You could also implement a strategy to try shifting in the
-                    # opposite direction (e.g., y -= shift) or both, but a single
-                    # incremental shift is a common simple heuristic.
                 
                 elif direction in ("right", "left"):#("below", "above"):
-                    # Shift horizontally
-                    x += shift # Try shifting 'right' first
-                    
-                    # NOTE: As above, a strategy could include x -= shift
+                    # Shift horizontally (right first)
+                    x += shift
 
-            # 1. Bounds check
+            # Bounds check
             if x < 0 or y < 0 or x + pw > self.width or y + ph > self.height:
-                # If even the base position (shift=0) is out of bounds, we fail immediately.
-                # For shift > 0, we simply stop this iteration.
                 continue
 
-            # 2. Overlap check (with partitions AND forbidden zones)
+            # Overlap check (with partitions AND forbidden zones)
             if self._overlaps(x, y, pw, ph):
                 continue # Try next shift
 
-            # 3. Find free rect that fully contains this placement
+            # Find free rect that fully contains this placement
             idx, rect = self._find_covering_free_rect(x, y, pw, ph)
             if idx is None:
                 continue # Try next shift
 
-            # If all checks pass, we have found a valid placement!
+            # Valid placement found
             fx, fy, fw, fh = rect
 
             # Place partition

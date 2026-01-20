@@ -6,19 +6,19 @@ Mapping QECC to distributed systems
 
 
 ## Tasks
-- Improve visualization
-- Add circuit construction for experiments
+
 
 
 ## Implementation
 
 
-### Rust
-- Graph Library: e.g. use qiskit rustworkx [rustworkx](https://github.com/Qiskit/rustworkx)
+### Main libraries
 - Circuit representaiton: [qiskit](https://github.com/Qiskit/qiskit)
 - Simulator: [Stim](https://github.com/quantumlib/Stim/tree/main?tab=readme-ov-file)
 - Benchmarks: [eccentric_bench](https://github.com/aswierkowska/eccentric_bench)
 
+Also implemented custom transpiler passes in qiskit (see glue/qiskit)
+It is necessary to build all rust crates in install qiskit locally. See dev/build_rust.sh
 
 
 
