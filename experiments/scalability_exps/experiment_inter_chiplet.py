@@ -17,6 +17,7 @@ from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+from experiments.utils import *
 
 
 def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: str = ""):
@@ -35,12 +36,34 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     x = np.arange(len(np_values))
     width = 0.35
 
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.5,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+
+    plt.rcParams.update(tex_fonts)
+
     # Pastel colors
     pastel_blue = '#A7D9ED'
     pastel_orange = '#F7C6A2'
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     
     ax.bar(x - width/2, low_depth_vals, width,
            label = r"$p_{inter}$ = $1e^{-4}$",
@@ -59,13 +82,14 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     ax.legend()
 
     # Add annotation
-    ax.text(
-        0.7, 1.02, "Lower is better ↓",
+
+    ax.text(0.57, 1.04, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
-        fontweight="bold",
-        color="#5c79bd",
-    )
+        #fontsize=10,
+        fontweight='bold',
+        color = plot_lib_color,
+        va='top',
+        ha='left')
 
     fig.tight_layout()
     fig.savefig(f"{filename}_depth.png", dpi=300)
@@ -73,7 +97,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
 
     # Create 2q gate overhead
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
 
     ax.bar(x - width/2, low_over_vals, width,
@@ -88,17 +112,18 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
+    ax.set_xlabel("Circuit size")
     ax.set_ylabel("2q Gate Overhead ")
     ax.legend()
 
     # Add annotation
-    ax.text(
-        0.7, 1.02, "Lower is better ↓",
+    ax.text(0.57, 1.04, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
-        fontweight="bold",
-        color="#5c79bd",
-    )
+        #fontsize=10,
+        fontweight='bold',
+        color = plot_lib_color,
+        va='top',
+        ha='left')
 
     fig.tight_layout()
     fig.savefig(f"{filename}_overhead.png", dpi = 300)

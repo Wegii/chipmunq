@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import pickle
+from experiments.utils import *
 
 
 def plot_evaluation(stat, filename, inter_chiplet_noise):
@@ -35,7 +36,28 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     d_values = sorted(d_values)
     physical_error_rates = sorted(list(physical_error_rates))
 
-    fig, ax = plt.subplots(figsize=(6, 5))
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.3,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+    plt.rcParams.update(tex_fonts)
+
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     # Plot identity (x = y)
     plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
 
@@ -44,8 +66,10 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     color_list = [colors_default, colors_transpiled]
 
     inter_markers = ['x', 'o', 's']
-    plot_label = ["Basic, Low Variance", "Basic, High Variance", "Cost, Low Variance", "Cost, High Variance", "Tradeoff, High Variance", "Tradeoff, High Variance"]
-    for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
+    #plot_label = ["Basic, Low Variance", "Basic, High Variance", "Cost, Low Variance", "Cost, High Variance", "Tradeoff, High Variance", "Tradeoff, High Variance"]
+    #for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
+    plot_label = ["Basic, Low Variance",  "Cost, Low Variance",  "Tradeoff, Low Variance", "Basic, High Variance", "Cost, High Variance", "Tradeoff, High Variance"]
+    for ti, t in enumerate(["basic10", "cost_inter10", "cost_tradeoff10", "basic100", "cost_inter100", "cost_tradeoff100"]):
         for i, d in enumerate(d_values):
             errors = defaultdict(dict)
 
@@ -66,10 +90,10 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
                 marker = ""
             plt.plot(physical_error_rates,
                         ys_custom,
-                        linewidth = 1.5,
+                        #linewidth = 1.5,
                         marker = marker,
-                        markersize = 4,
-                        markerfacecolor="none",
+                        #markersize = 4,
+                        #markerfacecolor="none",
                         linestyle= line_style,
                         color = line_color,
                         label = plot_label[ti])
@@ -85,16 +109,14 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     ax.text(
         0, 1.02, description,
         transform=ax.transAxes,
-        fontsize=9,
         #fontweight="bold"
     )
 
     ax.text(
-        0.75, 1.02, "Lower is better ↓",
+        0.56, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color="#5c79bd",
+        color=plot_lib_color,
     )
     
     #plt.ylim(-0.01, 0.9)
@@ -105,12 +127,11 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
 
     plt.xlabel("Physical error rate")
     plt.ylabel("Logical error rate")
-    plt.legend(loc="lower right", ncol=2)
+    plt.legend(loc="lower right", ncol=1)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.savefig(filename, bbox_inches='tight', dpi=300)
     plt.close()
-
 
 
 def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
@@ -145,25 +166,47 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
             diff_high_cost[d][p] = error_rates['cost_inter100'][d][p][0] - error_rates['basic100'][d][p][0]
             diff_high_cost_tradeoff[d][p] = error_rates['cost_tradeoff100'][d][p][0] - error_rates['basic100'][d][p][0]
 
-    fig, ax = plt.subplots(figsize=(8, 3))
+
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.3,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 3,
+        "lines.markersize": 9,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+    plt.rcParams.update(tex_fonts)
+
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6*1.5, WIDTH_FIGSIZE/1.5))
 
     ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
 
     ps_rates = sorted(diff_low_cost[5].keys())
     ys_custom = [diff_low_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', linewidth=2, color='#2A5687', linestyle='--', label=f'Cost, Low Variance')
+    plt.plot(ps_rates, ys_custom, marker='x', color='#2A5687', linestyle='--', label=f'Cost, Low Variance')
 
     ps_rates = sorted(diff_low_cost_tradeoff[5].keys())
     ys_custom = [diff_low_cost_tradeoff[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='o', linewidth=2, color='#2A5687', linestyle='--', label=f'Tradeoff, Low Variance')
+    plt.plot(ps_rates, ys_custom, marker='o', color='#2A5687', linestyle='--', label=f'Tradeoff, Low Variance')
 
     ps_rates = sorted(diff_high_cost[5].keys())
     ys_custom = [diff_high_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', linewidth=2, color="#7F2E2A", linestyle='--', label=f'Cost, High Variance')
+    plt.plot(ps_rates, ys_custom, marker='x', color="#7F2E2A", linestyle='--', label=f'Cost, High Variance')
 
     ps_rates = sorted(diff_high_cost_tradeoff[5].keys())
     ys_custom = [diff_high_cost_tradeoff[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='o', linewidth=2, color='#7F2E2A', linestyle='--', label=f'Tradeoff, High Variance')
+    plt.plot(ps_rates, ys_custom, marker='o', color='#7F2E2A', linestyle='--', label=f'Tradeoff, High Variance')
 
     description = (r"$p_{inter}$ = " +
                    f"{inter_chiplet_noise}, " +
@@ -175,26 +218,26 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     ax.text(
         0, 1.02, description,
         transform=ax.transAxes,
-        fontsize=9,
-        fontweight="bold"
+        #fontweight="bold"
     )
 
     ax.text(
-        0.81, 1.02, "Lower is better ↓",
+        0.7, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color="#5c79bd",
+        color=plot_lib_color,
     )
+        
     
-    plt.ylim(-1e-1, 0.5)
+    plt.ylim(-10e-1, 0.5)
     plt.xscale('log')
     #plt.yscale('log')
     plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
 
     plt.xlabel("Physical Error Rate")
-    plt.ylabel(r"Δ($LER_{Routing Method} - LER_{Basic}$)")
-    plt.legend(loc="lower right")
+    #plt.ylabel(r"Δ($LER_{Routing Method} - LER_{Basic}$)")
+    plt.ylabel(r"Δ$LER_{Routing}$")
+    plt.legend(loc="lower right", ncol=2)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.savefig(filename, bbox_inches='tight')

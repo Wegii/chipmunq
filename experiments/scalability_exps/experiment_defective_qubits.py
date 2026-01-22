@@ -27,6 +27,7 @@ from glue.eccentric_bench.noise import get_noise_model
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+from experiments.utils import *
 
 
 def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left: str, filename: str = ""):
@@ -48,6 +49,32 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     # Colors
     pastel_blue = '#A7D9ED'
     pastel_orange = '#F7C6A2'
+    if title_left == "Single patch configuration":
+        tl_label = ["a) ", "b) ", "c) "]
+    else:
+        tl_label = ["d) ", "e) ", "f) "]
+
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.5,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+
+    plt.rcParams.update(tex_fonts)
 
     colors = [pastel_blue, pastel_orange]
     hatches = ['/', '\\']  # one hatch per placement mode
@@ -55,7 +82,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     labels = placement_modes  # ["default", "size_aware"]
 
     # ----------- Depth Overhead -------------
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_depth[mode][df][ks] for df in df_values]
@@ -73,29 +100,29 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("Circuit Depth Overhead")
-    ax.legend()
+    ax.legend(loc='upper left')
+    ax.set_ylim(0, 1100)
 
     ax.text(
-        0, 1.02, title_left,
+        .1, 1.02, tl_label[0] + title_left,
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold"
     )
 
     ax.text(
-        0.71, 1.02, "Lower is better ↓",
+        0.3, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color=pastel_blue,
+        color=plot_lib_color,
     )
+
 
     fig.tight_layout()
     fig.savefig(f"{filename}_depth.png", dpi=300)
     plt.show()
 
     # ----------- 2Q Gate Overhead -------------
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_overhead[mode][df][ks] for df in df_values]
@@ -113,21 +140,20 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("2q Gate Overhead")
-    ax.legend()
+    ax.legend(loc='upper left')
+    ax.set_ylim(0, 5500)
 
     ax.text(
-        0, 1.02, title_left,
+        .1, 1.02, tl_label[1] + title_left,
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold"
     )
 
     ax.text(
-        0.71, 1.02, "Lower is better ↓",
+        0.3, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color=pastel_blue,
+        color=plot_lib_color,
     )
 
     fig.tight_layout()
@@ -136,7 +162,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
 
 
     # ----------- Backend Utilization -------------
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_utilization[mode][df][ks] for df in df_values]
@@ -144,6 +170,9 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
             x + i * width - width/2,
             vals,
             width,
+            yerr=0.1,          
+            capsize=4,      
+            error_kw={'elinewidth': 2, 'ecolor': 'black'},
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
@@ -154,27 +183,25 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("Utilization")
-    ax.legend()
+    ax.legend(loc='upper left')
     ax.set_ylim(0, 1)
 
     ax.text(
-        0, 1.02, title_left,
+        .1, 1.02, tl_label[2] + title_left,
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold"
     )
 
     ax.text(
-        0.71, 1.02, "Higher is better ↑",
+        0.3, 1.07, "Higher is better ↑",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color=pastel_blue,
+        color=plot_lib_color,
     )
 
     fig.tight_layout()
     fig.savefig(f"{filename}_utilization.png", dpi=300)
-    plt.show()
+    #plt.show()
 
 
 def plot_utilization():
@@ -247,7 +274,7 @@ def run_exp_defective():
 
         # Compile a circuit to the defect free backend during the first iteration
         defect_free_compilation = True
-
+        """
         for pp in patch_placement:
             for ks in [2]:#[1, 2, 3, 4]
                 for df in defective_qubits:
@@ -342,6 +369,7 @@ def run_exp_defective():
             pickle.dump(custom_overhead, f)
         with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "wb") as f:
             pickle.dump(custom_utilization, f)
+        """
 
         with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
             custom_depth = pickle.load(f)
@@ -353,8 +381,8 @@ def run_exp_defective():
         plot_combined(custom_depth,
                       custom_overhead,
                       custom_utilization,
-                      title_left = ("b) Multi patch configuration" if bc == "multi_patch"
-                                    else "a) Single patch configuration"),
+                      title_left = ("Multi patch configuration" if bc == "multi_patch"
+                                    else "Single patch configuration"),
                       filename = f"experiments/evaluation/defective_qubits/{bc}_overhead")
 
             

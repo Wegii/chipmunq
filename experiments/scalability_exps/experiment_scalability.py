@@ -17,46 +17,45 @@ from matplotlib.ticker import MaxNLocator
 import pickle
 from math import *
 import numpy as np
+from experiments.utils import *
 
 
 def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     # Extract sorted x values
     np_values = sorted(custom_time_storage.keys())
+    x_val = [3*x for x in np_values]
 
     # Gather all ks values
     ks_values = sorted({ks for d in custom_time_storage.values() for ks in d.keys()})
 
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
 
     colors_custom = [ "#8FB7E1", "#5E97CC", "#3B6FA8"]
     colors_sabre = [ "#E38E8A", "#C85E59", "#9F3B36"]
-    style = []
 
     for i, ks in enumerate(ks_values):
         # SABRE
         y_sabre = [sabre_time_storage[np].get(ks, None) for np in np_values]
-        plt.plot(np_values, y_sabre, marker='x', linestyle='--', label=f"SABRE d{2*ks+1}", color=colors_sabre[i])
+        plt.plot(x_val, y_sabre, marker='x', linestyle='--', label=f"SABRE d{2*ks+1}", color=colors_sabre[i])
 
     for i, ks in enumerate(ks_values):
         # Custom
         y_custom = [custom_time_storage[np].get(ks, None) for np in np_values]
-        plt.plot(np_values, y_custom, marker='o', linestyle='-', label=f"Chipmunq d{2*ks+1}", color=colors_custom[i])
+        plt.plot(x_val, y_custom, marker='o', linestyle='-', label=f"Chipmunq d{2*ks+1}", color=colors_custom[i])
 
     #plt.axvline(x=3)
 
     ax.text(
-        0.81, 1.02, "Lower is better ↓",
+        0.73, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color="#5c79bd",
+        color=plot_lib_color,
     )
 
     description = ("routing_method = basic")
     ax.text(
         0, 1.02, description,
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold"
     )
 
@@ -190,9 +189,9 @@ def run_exp_scalability():
     print("Sabre")
     print(sabre_time_storage)
 
-    #plot_combined(custom_time_storage,
-    #              sabre_time_storage,
-    #              "experiments/evaluation/scalability/cnot_scaling.png")
+    plot_combined(custom_time_storage,
+                  sabre_time_storage,
+                  "experiments/evaluation/scalability/cnot_scaling.png")
 
     calculate_speedup(custom_time_storage,
                       sabre_time_storage,

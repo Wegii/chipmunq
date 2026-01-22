@@ -12,6 +12,7 @@ from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+from experiments.utils import *
 
 import pickle
 
@@ -129,6 +130,28 @@ def plot_combined_split(custom_depth,
     pastel_orange = '#F7C6A2'
 
 
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.5,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+
+    plt.rcParams.update(tex_fonts)
+
 
     ks = list(next(iter(custom_depth.values())).keys())[0]
     np_values = sorted(custom_depth.keys())
@@ -149,7 +172,7 @@ def plot_combined_split(custom_depth,
 
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(6, 8))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
     
     ax.bar(x-width, general_depth_vals, width,
            label="Default", color="lightcoral",
@@ -165,22 +188,21 @@ def plot_combined_split(custom_depth,
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
-    ax.set_xlabel("Circuit size", fontsize=12)
-    ax.set_ylabel("Circuit depth", fontsize=12)
+    ax.set_xlabel("Circuit size")
+    ax.set_ylabel("Circuit depth")
     ax.legend()
 
     # Add annotation
-    ax.text(0.7, 1.03, 'Lower is better ↓',
+    ax.text(0.55, 1.03, 'Lower is better ↓',
             transform=ax.transAxes,
-            fontsize=10,
+            #fontsize=10,
             fontweight='bold',
-            color="#5c79bd",
+            color = plot_lib_color,
             va='top',
             ha='left')
     
 
-
-    #fig.tight_layout()
+    fig.tight_layout()
     fig.savefig(f"{filename}_depth.png", dpi=300)
     plt.show()
 
@@ -192,7 +214,8 @@ def plot_combined_split(custom_depth,
     # Add a small padding to the upper y-limit for better visualization
     upper_ylim = max_overall_val*1.001
 
-    fig = plt.figure(figsize=(6, 8)) # Adjust figure size as needed
+    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
+
     gs = gridspec.GridSpec(2, 1, height_ratios=[5, 20], hspace=0.1) # Swapped height_ratios
 
     # Top subplot (for values above the break, e.g., 60,000 to max)
@@ -254,19 +277,20 @@ def plot_combined_split(custom_depth,
     ax_top.plot((1 - d, 1 + d), (0, 0), **kwargs)
 
 
-    fig.text(0.0, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=12)
-    fig.text(0.45, 0.05, "Circuit Size", va='center', rotation='horizontal', fontsize=12)
-    ax_top.text(0.7, 1.2, 'Lower is better ↓',
+    fig.text(0.025, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=FONTSIZE*1.5)
+    fig.text(0.43, 0.011, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
+    ax_top.text(0.54, 1.15, 'Lower is better ↓',
                 transform=ax_top.transAxes,
-                fontsize=10,
+                #fontsize=FONTSIZE,
                 fontweight='bold',
-                color="#5c79bd",
+                color=plot_lib_color,
                 va='top',
                 ha='left')
 
     ax_top.legend(loc='upper left')
 
     #fig.tight_layout()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.06)
     fig.savefig(f"{filename}_overhead.png", dpi=300)
     plt.show()
     
@@ -374,13 +398,13 @@ def run_exp_statistics():
 
 
 
-    plot_combined(custom_depth,
-                  custom_overhead,
-                  sabre_depth,
-                  sabre_overhead,
-                  depth_overall,
-                  gate_overall,
-                  "experiments/evaluation/scalability/cnot_scaling_overhead")
+    #plot_combined(custom_depth,
+    #              custom_overhead,
+    #              sabre_depth,
+    #              sabre_overhead,
+    #              depth_overall,
+    #              gate_overall,
+    #              "experiments/evaluation/scalability/cnot_scaling_overhead")
     
     
     plot_combined_split(custom_depth,

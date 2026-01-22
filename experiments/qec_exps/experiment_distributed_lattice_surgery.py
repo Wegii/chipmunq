@@ -35,6 +35,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from collections import defaultdict
+from experiments.utils import *
 
 
 def plot_evaluation(stats, filename, inter_chiplet_noise):
@@ -54,13 +55,34 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     d_values = sorted(d_values)
     physical_error_rates = sorted(list(physical_error_rates))
 
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     # Plot identity (x = y)
     plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
 
     colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
     colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
     color_list = [colors_default, colors_transpiled]
+
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.3,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+    plt.rcParams.update(tex_fonts)
 
     inter_markers = ['x', 'o', 's']
     for ti, t in enumerate(["default", "compiled"]):
@@ -73,11 +95,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
             ys_custom = [errors[p] for p in physical_error_rates]
             plt.plot(physical_error_rates,
                         ys_custom,
-                        linewidth = 1,
+                        linewidth = 2,
                         marker = inter_markers[i],
                         markersize = 3,
                         markerfacecolor="none",
-                        linestyle= "solid" if t == "default" else "--",
+                        linestyle= "--" if t == "default" else "solid",
                         color = color_list[ti][i],
                         label = f'({t}, {d})')
             
@@ -92,16 +114,14 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     ax.text(
         0, 1.02, description,
         transform=ax.transAxes,
-        fontsize=9,
-        #fontweight="bold"
+        fontweight="bold"
     )
 
     ax.text(
-        0.75, 1.02, "Lower is better ↓",
+        0.57, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color="#5c79bd",
+        color=plot_lib_color,
     )
     
     #plt.ylim(-0.01, 0.9)
@@ -120,12 +140,12 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
 
 
 
-    fig, ax = plt.subplots(figsize=(4, 5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     for i, d in enumerate(d_values):
         errors = defaultdict(dict)
 
         for p in physical_error_rates:
-            errors[p] = error_rates["default"][d][p][0] / error_rates["compiled"][d][p][0]
+            errors[p] = error_rates["compiled"][d][p][0]/error_rates["default"][d][p][0]
                 
         ys_custom = [errors[p] for p in physical_error_rates]
         plt.plot(physical_error_rates,
@@ -142,16 +162,14 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     ax.text(
         0, 1.02, description,
         transform=ax.transAxes,
-        fontsize=9,
-        #fontweight="bold"
+        fontweight="bold"
     )
 
     ax.text(
-        0.62, 1.02, "Lower is better ↓",
+        0.57, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
-        fontsize=9,
         fontweight="bold",
-        color="#5c79bd",
+        color=plot_lib_color,
     )
     
     #plt.ylim(-0.01, 0.9)
@@ -161,8 +179,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
 
 
     plt.xlabel("Physical error rate")
-    plt.ylabel(r"$LER_{Default} / LER_{Compiled}$")
-    plt.legend(loc="lower right", ncol=1)
+    plt.ylabel(r"$LER_{Compiled} / LER_{Default}$")
+    plt.legend(loc="upper right", ncol=1)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.savefig(filename + "_relative.png", bbox_inches='tight', dpi=300)
