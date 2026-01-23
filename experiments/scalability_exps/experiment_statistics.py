@@ -50,7 +50,7 @@ def plot_combined(custom_depth,
     fig, ax = plt.subplots(figsize=(5, 5))
 
     ax.bar(x-width, general_depth_vals, width,
-           label="Default", color="gray",
+           label="Ideal", color="gray",
            hatch='//', edgecolor='black')
     
     ax.bar(x, custom_depth_vals, width,
@@ -88,7 +88,7 @@ def plot_combined(custom_depth,
     print(general_depth_vals)
 
     ax.bar(x - width, general_over_vals, width,
-           label="Default", color="gray",
+           label="Ideal", color="gray",
            hatch='/', edgecolor='black')
     
     ax.bar(x, custom_over_vals, width,
@@ -167,6 +167,25 @@ def plot_combined_split(custom_depth,
     sabre_over_vals = [gate_overall[np][ks]+sabre_overhead[np][ks] for np in np_values]
     general_over_vals = [gate_overall[np][ks] for np in np_values]
 
+    #print(custom_depth_vals)
+    overhead_ours = []
+    overhead_sabre = []
+    overhead_gates_ours = []
+    overhead_gates_sabre = []
+    for i in range(0, 3):
+        print((custom_depth_vals[i] - general_depth_vals[i])/(sabre_depth_vals[i] - general_depth_vals[i]))
+        print(general_depth_vals[i])
+        print((custom_over_vals[i] - general_over_vals[i])/(sabre_over_vals[i] - general_over_vals[i]))
+        print(general_over_vals[i])
+
+        overhead_ours.append("{:.1f}%".format(100*((custom_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
+        overhead_sabre.append("{:.1f}%".format(100*((sabre_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
+        overhead_gates_ours.append("{:.1f}%".format(100*((custom_over_vals[i] - general_over_vals[i])/general_over_vals[i])))
+        overhead_gates_sabre.append("{:.1f}%".format(100*((sabre_over_vals[i] - general_over_vals[i])/general_over_vals[i])))
+
+        # Depth: 1 - (0.17329910141206675 + 0.12664165103189493 + 0.10834670947030497)/3 = 0.8639041793619111
+        # 2q_gates: 1 - (0.09606831524639743 + 0.08065720687079911 + 0.08100405020251013)/3 = 0.9140901425600978
+
     x = np.arange(len(np_values))
     width = 0.25#0.35
 
@@ -175,22 +194,25 @@ def plot_combined_split(custom_depth,
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
     
     ax.bar(x-width, general_depth_vals, width,
-           label="Default", color="lightcoral",
+           label="Ideal", color="lightcoral",
            hatch='//', edgecolor='black')
     
-    ax.bar(x, custom_depth_vals, width,
+    bars_ours = ax.bar(x, custom_depth_vals, width,
            label="Chipmunq (Ours)", color=pastel_blue,
            hatch='/', edgecolor='black')
 
-    ax.bar(x+width, sabre_depth_vals, width,
-           label="(Light-)SABRE", color=pastel_orange,
-           hatch='o', edgecolor='black')
+    bars_sabre = ax.bar(x+width, sabre_depth_vals, width,
+                        label="(Light-)SABRE", color=pastel_orange,
+                        hatch='o', edgecolor='black')
+    
+    ax.bar_label(bars_ours, labels = overhead_ours, padding = 9, rotation = 90)
+    ax.bar_label(bars_sabre, labels = overhead_sabre, padding = 9, rotation = 90)
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
     ax.set_xlabel("Circuit size")
     ax.set_ylabel("Circuit depth")
-    ax.legend()
+    ax.legend(loc='upper left')
 
     # Add annotation
     ax.text(0.55, 1.03, 'Lower is better ↓',
@@ -201,8 +223,10 @@ def plot_combined_split(custom_depth,
             va='top',
             ha='left')
     
+    ax.set_ylim(0, 10300)
 
-    fig.tight_layout()
+    #fig.tight_layout()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
     fig.savefig(f"{filename}_depth.png", dpi=300)
     plt.show()
 
@@ -212,7 +236,7 @@ def plot_combined_split(custom_depth,
     max_overall_val = max(max(general_over_vals), max(custom_over_vals), max(sabre_over_vals))
 
     # Add a small padding to the upper y-limit for better visualization
-    upper_ylim = max_overall_val*1.001
+    upper_ylim = max_overall_val*1.002
 
     fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
 
@@ -221,7 +245,7 @@ def plot_combined_split(custom_depth,
     # Top subplot (for values above the break, e.g., 60,000 to max)
     ax_top = plt.subplot(gs[0]) # Now gs[0] for the top part
     ax_top.bar(x - width, general_over_vals, width,
-            label="Default", color="lightcoral",
+            label="Ideal", color="lightcoral",
             hatch='//', edgecolor='black')
     ax_top.bar(x, custom_over_vals, width,
             label="Chipmunq (Ours)", color=pastel_blue,
@@ -240,14 +264,19 @@ def plot_combined_split(custom_depth,
     # Bottom subplot (for values below the break, e.g., 0 to 40,000)
     ax_bottom = plt.subplot(gs[1]) # Now gs[1] for the bottom part
     ax_bottom.bar(x - width, general_over_vals, width,
-                label="Default", color="lightcoral",
+                label="Ideal", color="lightcoral",
                 hatch='/', edgecolor='black')
-    ax_bottom.bar(x, custom_over_vals, width,
-                label="Chipmunq (Ours)", color=pastel_blue,
-                hatch='/', edgecolor='black')
-    ax_bottom.bar(x + width, sabre_over_vals, width,
-                label="(Light-)SABRE", color=pastel_orange,
-                hatch='o', edgecolor='black')
+    bars_gates_ours = ax_bottom.bar(x, custom_over_vals, width,
+                                    label="Chipmunq (Ours)", color=pastel_blue,
+                                    hatch='/', edgecolor='black')
+    bars_gates_sabre = ax_bottom.bar(x + width, sabre_over_vals, width,
+                                     label="(Light-)SABRE", color=pastel_orange,
+                                     hatch='o', edgecolor='black')
+
+    ax_top.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)
+    ax_bottom.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)
+    ax_top.bar_label(bars_gates_sabre, labels = overhead_gates_sabre, padding = 9, rotation = 90)
+    ax_bottom.bar_label(bars_gates_sabre, labels = overhead_gates_sabre, padding = 9, rotation = 90)
 
     # Limit for bottom
     ax_bottom.set_ylim(0, 40000)
@@ -290,7 +319,7 @@ def plot_combined_split(custom_depth,
     ax_top.legend(loc='upper left')
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.06)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
     fig.savefig(f"{filename}_overhead.png", dpi=300)
     plt.show()
     

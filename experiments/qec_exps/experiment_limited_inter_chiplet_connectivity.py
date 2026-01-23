@@ -94,7 +94,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
                      marker = inter_markers[ni],
                      linestyle= "solid" if d == "5" else "solid",
                      color = color_list[i][ni],
-                     label = f'({d}, {n})')
+                     label = f'(d={d},' +  r'$n_{inter}$' + f'={n})')
             
 
     if inter_chiplet_noise == 0.0001:
@@ -181,7 +181,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
         # Font sizes
         "axes.labelsize": FONTSIZE*1.3,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "legend.fontsize": (FONTSIZE - 2)*1,
         "xtick.labelsize": (FONTSIZE - 1)*1.3,
         "ytick.labelsize": (FONTSIZE - 1)*1.3,
         "axes.titlesize": 10,
@@ -194,33 +194,33 @@ def plot_difference(stats, filename, inter_chiplet_noise):
         "errorbar.capsize": 3,
     }
     plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE/1.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*3, WIDTH_FIGSIZE/1.5))
     #fig, ax = plt.subplots(figsize=(8, 3)) 
 
     ys_custom = [diff_1['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_5[0], label=f'(5, 1)')
+    plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_5[0], label=r'(d=5, $n_{inter}$=1)')
 
     ys_custom = [diff_2['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='o', color=colors_5[1], label=f'(5, 2)')
+    plt.plot(physical_error_rates, ys_custom, marker='o', color=colors_5[1], label=r'(d=5, $n_{inter}$=2)')
 
     ys_custom = [diff_4['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='s', color=colors_5[2], label=f'(5, 4)')
+    plt.plot(physical_error_rates, ys_custom, marker='s', color=colors_5[2], label=r'(d=5, $n_{inter}$=4)')
 
     ys_custom = [diff_6['5'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='^', color=colors_5[3], label=f'(5, 6)')
+    plt.plot(physical_error_rates, ys_custom, marker='^', color=colors_5[3], label=r'(d=5, $n_{inter}$=6)')
 
 
     ys_custom = [diff_1['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_7[0], label=f'(7, 1)')
+    plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_7[0], label=r'(d=7, $n_{inter}$=1)')
 
     ys_custom = [diff_2['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='o', color=colors_7[1], label=f'(7, 2)')
+    plt.plot(physical_error_rates, ys_custom, marker='o', color=colors_7[1], label=r'(d=7, $n_{inter}$=2)')
 
     ys_custom = [diff_4['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='s', color=colors_7[2], label=f'(7, 4)')
+    plt.plot(physical_error_rates, ys_custom, marker='s', color=colors_7[2], label=r'(d=7, $n_{inter}$=4)')
 
     ys_custom = [diff_6['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='^', color=colors_7[3], label=f'(7, 6)')
+    plt.plot(physical_error_rates, ys_custom, marker='^', color=colors_7[3], label=r'(d=7, $n_{inter}$=6)')
 
 
     if inter_chiplet_noise == 0.0001:
@@ -239,7 +239,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     )
 
     ax.text(
-        0.56, 1.02, "Lower is better ↓",
+        0.63, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,

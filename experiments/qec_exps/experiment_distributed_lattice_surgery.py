@@ -101,7 +101,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
                         markerfacecolor="none",
                         linestyle= "--" if t == "default" else "solid",
                         color = color_list[ti][i],
-                        label = f'({t}, {d})')
+                        label = f'({t}, d = {d})')
             
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
