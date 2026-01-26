@@ -48,7 +48,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
 
     # Colors
     pastel_blue = '#A7D9ED'
-    pastel_orange = '#F7C6A2'
+    pastel_orange = '#6476AD' # '#F7C6A2'
     if title_left == "Single patch configuration":
         tl_label = ["a) ", "b) ", "c) "]
     else:
@@ -101,7 +101,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("Circuit Depth Overhead")
     ax.legend(loc='upper left')
-    ax.set_ylim(0, 1100)
+    ax.set_ylim(0, 1250)
 
     ax.text(
         .1, 1.02, tl_label[0] + title_left,
@@ -116,10 +116,9 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
         color=plot_lib_color,
     )
 
-
-    fig.tight_layout()
-    fig.savefig(f"{filename}_depth.png", dpi=300)
-    plt.show()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.1)
+    fig.savefig(f"{filename}_depth.pdf", format="pdf")
+    plt.close(fig)
 
     # ----------- 2Q Gate Overhead -------------
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
@@ -156,9 +155,9 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
         color=plot_lib_color,
     )
 
-    fig.tight_layout()
-    fig.savefig(f"{filename}_overhead.png", dpi=300)
-    plt.show()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.1)
+    fig.savefig(f"{filename}_overhead.pdf", format="pdf")
+    plt.close(fig)
 
 
     # ----------- Backend Utilization -------------
@@ -199,9 +198,9 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
         color=plot_lib_color,
     )
 
-    fig.tight_layout()
-    fig.savefig(f"{filename}_utilization.png", dpi=300)
-    #plt.show()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.1)
+    fig.savefig(f"{filename}_utilization.pdf", format="pdf")
+    plt.close(fig)
 
 
 def plot_utilization():

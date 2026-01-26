@@ -191,7 +191,8 @@ def plot_combined_split(custom_depth,
 
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     
     ax.bar(x-width, general_depth_vals, width,
            label="Ideal", color="lightcoral",
@@ -215,7 +216,7 @@ def plot_combined_split(custom_depth,
     ax.legend(loc='upper left')
 
     # Add annotation
-    ax.text(0.55, 1.03, 'Lower is better ↓',
+    ax.text(0.53, 1.04, 'Lower is better ↓',
             transform=ax.transAxes,
             #fontsize=10,
             fontweight='bold',
@@ -223,12 +224,13 @@ def plot_combined_split(custom_depth,
             va='top',
             ha='left')
     
-    ax.set_ylim(0, 10300)
+    ax.set_ylim(0, 11300)
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
-    fig.savefig(f"{filename}_depth.png", dpi=300)
-    plt.show()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.savefig(f"{filename}_depth.pdf",
+                format="pdf")
+    plt.close(fig)
 
 
 
@@ -236,11 +238,12 @@ def plot_combined_split(custom_depth,
     max_overall_val = max(max(general_over_vals), max(custom_over_vals), max(sabre_over_vals))
 
     # Add a small padding to the upper y-limit for better visualization
-    upper_ylim = max_overall_val*1.002
+    upper_ylim = max_overall_val*1.015
 
-    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
-
-    gs = gridspec.GridSpec(2, 1, height_ratios=[5, 20], hspace=0.1) # Swapped height_ratios
+    #fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
+    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    
+    gs = gridspec.GridSpec(2, 1, height_ratios=[7, 20], hspace=0.1) # Swapped height_ratios
 
     # Top subplot (for values above the break, e.g., 60,000 to max)
     ax_top = plt.subplot(gs[0]) # Now gs[0] for the top part
@@ -307,8 +310,8 @@ def plot_combined_split(custom_depth,
 
 
     fig.text(0.025, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=FONTSIZE*1.5)
-    fig.text(0.43, 0.011, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
-    ax_top.text(0.54, 1.15, 'Lower is better ↓',
+    fig.text(0.43, 0.013, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
+    ax_top.text(0.53, 1.18, 'Lower is better ↓',
                 transform=ax_top.transAxes,
                 #fontsize=FONTSIZE,
                 fontweight='bold',
@@ -319,9 +322,11 @@ def plot_combined_split(custom_depth,
     ax_top.legend(loc='upper left')
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
-    fig.savefig(f"{filename}_overhead.png", dpi=300)
-    plt.show()
+    #fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.savefig(f"{filename}_overhead.pdf",
+                format="pdf")
+    plt.close(fig)
     
 
 def run_exp_statistics():

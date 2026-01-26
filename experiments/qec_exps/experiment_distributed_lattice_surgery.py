@@ -134,9 +134,10 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     plt.ylabel("Logical error rate")
     plt.legend(loc="lower right", ncol=2)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename + ".png", bbox_inches='tight', dpi=300)
-    plt.close()
+    #plt.tight_layout()
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.1)
+    plt.savefig(filename + ".pdf", format="pdf")
+    plt.close(fig)
 
 
 
@@ -182,8 +183,9 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     plt.ylabel(r"$LER_{Compiled} / LER_{Default}$")
     plt.legend(loc="upper right", ncol=1)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename + "_relative.png", bbox_inches='tight', dpi=300)
+
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    plt.savefig(filename + "_relative.pdf", format="pdf")
     plt.close()
 
     

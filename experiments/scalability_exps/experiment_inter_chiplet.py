@@ -60,7 +60,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     # Pastel colors
     pastel_blue = '#A7D9ED'
-    pastel_orange = '#F7C6A2'
+    pastel_orange = '#6476AD'#'#F7C6A2'
 
     # Create depth statistics
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
@@ -91,9 +91,10 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
         va='top',
         ha='left')
 
-    fig.tight_layout()
-    fig.savefig(f"{filename}_depth.png", dpi=300)
-    plt.show()
+    #fig.tight_layout()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.savefig(f"{filename}_depth.pdf", format="pdf")
+    plt.close(fig)
 
 
     # Create 2q gate overhead
@@ -125,9 +126,10 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
         va='top',
         ha='left')
 
-    fig.tight_layout()
-    fig.savefig(f"{filename}_overhead.png", dpi = 300)
-    plt.show()
+    #fig.tight_layout()
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.savefig(f"{filename}_overhead.pdf", format="pdf")
+    plt.close(fig)
 
     
 

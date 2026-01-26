@@ -94,7 +94,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
                      marker = inter_markers[ni],
                      linestyle= "solid" if d == "5" else "solid",
                      color = color_list[i][ni],
-                     label = f'(d={d},' +  r'$n_{inter}$' + f'={n})')
+                     label = f'(d={d}, ' +  r'$n_{inter}$' + f'={n})')
             
 
     if inter_chiplet_noise == 0.0001:
@@ -129,9 +129,10 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     plt.ylabel("Logical error rate")
     plt.legend(loc="lower right", ncol=2)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight', dpi=300)
-    plt.close()
+    #plt.tight_layout()
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.1)
+    plt.savefig(filename, format="pdf")
+    plt.close(fig)
 
 
 def plot_difference(stats, filename, inter_chiplet_noise):
@@ -194,7 +195,8 @@ def plot_difference(stats, filename, inter_chiplet_noise):
         "errorbar.capsize": 3,
     }
     plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*3, WIDTH_FIGSIZE/1.5))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*3, WIDTH_FIGSIZE/1.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE/2))
     #fig, ax = plt.subplots(figsize=(8, 3)) 
 
     ys_custom = [diff_1['5'][p] for p in physical_error_rates]
@@ -239,7 +241,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     )
 
     ax.text(
-        0.63, 1.02, "Lower is better ↓",
+        0.58, 1.02, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -254,9 +256,10 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     plt.ylabel(r"$LER_{Reduced} / LER_{Full}$")
     plt.legend(loc = "upper right", ncol = 2)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight', dpi=300)
-    plt.close()
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    #fig.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.2)
+    plt.savefig(filename, format="pdf")
+    plt.close(fig)
 
 
 
@@ -373,12 +376,12 @@ def run_exp_distributed_inter_chiplet() -> None:
             stats = pickle.load(f)
 
         plot_evaluation(stats,
-                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.png",
+                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.pdf",
                         inter_chiplet_noise = ps_inter,
                         num_inter = num_inter_chiplet_connections)
         
         plot_difference(stats,
-                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_difference.png",
+                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_difference.pdf",
                         inter_chiplet_noise = ps_inter)
         
         

@@ -9,6 +9,12 @@ from qec_exps.experiment_limited_inter_chiplet_connectivity import *
 from qec_exps.experiment_noise_aware_routing import *
 
 
+# Experiments for evaluating qecc-synth and MECH
+run_runtime_scaling()
+
+
+
+
 # How does the performance of the proposed implementation scale as circuit complexity increases?
 run_exp_scalability()
 

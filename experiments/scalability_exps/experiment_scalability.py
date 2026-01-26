@@ -70,7 +70,10 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
     ax.legend(loc='lower right', ncol=2)
     plt.tight_layout()
-    plt.savefig(filename, dpi=300)
+    plt.savefig(filename,
+                format="pdf")
+    plt.close(fig)
+
 
 
 def calculate_speedup(custom_time_storage, sabre_time_storage, filename: str = ""):
@@ -191,11 +194,11 @@ def run_exp_scalability():
 
     plot_combined(custom_time_storage,
                   sabre_time_storage,
-                  "experiments/evaluation/scalability/cnot_scaling.png")
+                  "experiments/evaluation/scalability/cnot_scaling.pdf")
 
     calculate_speedup(custom_time_storage,
                       sabre_time_storage,
-                      "experiments/evaluation/scalability/cnot_scaling_speedup.png")
+                      "experiments/evaluation/scalability/cnot_scaling_speedup.pdf")
 
 if __name__ == "__main__":
     run_exp_scalability()

@@ -129,9 +129,9 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     plt.ylabel("Logical error rate")
     plt.legend(loc="lower right", ncol=1)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight', dpi=300)
-    plt.close()
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.1)
+    plt.savefig(filename, format="pdf")
+    plt.close(fig)
 
 
 def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
@@ -174,10 +174,10 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         # Font sizes
         "axes.labelsize": FONTSIZE*1.3,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "legend.fontsize": (FONTSIZE - 2)*0.8,
         "xtick.labelsize": (FONTSIZE - 1)*1.3,
         "ytick.labelsize": (FONTSIZE - 1)*1.3,
-        "axes.titlesize": 10,
+        "axes.titlesize": 8,
         # Line and marker styles
         "lines.linewidth": 3,
         "lines.markersize": 9,
@@ -188,7 +188,8 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     }
     plt.rcParams.update(tex_fonts)
 
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6*1.5, WIDTH_FIGSIZE/1.5))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6*1.5, WIDTH_FIGSIZE/1.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE/2))
 
     ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
 
@@ -222,7 +223,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     )
 
     ax.text(
-        0.7, 1.02, "Lower is better ↓",
+        0.3, 1.12, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -239,9 +240,9 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     plt.ylabel(r"Δ$LER_{Routing}$")
     plt.legend(loc="lower right", ncol=2)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename, bbox_inches='tight')
-    plt.close()
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    plt.savefig(filename, format="pdf")
+    plt.close(fig)
 
 
 def perform_noise_aware_routing():
@@ -406,10 +407,10 @@ if __name__ == "__main__":
             with open(f"experiments/evaluation/qec_routing/routing_{ra}_{ps}_sweep.pkl", "rb") as f:
                 stats = pickle.load(f)
 
-            plot_evaluation(stats, f"experiments/evaluation/qec_routing/routing_{ra}_{ps}.png", ps)
+            plot_evaluation(stats, f"experiments/evaluation/qec_routing/routing_{ra}_{ps}.pdf", ps)
 
             plot_error_improvement(stats,
-                                   f"experiments/evaluation/qec_routing/routing_difference_{ra}_{ps}.png",
+                                   f"experiments/evaluation/qec_routing/routing_difference_{ra}_{ps}.pdf",
                                    ps_inter_text,
                                    ra,
                                    1)
