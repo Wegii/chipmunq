@@ -329,7 +329,7 @@ class Stage1_Solver():
                 try:
                     #p = subprocess.Popen(['lib/NuWLS-c/bin/nuwls-c_static', self.wcnfName],  stdout=open(self.solName, 'w')) # 43200
                     #p = subprocess.Popen(['timeout', '-s', '15', '20', './../qecc_mapping/src/baseline/QECC_Synth/SurfStitch/MyCode/lib/NuWLS-c/bin/nuwls-c_static', self.wcnfName],  stdout=open(self.solName, 'w'))
-                    p = subprocess.Popen(['src/baseline/QECC_Synth/SurfStitch/MyCode/lib/NuWLS-c/bin/nuwls-c_static', self.wcnfName],  stdout=open(self.solName, 'w'))
+                    p = subprocess.Popen(['external/baseline/QECC_Synth/SurfStitch/MyCode/lib/NuWLS-c/bin/nuwls-c_static', self.wcnfName],  stdout=open(self.solName, 'w'))
                     print("started")
                     #cmd = f"timeout -s 15 ./../qecc_mapping/src/baseline/QECC_Synth/SurfStitch/MyCode/lib/NuWLS-c/bin/nuwls-c_static {self.wcnfName}"
                     #cmd = f"./../qecc_mapping/src/baseline/QECC_Synth/SurfStitch/MyCode/lib/NuWLS-c/bin/nuwls-c_static {self.wcnfName}"

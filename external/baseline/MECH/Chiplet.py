@@ -2,6 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from numpy import *
 from CouplingGraph import *
+import builtins
 
 def pick_n_elements(lst, n):
     m = len(lst) // n
@@ -200,8 +201,8 @@ def gen_efficient_highway_coupling_graph(G):
             unsatisfying_subgraph.add_edge(node, nei)
 
     for component in nx.connected_components(unsatisfying_subgraph):
-        left_most_node, right_most_node = min(component, key=lambda pos: pos[0]), max(component, key=lambda pos: pos[0])
-        bottom_most_node, up_most_node = min(component, key=lambda pos: pos[1]), max(component, key=lambda pos: pos[1])
+        left_most_node, right_most_node = builtins.min(component, key=lambda pos: pos[0]), builtins.max(component, key=lambda pos: pos[0])
+        bottom_most_node, up_most_node = builtins.min(component, key=lambda pos: pos[1]), builtins.max(component, key=lambda pos: pos[1])
         horizontal_paths = nx.all_shortest_paths(graph, left_most_node, right_most_node, weight='weight')
         vertical_paths = nx.all_shortest_paths(graph, bottom_most_node, up_most_node, weight='weight')
 
@@ -240,7 +241,7 @@ def gen_interleaving_path_between(G, source, target, adhoc_dense=True, offset=No
     else:
         coor_offset = 0
     all_shortest_paths = list(nx.all_shortest_paths(G, source, target))
-    shortest_path = min(all_shortest_paths, key=lambda path: sum(abs(x-(source[0] + 0.5*coor_offset)) for x,_ in path))
+    shortest_path = builtins.min(all_shortest_paths, key=lambda path: sum(abs(x-(source[0] + 0.5*coor_offset)) for x,_ in path))
     left_pointer, right_pointer = 0, len(shortest_path) - 1
 
     while right_pointer - left_pointer >= 2:
@@ -317,8 +318,8 @@ def deal_with_undetermined_nodes(G, adhoc_dense=True):
                     G.nodes[node]['type'] = 'highway'
 
 def gen_highway_layout(G):
-    highway_row = min(G.cross_link_rows, key=lambda x: abs(x - G.chiplet_y_size/2))
-    highway_col = min(G.cross_link_cols, key=lambda x: abs(x - G.chiplet_x_size/2))
+    highway_row = builtins.min(G.cross_link_rows, key=lambda x: abs(x - G.chiplet_y_size/2))
+    highway_col = builtins.min(G.cross_link_cols, key=lambda x: abs(x - G.chiplet_x_size/2))
     if highway_col <  G.chiplet_x_size/2:
         offset = 'right'
     else:
@@ -445,7 +446,7 @@ def get_distance_to_highway(G, node):
         G.highway_distance_dict = {}
         for source_node in G.nodes():
             shortest_paths = nx.single_source_dijkstra_path_length(G, source_node)
-            G.highway_distance_dict[source_node] = min(shortest_paths[highway_qubit] for highway_qubit in get_highway_qubits(G))
+            G.highway_distance_dict[source_node] = builtins.min(shortest_paths[highway_qubit] for highway_qubit in get_highway_qubits(G))
 
     return G.highway_distance_dict[node]
 

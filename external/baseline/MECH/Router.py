@@ -2,6 +2,7 @@ from collections import Counter
 from Chiplet import *
 from Circuit import *
 from HighwayOccupancy import *
+import builtins
 
 class ControlBlock:
     def __init__(self, control, target_counter=Counter()):
@@ -44,8 +45,8 @@ class Router:
             if self.chip.edges[(from_qubit, to_qubit)]['type'] == 'cross_chip':
                 num_of_cross_chip_links += 1
             line1, line2 = self.highway_manager.qubit_idx_dict[from_qubit], self.highway_manager.qubit_idx_dict[to_qubit]
-            cur_depth = max(self.circuit.get_line_depth(line1), self.circuit.get_line_depth(line2))
-            arrival_depth = max(arrival_depth + 3, cur_depth + 3)
+            cur_depth = builtins.max(self.circuit.get_line_depth(line1), self.circuit.get_line_depth(line2))
+            arrival_depth = builtins.max(arrival_depth + 3, cur_depth + 3)
         return arrival_depth + 3 * num_of_cross_chip_links * (cross_chip_gate_weight - 1) * cross_chip_overhead
 
     def execute_control_multi_target_block(self, control_block, cross_chip_gate_weight, cross_chip_overhead = 3):
@@ -56,18 +57,18 @@ class Router:
         p_control = self._v2p[v_control]
         if get_distance_to_highway(self.chip, p_control) > 1:
             entrances_with_paths = find_possible_entrances_with_paths(self.chip, p_control)
-            best_entrance, best_path = min(entrances_with_paths, key=lambda entrances_with_path: self.path_cost(entrances_with_path[1], cross_chip_gate_weight, cross_chip_overhead))
+            best_entrance, best_path = builtins.min(entrances_with_paths, key=lambda entrances_with_path: self.path_cost(entrances_with_path[1], cross_chip_gate_weight, cross_chip_overhead))
             self.swap_along_path_unless_encoutering_control(best_path)
             assert get_distance_to_highway(self.chip, self._v2p[v_control])
 
         # move target qubits to highway from near to far
         blocked_by_p_control = False
         while remaining_v_targets:
-            nearest_target = min(remaining_v_targets, key=lambda v_target: get_distance_to_highway(self.chip, self._v2p[v_target]))
+            nearest_target = builtins.min(remaining_v_targets, key=lambda v_target: get_distance_to_highway(self.chip, self._v2p[v_target]))
             p_control, p_nearest_target = self._v2p[v_control], self._v2p[nearest_target]
             if not is_qubit_next_to_highway(self.chip, p_nearest_target): #TODO: exclude the highway entrance occupied by control
                 entrances_with_paths = find_possible_entrances_with_paths(self.chip, p_nearest_target) #!TODO: don't occupy the position of control qubit!
-                best_entrance, best_path = min(entrances_with_paths, key=lambda entrances_with_path: self.path_cost(entrances_with_path[1], cross_chip_gate_weight, cross_chip_overhead))
+                best_entrance, best_path = builtins.min(entrances_with_paths, key=lambda entrances_with_path: self.path_cost(entrances_with_path[1], cross_chip_gate_weight, cross_chip_overhead))
                 blocked_by_p_control = self.swap_along_path_unless_encoutering_control(best_path, p_control)
                 
                 assert self._v2p[v_control] == p_control

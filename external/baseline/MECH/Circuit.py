@@ -2,7 +2,7 @@ from collections import defaultdict, deque
 from copy import deepcopy
 from random import shuffle
 from numpy import *
-
+import builtins
 
 class OpNode:
     def __init__(self, *qargs):
@@ -110,7 +110,7 @@ class Circuit:
     def get_earliest_index_for_2qubit_op(self, op, auto_commuting, auto_cancellation, min_idx=0, max_idx=None, addition_condition=lambda idx: True):
         control, target = op.control, op.target
         if max_idx is None:
-            max_idx = max(self.get_line_depth(control), self.get_line_depth(target))
+            max_idx = builtins.max(self.get_line_depth(control), self.get_line_depth(target))
         
         earliest_idx = -1
         for idx in range(max_idx, min_idx-1, -1):
@@ -132,7 +132,7 @@ class Circuit:
     def get_earliest_index_for_2qubit_component(self, op, auto_commuting, auto_cancellation, min_idx=0, max_idx=None, addition_condition=lambda idx: True):
         control, target = op.control, op.target
         if max_idx is None:
-            max_idx = max(self.get_line_depth(control), self.get_line_depth(target))
+            max_idx = builtins.max(self.get_line_depth(control), self.get_line_depth(target))
         
         earliest_idx = -1
         for idx in range(max_idx, min_idx-1, -1):
@@ -159,7 +159,7 @@ class Circuit:
     def depth(self):
         if not self.circuit_lines:
             return 0
-        return max([len(circuit_line) for circuit_line in self.circuit_lines.values()])
+        return builtins.max([len(circuit_line) for circuit_line in self.circuit_lines.values()])
     
     def get_mop_depth(self, line):
         idx = -1
@@ -170,7 +170,7 @@ class Circuit:
 
     @property
     def mop_depth(self):
-        return max([self.get_mop_depth(line) for line in range(self.qubit_num)])
+        return builtins.max([self.get_mop_depth(line) for line in range(self.qubit_num)])
 
     
     def add_1qubit_op(self, op, depth=None):
@@ -199,7 +199,7 @@ class Circuit:
 
     def add_mqubit_op(self, mop, depth=None):
         if depth is None:
-            depth = max([self.get_line_depth(qubit) for qubit in mop.qargs]) + 1
+            depth = builtins.max([self.get_line_depth(qubit) for qubit in mop.qargs]) + 1
         self.add_node_with_role(mop.shared, depth-1, mop, 'mc')
         for line in mop.indiv:
             self.add_node_with_role(line, depth-1, mop, 'mt')
@@ -264,7 +264,7 @@ class Circuit:
         if not self.circuit_lines:
             max_len = 0
         else:
-            max_len = max([len(circuit_line) for circuit_line in self.circuit_lines.values()])
+            max_len = builtins.max([len(circuit_line) for circuit_line in self.circuit_lines.values()])
         for line in range(self.qubit_num):
             circuit_line_len = len(self.circuit_lines[line])
             l=[get_node_repr_on_line(self.take_node(line, i), line) for i in range(circuit_line_len)] + [' ' for i in range(max_len - circuit_line_len)]

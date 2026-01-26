@@ -12,3 +12,4 @@ seaborn
 kahypar
 matplotlib
 fastjsonschema
+sympy

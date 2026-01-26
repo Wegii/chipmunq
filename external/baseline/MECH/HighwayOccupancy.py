@@ -208,7 +208,7 @@ class HighwayManager:
             last_shuttle_idx = len(self.shuttle_stack)-1
             self.end_shuttle(last_shuttle_idx, circuit)
             last_end_idx = self.get_shuttle_end_time(last_shuttle_idx)
-            prep_start_idx = max(self.get_shuttle_end_time(last_shuttle_idx) + 1, circuit.depth)  #TODO: distinguish data qubits on and off critical paths
+            prep_start_idx = builtins.max(self.get_shuttle_end_time(last_shuttle_idx) + 1, circuit.depth)  #TODO: distinguish data qubits on and off critical paths
             new_shuttle_idx = last_shuttle_idx + 1
         for idx in range(last_end_idx+1, prep_start_idx):
             self.set_highway_status(idx, -1, 'local')
@@ -260,8 +260,8 @@ class HighwayManager:
         if meas_start_time is not None:
             latest_idx = meas_start_time - 1
         else:
-            line_depth = max(circuit.get_line_depth(op.control), circuit.get_line_depth(op.target))
-            latest_idx = max(line_depth, exec_start_time)
+            line_depth = builtins.max(circuit.get_line_depth(op.control), circuit.get_line_depth(op.target))
+            latest_idx = builtins.max(line_depth, exec_start_time)
             
         # check control data viability
         for idx in range(latest_idx, exec_start_time, -1):
@@ -326,7 +326,7 @@ class HighwayManager:
     def get_highway_aware_earliest_index_for_2qubit_op(self, circuit, op, auto_commuting, auto_cancellation):
         # highway aware: local gates should avoid occupying highway preparation periods 
         control, target = op.control, op.target
-        line_depth = max(circuit.get_line_depth(control), circuit.get_line_depth(target))
+        line_depth = builtins.max(circuit.get_line_depth(control), circuit.get_line_depth(target))
         def is_not_in_prep_period(idx): #TODO: distinguish data qubits on and off critical paths
                 if len(self.shuttle_stack) == 0:
                     return True
@@ -465,10 +465,10 @@ class HighwayManager:
                 if qubit not in self.shuttle_stack[shuttle_idx].entrance_data_dict.keys():
                     continue
                 neighbors = list(occupied_subgraph.neighbors(qubit))
-                nearest_neighbor = min(neighbors, key=lambda nei: abs(nei[0] - qubit[0]) + abs(nei[1] - qubit[1]))
+                nearest_neighbor = builtins.min(neighbors, key=lambda nei: abs(nei[0] - qubit[0]) + abs(nei[1] - qubit[1]))
                 nearest_neighbor_distance = abs(nearest_neighbor[0] - qubit[0]) + abs(nearest_neighbor[1] - qubit[1])
                 all_nearest_neighbors = [nei for nei in neighbors if abs(nei[0] - qubit[0]) + abs(nei[1] - qubit[1]) ==  nearest_neighbor_distance]
-                best_neighbor = min(all_nearest_neighbors, key=lambda nei: op_num(nei))
+                best_neighbor = builtins.min(all_nearest_neighbors, key=lambda nei: op_num(nei))
                 self.bridge(circuit, shuttle_idx, best_neighbor, qubit)
                 if VERBOSE:
                     print('reentangled {} with {}'.format(self.qubit_idx_dict[qubit], self.qubit_idx_dict[best_neighbor]))
