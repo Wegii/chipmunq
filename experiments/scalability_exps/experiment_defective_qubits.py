@@ -82,7 +82,8 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     labels = placement_modes  # ["default", "size_aware"]
 
     # ----------- Depth Overhead -------------
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_depth[mode][df][ks] for df in df_values]
@@ -110,18 +111,20 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.27, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.1)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.87, bottom=0.13)
+    #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
     # ----------- 2Q Gate Overhead -------------
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_overhead[mode][df][ks] for df in df_values]
@@ -149,19 +152,20 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.27, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.1)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.87, bottom=0.13)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
 
     # ----------- Backend Utilization -------------
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_utilization[mode][df][ks] for df in df_values]
@@ -192,13 +196,13 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     )
 
     ax.text(
-        0.3, 1.07, "Higher is better ↑",
+        0.27, 1.07, "Higher is better ↑",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.1)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.87, bottom=0.13)
     fig.savefig(f"{filename}_utilization.pdf", format="pdf")
     plt.close(fig)
 

@@ -63,7 +63,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     pastel_orange = '#6476AD'#'#F7C6A2'
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
     
     ax.bar(x - width/2, low_depth_vals, width,
            label = r"$p_{inter}$ = $1e^{-4}$",
@@ -83,22 +83,27 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     # Add annotation
 
-    ax.text(0.57, 1.04, "Lower is better ↓",
+    ax.text(
+        -0.02, 1.02, "Effect of inter-chiplet noise",
         transform=ax.transAxes,
-        #fontsize=10,
-        fontweight='bold',
-        color = plot_lib_color,
-        va='top',
-        ha='left')
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.3, 1.07, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontweight="bold",
+        color=plot_lib_color,
+    )
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
 
     # Create 2q gate overhead
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
 
 
     ax.bar(x - width/2, low_over_vals, width,
@@ -118,16 +123,29 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     ax.legend()
 
     # Add annotation
-    ax.text(0.57, 1.04, "Lower is better ↓",
+    #ax.text(0.57, 1.04, "Lower is better ↓",
+    #    transform=ax.transAxes,
+    #    #fontsize=10,
+    #    fontweight='bold',
+    #    color = plot_lib_color,
+    #    va='top',
+    #    ha='left')
+    
+    ax.text(
+        -0.02, 1.02, "Effect of inter-chiplet noise",
         transform=ax.transAxes,
-        #fontsize=10,
-        fontweight='bold',
-        color = plot_lib_color,
-        va='top',
-        ha='left')
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.3, 1.07, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontweight="bold",
+        color=plot_lib_color,
+    )
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 

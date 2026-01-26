@@ -1,3 +1,6 @@
+from related_work_exps.experiment_runtime_scaling import *
+from related_work_exps.experiment_statistics import *
+
 from scalability_exps.experiment_scalability import *
 from scalability_exps.experiment_statistics import *
 from scalability_exps.experiment_inter_chiplet import *
@@ -9,9 +12,10 @@ from qec_exps.experiment_limited_inter_chiplet_connectivity import *
 from qec_exps.experiment_noise_aware_routing import *
 
 
-# Experiments for evaluating qecc-synth and MECH
+# Experiments for evaluating runtime of qecc-synth and MECH
 run_runtime_scaling()
-
+# Experiments for evaluating two-qubit gate utilization of qecc-synth and MECH
+run_statistics()
 
 
 

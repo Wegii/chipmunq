@@ -29,6 +29,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     ks_values = sorted({ks for d in custom_time_storage.values() for ks in d.keys()})
 
     fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
     colors_custom = [ "#8FB7E1", "#5E97CC", "#3B6FA8"]
     colors_sabre = [ "#E38E8A", "#C85E59", "#9F3B36"]

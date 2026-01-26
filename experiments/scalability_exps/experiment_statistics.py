@@ -192,7 +192,7 @@ def plot_combined_split(custom_depth,
 
     # Create depth statistics
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
     
     ax.bar(x-width, general_depth_vals, width,
            label="Ideal", color="lightcoral",
@@ -216,23 +216,58 @@ def plot_combined_split(custom_depth,
     ax.legend(loc='upper left')
 
     # Add annotation
-    ax.text(0.53, 1.04, 'Lower is better ↓',
-            transform=ax.transAxes,
-            #fontsize=10,
-            fontweight='bold',
-            color = plot_lib_color,
-            va='top',
-            ha='left')
+    #ax.text(0.53, 1.04, 'Lower is better ↓',
+    #        transform=ax.transAxes,
+    #        #fontsize=10,
+    #        fontweight='bold',
+    #        color = plot_lib_color,
+    #        va='top',
+    #        ha='left')
+    
+    ax.text(
+        -0.02, 1.02, "Compilation affecting circuit depth",
+        transform=ax.transAxes,
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.3, 1.07, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontweight="bold",
+        color=plot_lib_color,
+    )
     
     ax.set_ylim(0, 11300)
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
     fig.savefig(f"{filename}_depth.pdf",
                 format="pdf")
     plt.close(fig)
 
 
+
+
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.3,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+    plt.rcParams.update(tex_fonts)
 
     # Calculate the maximum value across all bars for the upper y-limit
     max_overall_val = max(max(general_over_vals), max(custom_over_vals), max(sabre_over_vals))
@@ -240,8 +275,7 @@ def plot_combined_split(custom_depth,
     # Add a small padding to the upper y-limit for better visualization
     upper_ylim = max_overall_val*1.015
 
-    #fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
-    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
     
     gs = gridspec.GridSpec(2, 1, height_ratios=[7, 20], hspace=0.1) # Swapped height_ratios
 
@@ -310,20 +344,29 @@ def plot_combined_split(custom_depth,
 
 
     fig.text(0.025, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=FONTSIZE*1.5)
-    fig.text(0.43, 0.013, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
-    ax_top.text(0.53, 1.18, 'Lower is better ↓',
+    fig.text(0.48, 0.037, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
+    ax_top.text(0.23, 1.4, 'Lower is better ↓',
                 transform=ax_top.transAxes,
                 #fontsize=FONTSIZE,
                 fontweight='bold',
                 color=plot_lib_color,
                 va='top',
                 ha='left')
+    
+    ax_top.text(
+        0.05, 1.19, "Compilation affecting #2q gates",
+        transform=ax_top.transAxes,
+        fontweight="bold",
+        va='top',
+        ha='left'   
+    )
+
 
     ax_top.legend(loc='upper left')
 
     #fig.tight_layout()
     #fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
     fig.savefig(f"{filename}_overhead.pdf",
                 format="pdf")
     plt.close(fig)

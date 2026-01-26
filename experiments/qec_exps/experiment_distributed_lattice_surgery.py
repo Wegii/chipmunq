@@ -55,7 +55,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     d_values = sorted(d_values)
     physical_error_rates = sorted(list(physical_error_rates))
 
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
     # Plot identity (x = y)
     plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
 
@@ -111,14 +112,19 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         ps_inter_text = r"$1e^{-2}$"
     description = (r"$p_{inter}$ = " + f"{ps_inter_text}")
 
+    #ax.text(
+    #    0, 1.02, description,
+    #    transform=ax.transAxes,
+    #    fontweight="bold"
+    #)
     ax.text(
-        0, 1.02, description,
+        0.1, 1.02, "Logical error rate of LS circuit",
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.57, 1.02, "Lower is better ↓",
+        0.3, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -133,10 +139,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     plt.xlabel("Physical error rate")
     plt.ylabel("Logical error rate")
     plt.legend(loc="lower right", ncol=2)
+    #plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
     #plt.tight_layout()
-    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.1)
-    plt.savefig(filename + ".pdf", format="pdf")
+    fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
+    plt.savefig(filename + ".pdf", format="pdf", bbox_inches='tight')
     plt.close(fig)
 
 

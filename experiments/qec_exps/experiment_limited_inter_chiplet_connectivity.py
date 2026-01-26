@@ -72,7 +72,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     plt.rcParams.update(tex_fonts)
 
     #fig, ax = plt.subplots(figsize=(6, 5))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
     # Plot identity (x = y)
     plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
 
@@ -105,15 +106,20 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
         ps_inter_text = r"$1e^{-2}$"
     description = (r"$p_{inter}$ = " + f"{ps_inter_text}")
 
+    #ax.text(
+    #    0, 1.02, description,
+    #    transform=ax.transAxes,
+    #    #fontsize=9,
+    #    fontweight="bold"
+    #)
     ax.text(
-        0, 1.02, description,
+        -0.01, 1.02, "Influence of limited connectivity on LER",
         transform=ax.transAxes,
-        #fontsize=9,
         fontweight="bold"
     )
 
     ax.text(
-        0.56, 1.02, "Lower is better ↓",
+        0.3, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -130,7 +136,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     plt.legend(loc="lower right", ncol=2)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
     #plt.tight_layout()
-    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.1)
+    fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
+    #fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.1)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
@@ -257,6 +264,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     plt.legend(loc = "upper right", ncol = 2)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     #fig.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.2)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
