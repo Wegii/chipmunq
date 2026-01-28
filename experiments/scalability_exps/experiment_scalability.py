@@ -28,6 +28,8 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     # Gather all ks values
     ks_values = sorted({ks for d in custom_time_storage.values() for ks in d.keys()})
 
+    
+
     fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
@@ -46,19 +48,26 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
 
     #plt.axvline(x=3)
 
+
     ax.text(
-        0.73, 1.02, "Lower is better ↓",
+        0.15, 1.02, "Compilation runtime vs. number of patches",
+        transform=ax.transAxes,
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.35, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    description = ("routing_method = basic")
-    ax.text(
-        0, 1.02, description,
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    #description = ("routing_method = basic")
+    #ax.text(
+    #    0, 1.02, description,
+    #    transform=ax.transAxes,
+    #    fontweight="bold"
+    #)
 
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tick_params(axis='both', labelsize=14)

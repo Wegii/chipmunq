@@ -23,47 +23,109 @@ from networkx.classes import Graph
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/QECC_Synth/SurfStitch/MyCode/src"))
 from external.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth import transpile_circuit_QECCSynth
 
+# SABRE
+sys.path.append(os.path.join(os.getcwd(), "./external/baseline/SABRE"))
+from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
+
+
 # Plotting
 from experiments.utils import *
 from experiments.related_work_exps.utils import *
 from matplotlib.ticker import MaxNLocator
 
 
-def plot_combined(mech_overhead, qeccsynth_overhead, filename: str = ""):
+def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type: str, filename: str = ""):
 
-    # Calculate number of two-qubit gates
-    mech_2q_overhead = [mech_overhead[d]["on-chip"] + mech_overhead[d]["cross-chip"] for d in sorted(mech_overhead.keys())]
-    qeccsynth_2q_overhead = [qeccsynth_overhead[d]["on-chip"] + qeccsynth_overhead[d]["cross-chip"] for d in sorted(qeccsynth_overhead.keys())]
+    if type == "gate_overhead":
+        mech_2q_overhead = [mech_overhead[d]["2q_gates_overhead"] for d in sorted(mech_overhead.keys())]
+        qeccsynth_2q_overhead = [1 + qeccsynth_overhead[d]["2q_gates_overhead"] for d in sorted(qeccsynth_overhead.keys())]
+        qiskit_2q_overhead = [qiskit_overhead[d]["2q_gates_overhead"] for d in sorted(qiskit_overhead.keys())]
+    elif type == "inter_chiplet":
+        mech_2q_overhead = [mech_overhead[d]["cross-chip"] for d in sorted(mech_overhead.keys())]
+        qeccsynth_2q_overhead = [qeccsynth_overhead[d]["cross-chip"] for d in sorted(qeccsynth_overhead.keys())]
+        qiskit_2q_overhead = [qiskit_overhead[d]["cross-chip"] for d in sorted(qiskit_overhead.keys())]
 
-    fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.5,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+
+    plt.rcParams.update(tex_fonts)
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
 
     distances = sorted(qeccsynth_overhead.keys())
     x_val = [2*x+1 for x in distances]
 
-    #y_mech = [mech_2q_overhead[di] for di in distances]
-    plt.plot(x_val, mech_2q_overhead, marker='x', linestyle='-', label=f"MECH", color = "#3B6FA8")
+    section_titles = x_val 
 
-    #y_qeccsynth = [qeccsynth_2q_overhead[di] for di in distances]
-    plt.plot(x_val, qeccsynth_2q_overhead, marker='o', linestyle='--', label=f"qecc_synth", color = "#9F3B36")
+
+    x = np.arange(len(section_titles))
+    width = 0.25
+
+    ax.bar(x-width, qiskit_2q_overhead, width,
+           label="LightSABRE", color="lightcoral",
+           hatch='o', edgecolor='black')
+
+    ax.bar(x, mech_2q_overhead, width,
+           label="MECH", color="#A7D9ED",
+           hatch='//', edgecolor='black')
+    
+    ax.bar(x+width, qeccsynth_2q_overhead, width,
+           label="QECC-Synth", color="#B2D8B2",
+           hatch='/', edgecolor='black')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(section_titles)
+
+    # Add annotation
+    if type == "gate_overhead":
+        title = "Effect of distance on #2q-gate overhead"
+    else:
+        title = "Effect of distance on chiplet utilization"
+    ax.text(
+        -0.02, 1.02, title,
+        transform=ax.transAxes,
+        fontweight="bold"
+    )
 
     ax.text(
-        0.73, 1.02, "Lower is better ↓",
+        0.3, 1.07, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
+
     plt.tick_params(axis='both', labelsize=14)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    plt.xlabel("Distance", fontsize=16)
-    plt.ylabel("#2q gates", fontsize=16)
+    plt.xlabel("Surface Code Distance", fontsize=16)
+    if type == "gate_overhead":
+        description = "#2q-gate overhead"
+    else:
+        description = "#inter-chiplet gates"
+    plt.ylabel(description, fontsize=16)
     plt.yscale("log")
 
-    #plt.grid(True)
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
-    ax.legend(loc='lower right')
-    fig.subplots_adjust(left=0.15, right=0.95, top=0.93, bottom=0.15)
+    ax.legend(loc='upper left')
+
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.12)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)
@@ -74,6 +136,7 @@ def run_statistics():
     code_distances = [2, 3, 4, 5] # range(2, 5)
     qeccsynth_overhead_storage = {}
     mech_overhead_storage = {}
+    qiskit_overhead_storage = {}
 
     for d in code_distances:
         cycles = d
@@ -84,21 +147,27 @@ def run_statistics():
 
         monolithic_backend, qubit_num, data_qubit_num = generate_simple_backend(n, m)
         architecture = generate_qecc_synth_backend_from_mech(monolithic_backend)
+        cm = generate_qiskit_backend_from_mech(monolithic_backend)
 
         # Print backend to file
         #display_simple_backend(monolithic_backend, f"experiments/evaluation/related_work/backends/monolithic_{n}_{m}.png")
 
-
         # MECH
         circuit_mech = transpile_circuit_MECH(code.qc, monolithic_backend)
-        result_mech = calc_circuit_mech_stats(circuit_mech)
+        result_mech = calc_circuit_mech_stats(circuit_mech, code.qc)
 
         # QECCsynth
-        circuit_qeccsynth = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{m}_{m}')
-        result_qeccsynth = calc_circuit_qiskit_stats(circuit_qeccsynth, monolithic_backend)
+        circuit_qeccsynth, result = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{m}_{m}')
+        result_qeccsynth = calc_circuit_qiskit_stats(circuit_qeccsynth, monolithic_backend, result)
+
+        # Qiskit
+        circuit_qiskit = transpile_circuit_SABRE(circuit = code.qc, coupling_map = cm)
+        result_qiskit = calc_circuit_qiskit_stats(circuit_qiskit, monolithic_backend, initial_circuit = code.qc)
+        
 
         qeccsynth_overhead_storage[d] = result_qeccsynth
         mech_overhead_storage[d] = result_mech
+        qiskit_overhead_storage[d] = result_qiskit
 
     # Write results to file
     with open(f"experiments/evaluation/related_work/overhead_mech.pkl", "wb") as f:
@@ -106,20 +175,30 @@ def run_statistics():
 
     with open(f"experiments/evaluation/related_work/overhead_qeccsynth.pkl", "wb") as f:
         pickle.dump(qeccsynth_overhead_storage, f)
-    
+
+    with open(f"experiments/evaluation/related_work/overhead_sabre.pkl", "wb") as f:
+        pickle.dump(qiskit_overhead_storage, f)    
     
     
 if __name__ == "__main__":
     # run_statistics()
-
 
     # Load pre-computed results
     with open(f"experiments/evaluation/related_work/overhead_mech.pkl", "rb") as f:
         mech_overhead_storage = pickle.load(f)
     with open(f"experiments/evaluation/related_work/overhead_qeccsynth.pkl", "rb") as f:
         qeccsynth_overhead_storage = pickle.load(f)
+    with open(f"experiments/evaluation/related_work/overhead_sabre.pkl", "rb") as f:
+        qiskit_overhead_storage = pickle.load(f)
 
-    plot_combined(mech_overhead_storage,
-                  qeccsynth_overhead_storage,
-                  "experiments/evaluation/related_work/memory_overhead.pdf")
+    plot_gate_overhead(mech_overhead_storage,
+                       qeccsynth_overhead_storage,
+                       qiskit_overhead_storage,
+                       "gate_overhead",
+                       "experiments/evaluation/related_work/memory_overhead.pdf")
     
+    plot_gate_overhead(mech_overhead_storage,
+                       qeccsynth_overhead_storage,
+                       qiskit_overhead_storage,
+                       "inter_chiplet",
+                       "experiments/evaluation/related_work/memory_inter_chiplet.pdf")

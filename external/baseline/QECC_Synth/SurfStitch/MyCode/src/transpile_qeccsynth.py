@@ -89,4 +89,4 @@ def transpile_circuit_QECCSynth(code_distance: int, architecture: tuple[np.array
 
     logging.info("Finished algorithm!")
 
-    return QC
+    return QC, result

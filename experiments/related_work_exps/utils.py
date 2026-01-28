@@ -128,6 +128,23 @@ def generate_qecc_synth_backend_from_mech(G: nx.graph) -> tuple[np.array, list]:
     return (CG, qubit_idx_dict)
 
 
+def generate_qiskit_backend_from_mech(G: nx.graph) -> CouplingMap:
+    """Generate backend to be used by qiskit
+
+    Args:
+        G (nx.graph): _description_
+
+    Returns:
+        CouplingMap: _description_
+    """
+
+    qubit_idx_dict = gen_qubit_idx_dict(G)
+    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
+    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
+    
+    return CouplingMap(regular_coupling)
+
+
 def display_simple_backend(backend: nx.Graph, filename: str) -> None:
     """Generate figure of coupling graph for specified backend
 
@@ -160,7 +177,10 @@ def get_surface_code_stim(d, T = None):
 
 
 
-def calc_circuit_qiskit_stats(transpiled_circuit: qiskit.circuit, G: nx.graph) -> dict:
+def calc_circuit_qiskit_stats(transpiled_circuit: qiskit.circuit,
+                              G: nx.graph,
+                              qeccsynth_result = None,
+                              initial_circuit = None) -> dict:
     """_summary_
 
     Args:
@@ -209,14 +229,45 @@ def calc_circuit_qiskit_stats(transpiled_circuit: qiskit.circuit, G: nx.graph) -
     # Calculate effective number of CNOT gates (for calculation, see section 7.1 of "MECH: Multi-Entry Communication Highway for Superconducting Quantum Chiplets")
     norm_cnots = within_chip_cnots + cross_chip_cnots * cross_chip_gate_weight
 
-    # Collect statistics
-    # print('Qiskit: decomposed_depth = {}, within_chip_cnots={}, cross_chip_cnots={}, norm_cnots = {}'.format(swap_decomposed_depth, within_chip_cnots, cross_chip_cnots, norm_cnots))
-    result_qiskit = {'depth': swap_decomposed_depth, 'eff_gate_num': norm_cnots, 'on-chip': within_chip_cnots, 'cross-chip': cross_chip_cnots}
+    if qeccsynth_result == None and initial_circuit != None:
+        # Calculate gate overhead using initial circuit
+
+        def num_2q_gates(circuit):
+            ops = circuit.count_ops()
+            two_qubit_gate_names = ["cx", "cz", "swap"]
+            return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+
+        two_qubit_overhead = (within_chip_cnots + cross_chip_cnots) - num_2q_gates(initial_circuit)
+        
+        result_qiskit = {'2q_gates_overhead': two_qubit_overhead,
+                         'depth': swap_decomposed_depth,
+                         'eff_gate_num': norm_cnots,
+                         'on-chip': within_chip_cnots,
+                         'cross-chip': cross_chip_cnots}
+    else:
+        # Calculate gate overhead using results file. Only applicable ot QECC-Synth
+
+        # If qeccsynth results are available, add 2q-gate overhead
+        # Calculation of CNOT overhead taken from QECC-Synth - CodeStitch.py
+        cnotNum = 0
+        for k in range(qeccsynth_result['chunkNum']):
+            for s in qeccsynth_result['Swap_layer'][k]:
+                cnotNum += 3
+        for k in range(qeccsynth_result['chunkNum']):
+            for k, stab in enumerate(qeccsynth_result['Stab'][k]):
+                cnotNum += len(stab['Ancilla']) * 2 - 2
+
+        two_qubit_overhead = cnotNum
+        result_qiskit = {'2q_gates_overhead': two_qubit_overhead,
+                         'depth': swap_decomposed_depth,
+                         'eff_gate_num': norm_cnots,
+                         'on-chip': within_chip_cnots,
+                         'cross-chip': cross_chip_cnots}
     
     return result_qiskit
 
 
-def calc_circuit_mech_stats(router: Router) -> dict:
+def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
     """_summary_
 
     Args:
@@ -260,11 +311,26 @@ def calc_circuit_mech_stats(router: Router) -> dict:
                 else:
                     on_chip_gate_num += 1
 
+
+    def num_2q_gates(circuit):
+        ops = circuit.count_ops()
+        two_qubit_gate_names = ["cx", "cz", "swap"]
+        return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+
+    initial_2q_gates = num_2q_gates(initial_circuit)
+
     # Calculate effective number of CNOT gates (for calculation, see section 7.1 of "MECH: Multi-Entry Communication Highway for Superconducting Quantum Chiplets")
     eff_gate_num = on_chip_gate_num + cross_chip_gate_num * cross_chip_gate_weight + meas_num * meas_weight
 
     # Collect statistics
-    # print('MECH: decomposed_depth = {}, within_chip_cnots={}, cross_chip_cnots={}, norm_cnots = {}'.format(router.circuit.depth, on_chip_gate_num, cross_chip_gate_num, eff_gate_num))
-    result_mech = {'depth': router.circuit.depth, 'eff_gate_num': eff_gate_num, 'on-chip': on_chip_gate_num, 'cross-chip': cross_chip_gate_num, 'meas_num': meas_num, 'shuttle_num': len(router.highway_manager.shuttle_stack)}
+    result_mech = {'initial_2q_gates': initial_2q_gates,
+                   'depth': router.circuit.depth,
+                   '2q_gates_overhead': (on_chip_gate_num + cross_chip_gate_num) - initial_2q_gates,
+                   'eff_gate_num': eff_gate_num,
+                   'on-chip': on_chip_gate_num,
+                   'cross-chip': cross_chip_gate_num,
+                   'meas_num': meas_num,
+                   'shuttle_num': len(router.highway_manager.shuttle_stack)}
+
 
     return result_mech
