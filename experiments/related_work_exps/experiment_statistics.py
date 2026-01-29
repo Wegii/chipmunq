@@ -39,7 +39,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     if type == "gate_overhead":
         mech_2q_overhead = [mech_overhead[d]["2q_gates_overhead"] for d in sorted(mech_overhead.keys())]
         qeccsynth_2q_overhead = [1 + qeccsynth_overhead[d]["2q_gates_overhead"] for d in sorted(qeccsynth_overhead.keys())]
-        qiskit_2q_overhead = [qiskit_overhead[d]["2q_gates_overhead"] for d in sorted(qiskit_overhead.keys())]
+        qiskit_2q_overhead = [1+ qiskit_overhead[d]["2q_gates_overhead"] for d in sorted(qiskit_overhead.keys())]
     elif type == "inter_chiplet":
         mech_2q_overhead = [mech_overhead[d]["cross-chip"] for d in sorted(mech_overhead.keys())]
         qeccsynth_2q_overhead = [1 + qeccsynth_overhead[d]["cross-chip"] for d in sorted(qeccsynth_overhead.keys())]
