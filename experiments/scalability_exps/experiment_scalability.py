@@ -39,12 +39,12 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     for i, ks in enumerate(ks_values):
         # SABRE
         y_sabre = [sabre_time_storage[np].get(ks, None) for np in np_values]
-        plt.plot(x_val, y_sabre, marker='x', linestyle='--', label=f"SABRE d{2*ks+1}", color=colors_sabre[i])
+        plt.plot(x_val, y_sabre, marker='x', linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
 
     for i, ks in enumerate(ks_values):
         # Custom
         y_custom = [custom_time_storage[np].get(ks, None) for np in np_values]
-        plt.plot(x_val, y_custom, marker='o', linestyle='-', label=f"Chipmunq d{2*ks+1}", color=colors_custom[i])
+        plt.plot(x_val, y_custom, marker='o', linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
 
     #plt.axvline(x=3)
 

@@ -35,9 +35,17 @@ from matplotlib.ticker import MaxNLocator
 
 def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: str = ""):
 
-    mech_2q_overhead = [mech_overhead[d] for d in sorted(mech_overhead.keys())]
-    qeccsynth_2q_overhead = [1 + qeccsynth_overhead[d]for d in sorted(qeccsynth_overhead.keys())]
-    qiskit_2q_overhead = [qiskit_overhead[d] for d in sorted(qiskit_overhead.keys())]
+    distances = [2, 5]
+
+    # Timeout-value for qecc-synth
+    qeccsynth_overhead[("chiplet", 11)] = 1e4
+    
+    mech_2q_overhead = ([mech_overhead[("mono", d)] for d in distances] + 
+                        [mech_overhead[("chiplet", d)] for d in distances])
+    qeccsynth_2q_overhead = ([qeccsynth_overhead[("mono", d)]for d in distances] + 
+                             [qeccsynth_overhead[("chiplet", d)]for d in distances])
+    qiskit_2q_overhead = ([qiskit_overhead[("mono", d)] for d in distances] + 
+                          [qiskit_overhead[("chiplet", d)] for d in distances])
 
     tex_fonts = {
         # Use LaTeX to write all text
@@ -62,8 +70,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     plt.rcParams.update(tex_fonts)
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
 
-    distances = sorted(qeccsynth_overhead.keys())
-    x_val = [2*x+1 for x in distances]
+    x_val = [2*x+1 for x in distances] + [2*x+1 for x in distances]
 
     section_titles = x_val 
 
@@ -78,9 +85,19 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
            label="MECH", color="#A7D9ED",
            hatch='//', edgecolor='black')
     
-    ax.bar(x+width, qeccsynth_2q_overhead, width,
-           label="QECC-Synth", color="#B2D8B2",
-           hatch='/', edgecolor='black')
+    bars_qeccsynth = ax.bar(x+width, qeccsynth_2q_overhead, width,
+                            label="QECC-Synth", color="#B2D8B2",
+                            hatch='/', edgecolor='black')
+    
+    # Adjust styling of last bar for qecc-synth to show that it timed out
+    timeout_bar = bars_qeccsynth[-1] 
+    timeout_bar.set_facecolor('white')      
+    timeout_bar.set_edgecolor('#B2D8B2')        
+    timeout_bar.set_linestyle('--')        
+    timeout_bar.set_hatch('xxx')           
+    timeout_bar.set_linewidth(2)
+    ax.text(x[-1] + width, 1200, "T/O", ha='center', va='bottom', 
+        color='black', fontweight='bold', fontsize=12)
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
@@ -104,15 +121,31 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     plt.tick_params(axis='both', labelsize=14)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    plt.xlabel("Surface Code Distance", fontsize=16)
+    ax.text(.5, -0.1, "Monolithic", 
+        transform=ax.get_xaxis_transform(),
+        ha='center',
+        fontsize = (FONTSIZE - 1)*1.5)
+    
+    ax.text(2.5, -0.1, "Chiplet", 
+        transform=ax.get_xaxis_transform(),
+        ha='center',
+        fontsize = (FONTSIZE - 1)*1.5)
+
+    ax.text(1.5, -0.17, "Surface code distance", 
+            transform=ax.get_xaxis_transform(),
+            ha='center',
+            fontsize = (FONTSIZE - 1)*1.5)
+    #plt.xlabel("Surface Code Distance", fontsize=16)
+
     description = "Runtime [s]"
-    plt.ylabel(description, fontsize=16)
+    plt.ylabel(description,)
     plt.yscale("log")
+    ax.set_ylim(0, 2e4)
 
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
     ax.legend(loc='upper left')
 
-    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.12)
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.14)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)
@@ -120,43 +153,54 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
 
 
 def run_runtime_scaling():
-    code_distances = [2, 3, 4, 5] # range(2, 5)
+    code_distances = [2, 5] # [2, 3, 4, 5]
+    backend = ["mono", "chiplet"]
+    
     qeccsynth_time_storage = {}
     mech_time_storage = {}
     sabre_time_storage = {}
 
-    for d in code_distances:
-        cycles = d
-        code = get_surface_code_stim(d, cycles)
+    for b in backend:
+        for d in code_distances:
+            cycles = d
+            code = get_surface_code_stim(d, cycles)
 
-        # TODO: calculate chiplet size based on distance
-        n = m = int(d*1.5)
+            # TODO: calculate chiplet size based on distance
+            n = m = int(d*1.5)
+            if b == "chiplet":
+                n_icc = 1
+            else:
+                n_icc = None
 
-        monolithic_backend, qubit_num, data_qubit_num = generate_simple_backend(n, m)
-        architecture = generate_qecc_synth_backend_from_mech(monolithic_backend)
-        cm = generate_qiskit_backend_from_mech(monolithic_backend)
+            monolithic_backend, _, _ = generate_simple_backend(n, m, n_icc)
+            architecture = generate_qecc_synth_backend_from_mech(monolithic_backend)
+            cm = generate_qiskit_backend_from_mech(monolithic_backend)
 
-        # Print backend to file
-        display_simple_backend(monolithic_backend, f"experiments/evaluation/related_work/backends/monolithic_{n}_{m}.png")
-            
-        # MECH
-        start_mech = time.time()
-        _ = transpile_circuit_MECH(code.qc, monolithic_backend)
-        end_mech = time.time()
+            # Print backend to file
+            display_simple_backend(monolithic_backend, f"experiments/evaluation/related_work/backends/{b}_{n}_{m}_{n_icc}.png")
+                
+            # MECH
+            start_mech = time.time()
+            _ = transpile_circuit_MECH(code.qc, monolithic_backend)
+            end_mech = time.time()
 
-        # QECCsynth
-        start_qeccsynth = time.time()
-        _ = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{m}_{m}')
-        end_qeccsynth = time.time()
+            # QECCsynth
+            if not(b == "chiplet" and d == 5):
+                start_qeccsynth = time.time()
+                _ = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{m}_{m}')
+                end_qeccsynth = time.time()
 
-        # Qiskit
-        start_sabre = time.time()
-        _ = transpile_circuit_SABRE(circuit = code.qc, coupling_map = cm)
-        end_sabre = time.time()
+            # Qiskit
+            start_sabre = time.time()
+            _ = transpile_circuit_SABRE(circuit = code.qc, coupling_map = cm)
+            end_sabre = time.time()
 
-        qeccsynth_time_storage[d] = end_qeccsynth - start_qeccsynth
-        mech_time_storage[d] = end_mech - start_mech
-        sabre_time_storage[d] = end_sabre - start_sabre
+            if not(b == "chiplet" and d == 5):
+                qeccsynth_time_storage[(b, d)] = end_qeccsynth - start_qeccsynth
+            else:
+                qeccsynth_time_storage[(b, d)] = 1e3
+            mech_time_storage[(b, d)] = end_mech - start_mech
+            sabre_time_storage[(b, d)] = end_sabre - start_sabre
 
     # Write results to file
     with open(f"experiments/evaluation/related_work/timing_mech.pkl", "wb") as f:
@@ -171,9 +215,9 @@ def run_runtime_scaling():
     
     
 if __name__ == "__main__":
-    # run_runtime_scaling()
+    #run_runtime_scaling()
 
-
+    
     # Load pre-computed results
     with open(f"experiments/evaluation/related_work/timing_mech.pkl", "rb") as f:
         mech_time_storage = pickle.load(f)
@@ -186,4 +230,5 @@ if __name__ == "__main__":
                   qeccsynth_time_storage,
                   sabre_time_storage,
                   "experiments/evaluation/related_work/memory_scaling.pdf")
+    
     

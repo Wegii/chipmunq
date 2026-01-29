@@ -66,7 +66,8 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     }
 
     plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.7))
 
     distances = sorted(qeccsynth_overhead.keys())
     x_val = [2*x+1 for x in distances]
@@ -94,11 +95,13 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
 
     # Add annotation
     if type == "gate_overhead":
-        title = "Effect of distance on #2q-gate overhead"
+        title = "b) Effect of distance on #2q-gate overhead"
+        shift = -0.09
     else:
-        title = "Effect of distance on chiplet utilization"
+        title = "c) Effect of distance on #Inter-chiplet gates"
+        shift = -0.12
     ax.text(
-        -0.02, 1.02, title,
+        shift, 1.02, title,
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -125,7 +128,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
     ax.legend(loc='upper left')
 
-    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.12)
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.15)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)

@@ -199,11 +199,11 @@ def plot_combined_split(custom_depth,
            hatch='//', edgecolor='black')
     
     bars_ours = ax.bar(x, custom_depth_vals, width,
-           label="Chipmunq (Ours)", color=pastel_blue,
+           label="Chipmunq", color=pastel_blue,
            hatch='/', edgecolor='black')
 
     bars_sabre = ax.bar(x+width, sabre_depth_vals, width,
-                        label="(Light-)SABRE", color=pastel_orange,
+                        label="LightSABRE", color=pastel_orange,
                         hatch='o', edgecolor='black')
     
     ax.bar_label(bars_ours, labels = overhead_ours, padding = 9, rotation = 90)
@@ -255,7 +255,7 @@ def plot_combined_split(custom_depth,
         # Font sizes
         "axes.labelsize": FONTSIZE*1.3,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.1,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
         "xtick.labelsize": (FONTSIZE - 1)*1.3,
         "ytick.labelsize": (FONTSIZE - 1)*1.3,
         "axes.titlesize": 10,
@@ -285,10 +285,10 @@ def plot_combined_split(custom_depth,
             label="Ideal", color="lightcoral",
             hatch='//', edgecolor='black')
     ax_top.bar(x, custom_over_vals, width,
-            label="Chipmunq (Ours)", color=pastel_blue,
+            label="Chipmunq", color=pastel_blue,
             hatch='/', edgecolor='black')
     ax_top.bar(x + width, sabre_over_vals, width,
-            label="(Light-)SABRE", color=pastel_orange,
+            label="LightSABRE", color=pastel_orange,
             hatch='o', edgecolor='black')
 
 
@@ -304,10 +304,10 @@ def plot_combined_split(custom_depth,
                 label="Ideal", color="lightcoral",
                 hatch='/', edgecolor='black')
     bars_gates_ours = ax_bottom.bar(x, custom_over_vals, width,
-                                    label="Chipmunq (Ours)", color=pastel_blue,
+                                    label="Chipmunq", color=pastel_blue,
                                     hatch='/', edgecolor='black')
     bars_gates_sabre = ax_bottom.bar(x + width, sabre_over_vals, width,
-                                     label="(Light-)SABRE", color=pastel_orange,
+                                     label="LightSABRE", color=pastel_orange,
                                      hatch='o', edgecolor='black')
 
     ax_top.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)

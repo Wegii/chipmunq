@@ -23,7 +23,7 @@ import stim
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 
-def generate_simple_backend(x_num: int, y_num: int) -> tuple[nx.Graph, int, int]:
+def generate_simple_backend(x_num: int, y_num: int, icc_num: int = None) -> tuple[nx.Graph, int, int]:
     """Generate simple backend using MECH library.
 
     The backend generated with MECH can be used by Qiskit, QECC-Synth and by MECH itself. This is the fastest solution for now,
@@ -41,8 +41,11 @@ def generate_simple_backend(x_num: int, y_num: int) -> tuple[nx.Graph, int, int]
     chip_col_num = 2
     chip_row_num = 2
 
+    if icc_num == None:
+        icc_num = x_num
+
     # Generate layout of chip by connecting smaller chiplets
-    G = gen_chiplet_array(structure, chip_col_num, chip_row_num, x_num, y_num, cross_link_sparsity=x_num)
+    G = gen_chiplet_array(structure, chip_col_num, chip_row_num, x_num, y_num, cross_link_sparsity=icc_num)
     # Add highway (for MECH)
     gen_highway_layout(G)
 
