@@ -42,7 +42,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
         qiskit_2q_overhead = [qiskit_overhead[d]["2q_gates_overhead"] for d in sorted(qiskit_overhead.keys())]
     elif type == "inter_chiplet":
         mech_2q_overhead = [mech_overhead[d]["cross-chip"] for d in sorted(mech_overhead.keys())]
-        qeccsynth_2q_overhead = [qeccsynth_overhead[d]["cross-chip"] for d in sorted(qeccsynth_overhead.keys())]
+        qeccsynth_2q_overhead = [1 + qeccsynth_overhead[d]["cross-chip"] for d in sorted(qeccsynth_overhead.keys())]
         qiskit_2q_overhead = [qiskit_overhead[d]["cross-chip"] for d in sorted(qiskit_overhead.keys())]
 
     tex_fonts = {
@@ -67,7 +67,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
 
     plt.rcParams.update(tex_fonts)
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.7))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     distances = sorted(qeccsynth_overhead.keys())
     x_val = [2*x+1 for x in distances]
@@ -78,15 +78,15 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     x = np.arange(len(section_titles))
     width = 0.25
 
-    ax.bar(x-width, qiskit_2q_overhead, width,
+    qiskit_bar = ax.bar(x-width, qiskit_2q_overhead, width,
            label="LightSABRE", color="lightcoral",
            hatch='o', edgecolor='black')
 
-    ax.bar(x, mech_2q_overhead, width,
+    mech_bar = ax.bar(x, mech_2q_overhead, width,
            label="MECH", color="#A7D9ED",
            hatch='//', edgecolor='black')
     
-    ax.bar(x+width, qeccsynth_2q_overhead, width,
+    qecc_synth_bar = ax.bar(x+width, qeccsynth_2q_overhead, width,
            label="QECC-Synth", color="#B2D8B2",
            hatch='/', edgecolor='black')
 
@@ -98,7 +98,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
         title = "b) Effect of distance on #2q-gate overhead"
         shift = -0.09
     else:
-        title = "c) Effect of distance on #Inter-chiplet gates"
+        title = "c) Effect of distance on #inter-chiplet gates"
         shift = -0.12
     ax.text(
         shift, 1.02, title,
@@ -107,7 +107,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.3, 1.1, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -126,13 +126,22 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     plt.yscale("log")
 
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
-    ax.legend(loc='upper left')
 
-    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.15)
+    # ax.legend(loc='upper left')
+
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.87, bottom=0.18)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)
 
+    # Create custom figure for legend
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = [qiskit_bar, mech_bar, qecc_synth_bar],
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 3)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
 
 
 def run_statistics():

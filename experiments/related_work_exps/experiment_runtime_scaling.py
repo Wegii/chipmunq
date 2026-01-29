@@ -68,7 +68,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     }
 
     plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     x_val = [2*x+1 for x in distances] + [2*x+1 for x in distances]
 
@@ -104,15 +104,15 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
 
     # Add annotation
 
-    title = "Effect of distance on compilation time"
+    title = "a) Effect of distance on compilation time"
     ax.text(
-        -0.02, 1.02, title,
+        -0.06, 1.02, title,
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.3, 1.1, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -121,17 +121,17 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     plt.tick_params(axis='both', labelsize=14)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    ax.text(.5, -0.1, "Monolithic", 
+    ax.text(.5, -0.21, "Monolithic", 
         transform=ax.get_xaxis_transform(),
         ha='center',
         fontsize = (FONTSIZE - 1)*1.5)
     
-    ax.text(2.5, -0.1, "Chiplet", 
+    ax.text(2.5, -0.21, "Chiplet", 
         transform=ax.get_xaxis_transform(),
         ha='center',
         fontsize = (FONTSIZE - 1)*1.5)
 
-    ax.text(1.5, -0.17, "Surface code distance", 
+    ax.text(1.5, -0.29, "Surface code distance", 
             transform=ax.get_xaxis_transform(),
             ha='center',
             fontsize = (FONTSIZE - 1)*1.5)
@@ -140,12 +140,12 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     description = "Runtime [s]"
     plt.ylabel(description,)
     plt.yscale("log")
-    ax.set_ylim(0, 2e4)
+    ax.set_ylim(0, 5e3)
 
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
-    ax.legend(loc='upper left')
+    # ax.legend(loc='upper left')
 
-    fig.subplots_adjust(left=0.175, right=0.95, top=0.9, bottom=0.14)
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.87, bottom=0.2)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)
