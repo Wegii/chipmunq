@@ -28,6 +28,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from experiments.utils import *
+from collections import defaultdict
 
 
 def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left: str, filename: str = ""):
@@ -218,8 +219,28 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     plt.close(legend_fig)
 
 
-def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, filename: str = ""):
+def ci95_bootstrap(values, df_values, mode, ks):
+    means = []
+    err_low = []
+    err_high = []
+    for df in df_values:
+        val = list(values[mode][df][ks].values())
+        mean = np.mean(val)
+        # Create fake replications by sampling own data with replacement
+        boot_means = [np.mean(np.random.choice(val, size=len(val), replace=True)) 
+                    for _ in range(5000)]
+        # Find the bounds where 95% of those means fall
+        low_perc = np.percentile(boot_means, 2.5)
+        high_perc = np.percentile(boot_means, 97.5)
+        
+        means.append(mean)
+        err_low.append(mean - low_perc)
+        err_high.append(high_perc - mean)
+    
+    return means, [err_low, err_high]
 
+
+def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, filename: str = ""):
     # placement modes (outer keys)
     placement_modes = list(custom_depth[0].keys())  # ["default", "size_aware"]
 
@@ -263,29 +284,38 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     plt.rcParams.update(tex_fonts)
 
 
-
     labels = ["center", "size_aware"]  # ["default", "size_aware"]
 
     # ----------- Depth Overhead -------------
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     for i, mode in enumerate(placement_modes):
-        vals = [custom_depth[0][mode][df][ks] for df in df_values]
+        print([(list(custom_depth[0][mode][df][ks].values())) for df in df_values])
+        # Single patch
+        values_mean, values_err = ci95_bootstrap(custom_depth[0], df_values, mode, ks)
+
         ax.bar(
             x + i * width - 1.5*width,
-            vals,
+            values_mean,
             width,
+            yerr=values_err,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
             edgecolor='black'
         )
 
-        vals = [custom_depth[1][mode][df][ks] for df in df_values]
+        # Multi patch
+        values_mean, values_err = ci95_bootstrap(custom_depth[1], df_values, mode, ks)
         ax.bar(
             x + (2+i) * width - 1.5*width,
-            vals,
+            values_mean,
             width,
+            yerr=values_err,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i] + "multi",
             color=colors[2+i],
             hatch=hatches[i],
@@ -297,7 +327,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("Depth Overhead")
     #ax.legend(loc='upper left')
-    ax.set_ylim(0, 1250)
+    #ax.set_ylim(0, 1250)
 
     ax.text(
         -0.1, 1.02, "a) Defective qubits affecting circuit depth",
@@ -323,22 +353,30 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     for i, mode in enumerate(placement_modes):
-        vals = [custom_overhead[0][mode][df][ks] for df in df_values]
+        # Single patch
+        values_mean, values_err = ci95_bootstrap(custom_overhead[0], df_values, mode, ks)
         ax.bar(
             x + i * width - 1.5*width,
-            vals,
+            values_mean,
             width,
+            yerr=values_err,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
             edgecolor='black'
         )
 
-        vals = [custom_overhead[1][mode][df][ks] for df in df_values]
+        # Multi patch
+        values_mean, values_err = ci95_bootstrap(custom_overhead[1], df_values, mode, ks)
         ax.bar(
             x + (2+i) * width - 1.5*width,
-            vals,
+            values_mean,
             width,
+            yerr=values_err,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i] + "multi",
             color=colors[2+i],
             hatch=hatches[i],
@@ -350,7 +388,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("2q Gate Overhead")
     #ax.legend(loc='upper left')
-    ax.set_ylim(0, 5500)
+    #ax.set_ylim(0, 5500)
 
     ax.text(
         -0.05, 1.02, "b) Defective qubits affecting #2q gates",
@@ -378,14 +416,15 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
 
     handles = []
     for i, mode in enumerate(placement_modes):
-        vals = [custom_utilization[0][mode][df][ks] for df in df_values]
+        # Single patch
+        values_mean, values_err = ci95_bootstrap(custom_utilization[0], df_values, mode, ks)
         h = ax.bar(
             x + i * width - 1.5*width,
-            vals,
+            values_mean,
             width,
-            yerr=0.1,          
-            capsize=4,      
-            error_kw={'elinewidth': 2, 'ecolor': 'black'},
+            yerr=values_err,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label="single patch: " + labels[i],
             color=colors[i],
             hatch=hatches[i],
@@ -393,14 +432,15 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
         )
         handles.append(h)
 
-        vals = [custom_utilization[1][mode][df][ks] for df in df_values]
+        # Multi patch
+        values_mean, values_err = ci95_bootstrap(custom_utilization[1], df_values, mode, ks)
         h = ax.bar(
             x + (2+i) * width - 1.5*width,
-            vals,
+            values_mean,
             width,
-            yerr=0.1,          
-            capsize=4,      
-            error_kw={'elinewidth': 2, 'ecolor': 'black'},
+            yerr=values_err,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label="multi patch: " + labels[i],
             color=colors[2+i],
             hatch=hatches[i],
@@ -441,8 +481,6 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     plt.close(legend_fig)
     
 
-
-
 def calculate_qpu_utilization(circuit, backend):
 
     # Iterate over circuit
@@ -481,6 +519,10 @@ def calculate_qpu_utilization(circuit, backend):
     return utilized_qubits/(len(utilized_chiplets)*num_qubits_per_chiplet)  
 
 
+def recursive_dict():
+    return defaultdict(recursive_dict)
+
+
 def run_exp_defective():
 
     # Backend configuration
@@ -495,107 +537,79 @@ def run_exp_defective():
     # - Backend fits multiple patches
     backend_config = ["single_patch", "multi_patch"]
 
+    """
     for bc in backend_config:
 
         custom_depth = {}
         custom_overhead = {}
 
-        custom_depth = {pp: {} for pp in patch_placement}
-        custom_overhead = {pp: {} for pp in patch_placement}
-        custom_utilization = {pp: {} for pp in patch_placement}
+        custom_depth = recursive_dict()
+        custom_overhead = recursive_dict()
+        custom_utilization = recursive_dict()
 
-        np = 1
         defective_qubits = [0, 1, 2, 3]
+        num_iterations = 10
+        num_dupl = 1
+
+        if bc == "single_patch":
+            nx, nm = 15, 8
+        elif bc == "multi_patch":
+            nx, nm = 23, 14
 
         # Compile a circuit to the defect free backend during the first iteration
         defect_free_compilation = True
-        """
+        
+        # Iterate over placement methods
         for pp in patch_placement:
+            # Iterate over code size
             for ks in [2]:#[1, 2, 3, 4]
+                # Generate circuit
+                circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
+                                                            n1 = 1,
+                                                            n2 = 0)
+                # Stim to qiskit
+                stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                
+                # Iterate over number of defective qubits
                 for df in defective_qubits:
+                    # Perform multiple iterations, since defective qubits are selected randomly
+                    for run in range(0, num_iterations):
+                        ic = 0
+                        while True:
+                            try:
+                                backend = BackendChipletV2(size = (num_dupl*6, num_dupl*6, nx, nm),
+                                                    n_inter = num_inter_chiplet_connections,
+                                                    connectivity = "nn",
+                                                    topology = "rotated_grid",
+                                                    inter_chiplet_noise = ps_inter,
+                                                    inter_chiplet_amplification = 1,
+                                                    inter_chiplet_noise_type = "constant",
+                                                    num_defective_qubits=df,
+                                                    chiplet_seed = run + 42 + ic
+                                                )
 
-                    if df not in custom_depth[pp]:
-                        custom_depth[pp][df] = {}
-                        custom_overhead[pp][df] = {}
-                        custom_utilization[pp][df] = {}
+                                # Custom transpilation
+                                defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                                                backend,
+                                                                                pre_defined_partitions = partitions,
+                                                                                patch_initialization = pp)
+                                break                                
+                            except Exception as e:
+                                ic += 1
+                                print("Unable to place patches given location of defective qubits!")
+                                print("Retrying...")
                         
 
-                    # Generate circuit
-                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                                n1 = np,
-                                                                n2 = 0)
+                        def num_2q_gates(circuit):
+                            ops = circuit.count_ops()
+                            two_qubit_gate_names = ["cx", "cz", "swap"]
+                            return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
-                    if bc == "single_patch":
-                        nx, nm = 15, 8
-                    elif bc == "multi_patch":
-                        nx, nm = 23, 14
+                        # Calculate qpu utilization
+                        custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(defective_circuit, backend)
 
-                    backend = BackendChipletV2(size = (np*6, np*6, nx, nm),
-                                                n_inter = num_inter_chiplet_connections,
-                                                connectivity = "nn",
-                                                topology = "rotated_grid",
-                                                inter_chiplet_noise = ps_inter,
-                                                inter_chiplet_amplification = 1,
-                                                inter_chiplet_noise_type = "constant",
-                                                num_defective_qubits=df,
-                                            )
-                    
-                    backend_non_defective = BackendChipletV2(size = (np*6, np*6, nx, nm),
-                                                n_inter = num_inter_chiplet_connections,
-                                                connectivity = "nn",
-                                                topology = "rotated_grid",
-                                                inter_chiplet_noise = ps_inter,
-                                                inter_chiplet_amplification = 1,
-                                                inter_chiplet_noise_type = "constant",
-                                                num_defective_qubits=0,
-                                            )
-                    
-
-                    # Stim to qiskit
-                    stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
-
-                    # Custom transpilation
-                    print("Df")
-                    
-                    defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                            backend,
-                                                            pre_defined_partitions = partitions,
-                                                            patch_initialization = pp)
-
-                    if defect_free_compilation:
-                        if bc == "multi_patch":
-                            defect_free_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                                        backend_non_defective,
-                                                                        pre_defined_partitions=partitions,
-                                                                        patch_initialization = "size_aware")
-                        else:
-                            defect_free_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                                        backend_non_defective,
-                                                                        pre_defined_partitions=partitions,
-                                                                        patch_initialization = "center")
-
-                        #plot_circuit_layout(defect_free_circuit,
-                        #        backend_non_defective,
-                        #        filename=f"experiments/evaluation/defective_qubits/backend/{bc}_{pp}_layout_{df}_defect_free.png")
-                        #defect_free_compilation = False
-                    
-                    
-                    #plot_circuit_layout(defective_circuit,
-                    #                    backend,
-                    #                    filename=f"experiments/evaluation/defective_qubits/backend/{bc}_{pp}_layout_{df}.png")
-                    
-
-                    def num_2q_gates(circuit):
-                        ops = circuit.count_ops()
-                        two_qubit_gate_names = ["cx", "cz", "swap"]
-                        return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
-                    
-                    # Calculate qpu utilization
-                    custom_utilization[pp][df][ks] = calculate_qpu_utilization(defective_circuit, backend)
-
-                    custom_depth[pp][df][ks] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
-                    custom_overhead[pp][df][ks] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
+                        custom_depth[pp][df][ks][run] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
+                        custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
 
     
         with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "wb") as f:
@@ -604,8 +618,10 @@ def run_exp_defective():
             pickle.dump(custom_overhead, f)
         with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "wb") as f:
             pickle.dump(custom_utilization, f)
-        
 
+    """
+    
+    """
         with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
             custom_depth = pickle.load(f)
         with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "rb") as f:
