@@ -41,11 +41,11 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.3,
+        "axes.labelsize": FONTSIZE*1.5,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.1,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
@@ -55,12 +55,15 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
         # Error bar cap size
         "errorbar.capsize": 3,
     }
+
     plt.rcParams.update(tex_fonts)
 
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    handles = []
     # Plot identity (x = y)
-    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
+    h = plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
+    handles.extend(h)
 
     colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
     colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
@@ -89,7 +92,7 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
                 marker = "o"
             else:
                 marker = ""
-            plt.plot(physical_error_rates,
+            h = plt.plot(physical_error_rates,
                         ys_custom,
                         #linewidth = 1.5,
                         marker = marker,
@@ -98,6 +101,7 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
                         linestyle= line_style,
                         color = line_color,
                         label = plot_label[ti])
+            handles.extend(h)
             
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
@@ -108,13 +112,13 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     description = (r"$p_{inter}$ = " + f"{ps_inter_text}, d = 5")
 
     ax.text(
-        -0.01, 1.02, "Influence of routing method on LER",
+        .05, 1.02, "a) Effect of cost_routing on LER",
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.3, 1.13, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -122,17 +126,27 @@ def plot_evaluation(stat, filename, inter_chiplet_noise):
     
     #plt.ylim(-0.01, 0.9)
     plt.ylim(1e-6, 1e0)
+    plt.xlim(1e-4, 1e-2)
     plt.xscale('log')
     plt.yscale('log')
 
 
     plt.xlabel("Physical error rate")
     plt.ylabel("Logical error rate")
-    plt.legend(loc="lower right", ncol=1)
+    #plt.legend(loc="lower right", ncol=1)
     #plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
+    #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
+    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = handles,
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 3)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
 
 
 def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
@@ -173,24 +187,25 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.3,
+        "axes.labelsize": FONTSIZE*1.5,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*0.8,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
-        "axes.titlesize": 8,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
         # Line and marker styles
-        "lines.linewidth": 3,
-        "lines.markersize": 9,
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
         # Error bar cap size
         "errorbar.capsize": 3,
     }
+
     plt.rcParams.update(tex_fonts)
 
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6*1.5, WIDTH_FIGSIZE/1.5))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE/2))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
 
@@ -217,14 +232,20 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
                    r", $\beta = $" + str(beta)
                    )
 
+    #ax.text(
+    #    0, 1.02, description,
+    #    transform=ax.transAxes,
+    #    #fontweight="bold"
+    #)
+
     ax.text(
-        0, 1.02, description,
+        -.1, 1.02, "b) Relative effect of cost_routing on LER",
         transform=ax.transAxes,
-        #fontweight="bold"
+        fontweight="bold"
     )
 
     ax.text(
-        0.3, 1.12, "Lower is better ↓",
+        0.3, 1.13, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -232,6 +253,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         
     
     plt.ylim(-10e-1, 0.5)
+    plt.xlim(1e-4, 1e-2)
     plt.xscale('log')
     #plt.yscale('log')
     plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
@@ -239,9 +261,10 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     plt.xlabel("Physical Error Rate")
     #plt.ylabel(r"Δ($LER_{Routing Method} - LER_{Basic}$)")
     plt.ylabel(r"Δ$LER_{Routing}$")
-    plt.legend(loc="lower right", ncol=2)
+    #plt.legend(loc="lower right", ncol=2)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    #fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     
     plt.savefig(filename, format="pdf")
     plt.close(fig)

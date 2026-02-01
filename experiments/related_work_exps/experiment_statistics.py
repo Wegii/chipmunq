@@ -107,7 +107,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     )
 
     ax.text(
-        0.3, 1.1, "Lower is better ↓",
+        0.3, 1.15, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -129,7 +129,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
 
     # ax.legend(loc='upper left')
 
-    fig.subplots_adjust(left=0.175, right=0.95, top=0.87, bottom=0.18)
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.83, bottom=0.18)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)

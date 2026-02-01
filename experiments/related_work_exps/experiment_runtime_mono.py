@@ -35,7 +35,7 @@ from matplotlib.ticker import MaxNLocator
 
 def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: str = ""):
 
-    distances = [4, 5, 6, 7]
+    distances = [2, 3, 4, 5, 6, 7]
 
     # Timeout-value for qecc-synth
     
@@ -119,7 +119,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     )
 
     ax.text(
-        0.3, 1.1, "Lower is better ↓",
+        0.3, 1.15, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -138,7 +138,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
     # ax.legend(loc='upper left')
 
-    fig.subplots_adjust(left=0.175, right=0.95, top=0.87, bottom=0.2)
+    fig.subplots_adjust(left=0.175, right=0.95, top=0.83, bottom=0.2)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)
@@ -146,7 +146,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
 
 
 def run_runtime_scaling():
-    code_distances = [4, 5, 6, 7] # [2, 3, 4, 5]
+    code_distances = [2, 3, 4, 5, 6, 7] # [2, 3, 4, 5]
     backend = ["mono"]
     
     qeccsynth_time_storage = {}

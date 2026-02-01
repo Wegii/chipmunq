@@ -29,34 +29,59 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     ks_values = sorted({ks for d in custom_time_storage.values() for ks in d.keys()})
 
     
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.5,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
 
-    fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
+    plt.rcParams.update(tex_fonts)
+
+    #fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
 
     colors_custom = [ "#8FB7E1", "#5E97CC", "#3B6FA8"]
     colors_sabre = [ "#E38E8A", "#C85E59", "#9F3B36"]
 
+    handles = []
     for i, ks in enumerate(ks_values):
         # SABRE
         y_sabre = [sabre_time_storage[np].get(ks, None) for np in np_values]
-        plt.plot(x_val, y_sabre, marker='x', linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
+        h = plt.plot(x_val, y_sabre, marker='x', linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
+        handles.extend(h)
 
     for i, ks in enumerate(ks_values):
         # Custom
         y_custom = [custom_time_storage[np].get(ks, None) for np in np_values]
-        plt.plot(x_val, y_custom, marker='o', linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
+        h = plt.plot(x_val, y_custom, marker='o', linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
+        handles.extend(h)
 
     #plt.axvline(x=3)
 
 
     ax.text(
-        0.15, 1.02, "Compilation runtime vs. number of patches",
+        -0.01, 1.025, "a) Number of patches affecting runtime",
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.35, 1.07, "Lower is better ↓",
+        0.3, 1.15, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -78,11 +103,20 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
 
     #plt.grid(True)
     plt.grid(True, which='major', linestyle='--', alpha=0.5)
-    ax.legend(loc='lower right', ncol=2)
-    plt.tight_layout()
+    #ax.legend(loc='lower right', ncol=2)
+    #plt.tight_layout()
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.83, bottom=0.21)
     plt.savefig(filename,
                 format="pdf")
     plt.close(fig)
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = handles,
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 2)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
 
 
 

@@ -16,107 +16,6 @@ from experiments.utils import *
 
 import pickle
 
-def plot_combined(custom_depth,
-                  custom_overhead,
-                  sabre_depth,
-                  sabre_overhead,
-                  depth_overall,
-                  gate_overall,
-                  filename: str = ""):
-    ks = list(next(iter(custom_depth.values())).keys())[0]
-    np_values = sorted(custom_depth.keys())
-
-    section_titles = ["Small", "Medium", "Big"]
-
-    # Extract values
-    custom_depth_vals = [depth_overall[np][ks]+custom_depth[np][ks] for np in np_values]
-    sabre_depth_vals = [depth_overall[np][ks]+sabre_depth[np][ks] for np in np_values]
-    general_depth_vals = [depth_overall[np][ks] for np in np_values]
-
-    custom_over_vals = [gate_overall[np][ks]+custom_overhead[np][ks] for np in np_values]
-    sabre_over_vals = [gate_overall[np][ks]+sabre_overhead[np][ks] for np in np_values]
-    general_over_vals = [gate_overall[np][ks] for np in np_values]
-
-    x = np.arange(len(np_values))
-    width = 0.25#0.35
-
-    # Pastel colors
-    #pastel_blue = "#5c79bd"
-    #pastel_orange = "#ef8d38"
-    pastel_blue = '#A7D9ED'
-    pastel_orange = '#F7C6A2'
-
-    # Create depth statistics
-    fig, ax = plt.subplots(figsize=(5, 5))
-
-    ax.bar(x-width, general_depth_vals, width,
-           label="Ideal", color="gray",
-           hatch='//', edgecolor='black')
-    
-    ax.bar(x, custom_depth_vals, width,
-           label="Custom", color=pastel_blue,
-           hatch='/', edgecolor='black')
-
-    ax.bar(x+width, sabre_depth_vals, width,
-           label="SABRE", color=pastel_orange,
-           hatch='o', edgecolor='black')
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(section_titles)
-    ax.set_xlabel("Circuit size")
-    ax.set_ylabel("Circuit Depth Overhead")
-    ax.legend()
-
-    # Add annotation
-    ax.text(-0.025, 1.05, 'Lower is better ↓',
-            transform=ax.transAxes,
-            fontsize=10,
-            fontweight='bold',
-            va='top',
-            ha='left')
-
-    fig.tight_layout()
-    fig.savefig(f"{filename}_depth.png", dpi=300)
-    plt.show()
-
-
-
-
-
-    # Create 2q gate overhead
-    fig, ax = plt.subplots(figsize=(5, 5))
-    print(general_depth_vals)
-
-    ax.bar(x - width, general_over_vals, width,
-           label="Ideal", color="gray",
-           hatch='/', edgecolor='black')
-    
-    ax.bar(x, custom_over_vals, width,
-           label="Custom", color=pastel_blue,
-           hatch='/', edgecolor='black')
-
-    ax.bar(x + width, sabre_over_vals, width,
-           label="SABRE", color=pastel_orange,
-           hatch='o', edgecolor='black')
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(section_titles)
-    ax.set_ylabel("2q Gate Overhead ")
-    ax.legend()
-
-    # Add annotation
-    ax.text(-0.025, 1.05, 'Lower is better ↓',
-            transform=ax.transAxes,
-            fontsize=10,
-            fontweight='bold',
-            va='top',
-            ha='left')
-
-    fig.tight_layout()
-    fig.savefig(f"{filename}_overhead.png", dpi=300)
-    plt.show()
-
-
 
 def plot_combined_split(custom_depth,
                   custom_overhead,
@@ -178,10 +77,12 @@ def plot_combined_split(custom_depth,
         print((custom_over_vals[i] - general_over_vals[i])/(sabre_over_vals[i] - general_over_vals[i]))
         print(general_over_vals[i])
 
-        overhead_ours.append("{:.1f}%".format(100*((custom_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
-        overhead_sabre.append("{:.1f}%".format(100*((sabre_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
-        overhead_gates_ours.append("{:.1f}%".format(100*((custom_over_vals[i] - general_over_vals[i])/general_over_vals[i])))
-        overhead_gates_sabre.append("{:.1f}%".format(100*((sabre_over_vals[i] - general_over_vals[i])/general_over_vals[i])))
+        overhead_ours.append("{:.0f}%".format(100*((custom_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
+        #overhead_ours.append("{:.1f}x".format(((custom_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
+        
+        overhead_sabre.append("{:.0f}%".format(100*((sabre_depth_vals[i] - general_depth_vals[i])/general_depth_vals[i])))
+        overhead_gates_ours.append("{:.0f}%".format(100*((custom_over_vals[i] - general_over_vals[i])/general_over_vals[i])))
+        overhead_gates_sabre.append("{:.0f}%".format(100*((sabre_over_vals[i] - general_over_vals[i])/general_over_vals[i])))
 
         # Depth: 1 - (0.17329910141206675 + 0.12664165103189493 + 0.10834670947030497)/3 = 0.8639041793619111
         # 2q_gates: 1 - (0.09606831524639743 + 0.08065720687079911 + 0.08100405020251013)/3 = 0.9140901425600978
@@ -191,9 +92,9 @@ def plot_combined_split(custom_depth,
 
 
     # Create depth statistics
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*1.5))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
-    
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+
     ax.bar(x-width, general_depth_vals, width,
            label="Ideal", color="lightcoral",
            hatch='//', edgecolor='black')
@@ -213,7 +114,7 @@ def plot_combined_split(custom_depth,
     ax.set_xticklabels(section_titles)
     ax.set_xlabel("Circuit size")
     ax.set_ylabel("Circuit depth")
-    ax.legend(loc='upper left')
+    #ax.legend(loc='upper left')
 
     # Add annotation
     #ax.text(0.53, 1.04, 'Lower is better ↓',
@@ -225,22 +126,24 @@ def plot_combined_split(custom_depth,
     #        ha='left')
     
     ax.text(
-        -0.02, 1.02, "Compilation affecting circuit depth",
+        -0.04, 1.05, "b) Compilation affecting circuit depth",
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.28, 1.17, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
     
-    ax.set_ylim(0, 11300)
+    ax.set_ylim(0, 15500)
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
+    #fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
+    plt.grid(True, which='major', linestyle='--', alpha=0.5)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.83, bottom=0.21)
     fig.savefig(f"{filename}_depth.pdf",
                 format="pdf")
     plt.close(fig)
@@ -273,15 +176,17 @@ def plot_combined_split(custom_depth,
     max_overall_val = max(max(general_over_vals), max(custom_over_vals), max(sabre_over_vals))
 
     # Add a small padding to the upper y-limit for better visualization
-    upper_ylim = max_overall_val*1.015
+    upper_ylim = max_overall_val*1.01 # 1.015
 
-    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+
+    #fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     
-    gs = gridspec.GridSpec(2, 1, height_ratios=[7, 20], hspace=0.1) # Swapped height_ratios
+    gs = gridspec.GridSpec(2, 1, height_ratios=[12, 15], hspace=0.1) # Swapped height_ratios
 
     # Top subplot (for values above the break, e.g., 60,000 to max)
     ax_top = plt.subplot(gs[0]) # Now gs[0] for the top part
-    ax_top.bar(x - width, general_over_vals, width,
+    bars_ideal = ax_top.bar(x - width, general_over_vals, width,
             label="Ideal", color="lightcoral",
             hatch='//', edgecolor='black')
     ax_top.bar(x, custom_over_vals, width,
@@ -297,6 +202,7 @@ def plot_combined_split(custom_depth,
     ax_top.set_xticks(x)
     ax_top.set_xticklabels([])
     ax_top.tick_params(axis='y', length=5)
+    plt.grid(True, which='major', linestyle='--', alpha=0.5)
 
     # Bottom subplot (for values below the break, e.g., 0 to 40,000)
     ax_bottom = plt.subplot(gs[1]) # Now gs[1] for the bottom part
@@ -344,8 +250,8 @@ def plot_combined_split(custom_depth,
 
 
     fig.text(0.025, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=FONTSIZE*1.5)
-    fig.text(0.48, 0.037, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
-    ax_top.text(0.23, 1.4, 'Lower is better ↓',
+    fig.text(0.48, 0.04, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
+    ax_top.text(0.24, 1.6, 'Lower is better ↓',
                 transform=ax_top.transAxes,
                 #fontsize=FONTSIZE,
                 fontweight='bold',
@@ -354,7 +260,7 @@ def plot_combined_split(custom_depth,
                 ha='left')
     
     ax_top.text(
-        0.05, 1.19, "Compilation affecting #2q gates",
+        -0.025, 1.3, "c) Compilation affecting #2q gates",
         transform=ax_top.transAxes,
         fontweight="bold",
         va='top',
@@ -362,14 +268,25 @@ def plot_combined_split(custom_depth,
     )
 
 
-    ax_top.legend(loc='upper left')
+    #ax_top.legend(loc='upper left')
 
     #fig.tight_layout()
     #fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.07)
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
+    #fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
+    plt.grid(True, which='major', linestyle='--', alpha=0.5)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.83, bottom=0.21)
     fig.savefig(f"{filename}_overhead.pdf",
                 format="pdf")
     plt.close(fig)
+
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = [bars_ideal, bars_gates_ours, bars_gates_sabre],
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 3)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
     
 
 def run_exp_statistics():

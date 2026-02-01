@@ -47,8 +47,8 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     width = 0.35
 
     # Colors
-    pastel_blue = '#A7D9ED'
-    pastel_orange = '#6476AD' # '#F7C6A2'
+    pastel_blue = "#A7D9ED" #'#A7D9ED'
+    pastel_orange = "lightcoral" # '#6476AD' # '#F7C6A2'
     if title_left == "Single patch configuration":
         tl_label = ["a) ", "b) ", "c) "]
     else:
@@ -77,13 +77,14 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     plt.rcParams.update(tex_fonts)
 
     colors = [pastel_blue, pastel_orange]
-    hatches = ['/', '\\']  # one hatch per placement mode
+    hatches = ['//', 'o']  # one hatch per placement mode
 
     labels = placement_modes  # ["default", "size_aware"]
 
     # ----------- Depth Overhead -------------
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_depth[mode][df][ks] for df in df_values]
@@ -100,8 +101,8 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective Qubits")
-    ax.set_ylabel("Circuit Depth Overhead")
-    ax.legend(loc='upper left')
+    ax.set_ylabel("Depth Overhead")
+    #ax.legend(loc='upper left')
     ax.set_ylim(0, 1250)
 
     ax.text(
@@ -111,20 +112,20 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     )
 
     ax.text(
-        0.27, 1.07, "Lower is better ↓",
+        0.27, 1.15, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.87, bottom=0.13)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
     #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
     # ----------- 2Q Gate Overhead -------------
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_overhead[mode][df][ks] for df in df_values]
@@ -142,7 +143,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("2q Gate Overhead")
-    ax.legend(loc='upper left')
+    #ax.legend(loc='upper left')
     ax.set_ylim(0, 5500)
 
     ax.text(
@@ -152,24 +153,25 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     )
 
     ax.text(
-        0.27, 1.07, "Lower is better ↓",
+        0.27, 1.15, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.87, bottom=0.13)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
 
     # ----------- Backend Utilization -------------
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
+    handles = []
     for i, mode in enumerate(placement_modes):
         vals = [custom_utilization[mode][df][ks] for df in df_values]
-        ax.bar(
+        handle = ax.bar(
             x + i * width - width/2,
             vals,
             width,
@@ -181,12 +183,13 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
             hatch=hatches[i],
             edgecolor='black'
         )
+        handles.append(handle)
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective Qubits")
     ax.set_ylabel("Utilization")
-    ax.legend(loc='upper left')
+    #ax.legend(loc='upper left')
     ax.set_ylim(0, 1)
 
     ax.text(
@@ -196,19 +199,248 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     )
 
     ax.text(
-        0.27, 1.07, "Higher is better ↑",
+        0.27, 1.15, "Higher is better ↑",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.87, bottom=0.13)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
     fig.savefig(f"{filename}_utilization.pdf", format="pdf")
     plt.close(fig)
 
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = [handles[0], handles[1]],
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 3)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
 
-def plot_utilization():
-    pass
+
+def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, filename: str = ""):
+
+    # placement modes (outer keys)
+    placement_modes = list(custom_depth[0].keys())  # ["default", "size_aware"]
+
+    # defective qubit counts (inner keys)
+    df_values = sorted(custom_depth[0][placement_modes[0]].keys())  # [1,2,3]
+
+    ks = list(custom_depth[0][placement_modes[0]][df_values[0]].keys())[0]
+
+    # X-axis (one position per defective-qubit count)
+    x = np.arange(len(df_values))  # [0,1,2]
+
+    # Two bars per group
+    width = 0.35/2
+
+    title_left = ""
+
+    # Colors
+    colors = ["#4682B4", "#AEC6CF", "#F7C6A2", "#F08080"]
+    hatches = ['//', 'o']  # one hatch per placement mode
+   
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Font sizes
+        "axes.labelsize": FONTSIZE*1.5,
+        "font.size": FONTSIZE*1.2,
+        "legend.fontsize": (FONTSIZE - 2)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.5,
+        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "axes.titlesize": 10,
+        # Line and marker styles
+        "lines.linewidth": 2,
+        "lines.markersize": 6,
+        "lines.markeredgewidth": 1.5,
+        "lines.markeredgecolor": "black",
+        # Error bar cap size
+        "errorbar.capsize": 3,
+    }
+
+    plt.rcParams.update(tex_fonts)
+
+
+
+    labels = ["center", "size_aware"]  # ["default", "size_aware"]
+
+    # ----------- Depth Overhead -------------
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+
+    for i, mode in enumerate(placement_modes):
+        vals = [custom_depth[0][mode][df][ks] for df in df_values]
+        ax.bar(
+            x + i * width - 1.5*width,
+            vals,
+            width,
+            label=labels[i],
+            color=colors[i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+
+        vals = [custom_depth[1][mode][df][ks] for df in df_values]
+        ax.bar(
+            x + (2+i) * width - 1.5*width,
+            vals,
+            width,
+            label=labels[i] + "multi",
+            color=colors[2+i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(df) for df in df_values])
+    ax.set_xlabel("#Defective Qubits")
+    ax.set_ylabel("Depth Overhead")
+    #ax.legend(loc='upper left')
+    ax.set_ylim(0, 1250)
+
+    ax.text(
+        -0.1, 1.02, "a) Defective qubits affecting circuit depth",
+        transform=ax.transAxes,
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.27, 1.15, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontweight="bold",
+        color=plot_lib_color,
+    )
+
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.savefig(f"{filename}_depth.pdf", format="pdf")
+    plt.close(fig)
+
+
+
+    
+    # ----------- 2Q Gate Overhead -------------
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+
+    for i, mode in enumerate(placement_modes):
+        vals = [custom_overhead[0][mode][df][ks] for df in df_values]
+        ax.bar(
+            x + i * width - 1.5*width,
+            vals,
+            width,
+            label=labels[i],
+            color=colors[i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+
+        vals = [custom_overhead[1][mode][df][ks] for df in df_values]
+        ax.bar(
+            x + (2+i) * width - 1.5*width,
+            vals,
+            width,
+            label=labels[i] + "multi",
+            color=colors[2+i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(df) for df in df_values])
+    ax.set_xlabel("#Defective Qubits")
+    ax.set_ylabel("2q Gate Overhead")
+    #ax.legend(loc='upper left')
+    ax.set_ylim(0, 5500)
+
+    ax.text(
+        -0.05, 1.02, "b) Defective qubits affecting #2q gates",
+        transform=ax.transAxes,
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.27, 1.15, "Lower is better ↓",
+        transform=ax.transAxes,
+        fontweight="bold",
+        color=plot_lib_color,
+    )
+
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.savefig(f"{filename}_overhead.pdf", format="pdf")
+    plt.close(fig)
+
+
+
+    
+    # ----------- Backend Utilization -------------
+    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+
+    handles = []
+    for i, mode in enumerate(placement_modes):
+        vals = [custom_utilization[0][mode][df][ks] for df in df_values]
+        h = ax.bar(
+            x + i * width - 1.5*width,
+            vals,
+            width,
+            yerr=0.1,          
+            capsize=4,      
+            error_kw={'elinewidth': 2, 'ecolor': 'black'},
+            label="single patch: " + labels[i],
+            color=colors[i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+        handles.append(h)
+
+        vals = [custom_utilization[1][mode][df][ks] for df in df_values]
+        h = ax.bar(
+            x + (2+i) * width - 1.5*width,
+            vals,
+            width,
+            yerr=0.1,          
+            capsize=4,      
+            error_kw={'elinewidth': 2, 'ecolor': 'black'},
+            label="multi patch: " + labels[i],
+            color=colors[2+i],
+            hatch=hatches[i],
+            edgecolor='black'
+        )
+        handles.append(h)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(df) for df in df_values])
+    ax.set_xlabel("#Defective Qubits")
+    ax.set_ylabel("Utilization")
+    #ax.legend(loc='upper left')
+    ax.set_ylim(0, 1.2)
+
+    ax.text(
+        -0.22, 1.02, "c) Defective qubits affecting chiplet utilization",
+        transform=ax.transAxes,
+        fontweight="bold"
+    )
+
+    ax.text(
+        0.27, 1.15, "Higher is better ↑",
+        transform=ax.transAxes,
+        fontweight="bold",
+        color=plot_lib_color,
+    )
+
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.savefig(f"{filename}_utilization.pdf", format="pdf")
+    plt.close(fig)
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = handles,
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 4)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
+    
+
 
 
 def calculate_qpu_utilization(circuit, backend):
@@ -372,7 +604,7 @@ def run_exp_defective():
             pickle.dump(custom_overhead, f)
         with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "wb") as f:
             pickle.dump(custom_utilization, f)
-        """
+        
 
         with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
             custom_depth = pickle.load(f)
@@ -387,6 +619,28 @@ def run_exp_defective():
                       title_left = ("Multi patch configuration" if bc == "multi_patch"
                                     else "Single patch configuration"),
                       filename = f"experiments/evaluation/defective_qubits/{bc}_overhead")
+    """        
+
+    backend_config = ["single_patch", "multi_patch"]
+    custom_depth_combined = []
+    custom_overhead_combined = []
+    custom_utilization_combined = []
+    for bc in backend_config:            
+        with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
+            custom_depth = pickle.load(f)
+        with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "rb") as f:
+            custom_overhead = pickle.load(f)
+        with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "rb") as f:
+            custom_utilization = pickle.load(f)
+
+        custom_depth_combined.append(custom_depth)
+        custom_overhead_combined.append(custom_overhead)
+        custom_utilization_combined.append(custom_utilization)
+
+    plot_combined_backends(custom_depth_combined,
+                            custom_overhead_combined,
+                            custom_utilization_combined,
+                            filename = f"experiments/evaluation/defective_qubits/combined_overhead")
 
             
 if __name__ == "__main__":
