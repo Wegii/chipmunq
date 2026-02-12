@@ -100,7 +100,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
                      marker = inter_markers[ni],
                      linestyle= "solid" if d == "5" else "solid",
                      color = color_list[i][ni],
-                     label = f'(d={d}, ' +  r'$n_{inter}$' + f'={n})')
+                     label = f'(d={d}, ' +  r'$n_{inter}$' + f' = {n})')
             handles.extend(h)
             
 
@@ -152,7 +152,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 2)
+                               ncols = 6)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
 
@@ -278,7 +278,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
 
     plt.xscale('log')
     plt.yscale('log')
-    plt.xlabel("Physical Error Rate")
+    plt.xlabel("Physical error rate")
     #plt.ylabel(r"Δ($LER_{Reduced} - LER_{Full}$)")
     plt.ylabel(r"$LER_{Reduced} / LER_{Full}$")
     #plt.legend(loc = "upper right", ncol = 2)

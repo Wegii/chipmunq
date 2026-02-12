@@ -1,9 +1,5 @@
 from qiskit import QuantumCircuit
 
-#import os
-#import sys
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
-#from qiskit_qec.circuits.stim_code_circuit import StimCodeCircuit
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 
@@ -24,31 +20,17 @@ def stim_to_qiskit(stim_circuit) -> QuantumCircuit:
     return stim_code
 
 
-def qiskit_to_stim():
-    """Convert qiskit circuit to stim circuit
 
-    Wrapper around qiskit_qec.utils.get_stim_circuits
+def get_partitions_stim_tqec(stim_circuit, code_distance):
 
+    # Iterate over cirucit
+
+    # Extract all Qubit_coords
+
+    # Parse QUBIT_COORDS(y, x) idx
+
+    # Start at min y and min x
     
-    References:
-        - https://qiskit-community.github.io/qiskit-qec/stubs/qiskit_qec.utils.get_stim_circuits.html
-    """
-
-    # TODO: See https://github.com/aswierkowska/eccentric_bench/blob/main/main.py how to add the detectors again
-
-    pass
-
-
-def qiskit_to_pyzx():
-    pass
-
-def pyzx_to_tqec():
-    # IMplement necessary steps to go from pyzx to tqec
-
-    # This utilizes topologiq library
-
-    # Note: topologiq wants to use quite old version of libraries. This can potentially be ignored
-
     pass
 
 

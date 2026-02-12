@@ -58,17 +58,19 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     colors_custom = [ "#8FB7E1", "#5E97CC", "#3B6FA8"]
     colors_sabre = [ "#E38E8A", "#C85E59", "#9F3B36"]
 
+    inter_markers = ['x', 'o', 's']
+
     handles = []
     for i, ks in enumerate(ks_values):
         # SABRE
         y_sabre = [sabre_time_storage[np].get(ks, None) for np in np_values]
-        h = plt.plot(x_val, y_sabre, marker='x', linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
+        h = plt.plot(x_val, y_sabre, marker=inter_markers[i], linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
         handles.extend(h)
 
     for i, ks in enumerate(ks_values):
         # Custom
         y_custom = [custom_time_storage[np].get(ks, None) for np in np_values]
-        h = plt.plot(x_val, y_custom, marker='o', linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
+        h = plt.plot(x_val, y_custom, marker=inter_markers[i], linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
         handles.extend(h)
 
     #plt.axvline(x=3)
@@ -97,8 +99,8 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tick_params(axis='both', labelsize=14)
 
-    plt.xlabel("Number of Patches", fontsize=16)
-    plt.ylabel("Runtime [s]", fontsize=16)
+    plt.xlabel("Number of patches", fontsize=FONTSIZE*1.5)
+    plt.ylabel("Runtime [s]", fontsize=FONTSIZE*1.5)
     plt.yscale("log")
 
     #plt.grid(True)
@@ -114,7 +116,8 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 2)
+                               ncols = 6,
+                               columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
 

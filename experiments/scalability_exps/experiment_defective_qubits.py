@@ -101,7 +101,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective Qubits")
+    ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Depth Overhead")
     #ax.legend(loc='upper left')
     ax.set_ylim(0, 1250)
@@ -142,7 +142,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective Qubits")
+    ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("2q Gate Overhead")
     #ax.legend(loc='upper left')
     ax.set_ylim(0, 5500)
@@ -188,7 +188,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective Qubits")
+    ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Utilization")
     #ax.legend(loc='upper left')
     ax.set_ylim(0, 1)
@@ -258,7 +258,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     title_left = ""
 
     # Colors
-    colors = ["#4682B4", "#AEC6CF", "#F7C6A2", "#F08080"]
+    colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
     hatches = ['//', 'o']  # one hatch per placement mode
    
     tex_fonts = {
@@ -324,7 +324,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective Qubits")
+    ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Depth Overhead")
     #ax.legend(loc='upper left')
     #ax.set_ylim(0, 1250)
@@ -342,7 +342,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
@@ -385,7 +385,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective Qubits")
+    ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("2q Gate Overhead")
     #ax.legend(loc='upper left')
     #ax.set_ylim(0, 5500)
@@ -403,7 +403,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
@@ -450,7 +450,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective Qubits")
+    ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Utilization")
     #ax.legend(loc='upper left')
     ax.set_ylim(0, 1.2)
@@ -468,7 +468,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
         color=plot_lib_color,
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
+    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_utilization.pdf", format="pdf")
     plt.close(fig)
 

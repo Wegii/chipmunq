@@ -57,13 +57,16 @@ def transpile_stim_circuit(circuit: StimCodeCircuit,
     return custom_circuit_stim, custom_circuit, sabre_circuit_stim, sabre_circuit
 
 
-def run_sinter_simulation(tasks_fct, ks, ps):
+def run_sinter_simulation(tasks_fct, ks, ps, num_shots: int = 100_000_000, num_t = None):
+    if num_t == None:
+        num_t = int(multiprocessing.cpu_count()/2)
+
     stats = sinter.collect(
-        num_workers = int(multiprocessing.cpu_count()/2),#multiprocessing.cpu_count(),
+        num_workers = num_t,#multiprocessing.cpu_count(),
         tasks=(tasks_fct()),
         save_resume_filepath = None,
         progress_callback=None,
-        max_shots=100_000_000, #10_000_000,
+        max_shots=num_shots, #10_000_000,
         max_errors=5_000,
         decoders=["pymatching"],
         print_progress=True,

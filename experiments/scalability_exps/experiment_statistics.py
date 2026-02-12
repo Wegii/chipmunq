@@ -107,8 +107,8 @@ def plot_combined_split(custom_depth,
                         label="LightSABRE", color=pastel_orange,
                         hatch='o', edgecolor='black')
     
-    ax.bar_label(bars_ours, labels = overhead_ours, padding = 9, rotation = 90)
-    ax.bar_label(bars_sabre, labels = overhead_sabre, padding = 9, rotation = 90)
+    #ax.bar_label(bars_ours, labels = overhead_ours, padding = 9, rotation = 90)
+    #ax.bar_label(bars_sabre, labels = overhead_sabre, padding = 9, rotation = 90)
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
@@ -126,7 +126,7 @@ def plot_combined_split(custom_depth,
     #        ha='left')
     
     ax.text(
-        -0.04, 1.05, "b) Compilation affecting circuit depth",
+        -0.18, 1.05, "b) Compilation overhead on circuit depth",
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -139,6 +139,61 @@ def plot_combined_split(custom_depth,
     )
     
     ax.set_ylim(0, 15500)
+
+    
+    # Arrow and text for first bars
+    ax.text(
+        0.16, .22, "-5.5x",
+        transform=ax.transAxes,
+        color="green",
+    )
+    plt.annotate(
+        '',                      
+        xy=(-0.04, 1500),              
+        xytext=(0.3, 2500),          
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.6",
+            color="green",
+            lw=1.5
+        )
+    )
+    
+    # Arrow and text for second bars
+    ax.text(
+        0.5, .4, "-9x",
+        transform=ax.transAxes,
+        color="green",
+    )
+    plt.annotate(
+        '',                      # No text
+        xy=(1, 4000),              # Tip: Pointing to the bottom
+        xytext=(1.3, 5500),          # Base: Starting at the top
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.6", # Positive = curve up/left
+            color="green",
+            lw=1.5
+        )
+    )
+
+    # Arrow and text for third bars
+    ax.text(
+        0.84, .66, "-8x",
+        transform=ax.transAxes,
+        color="green",
+    )
+    plt.annotate(
+        '',                      # No text
+        xy=(2, 8000),              # Tip: Pointing to the bottom
+        xytext=(2.3, 9500),          # Base: Starting at the top
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.6", # Positive = curve up/left
+            color="green",
+            lw=1.5
+        )
+    )
 
     #fig.tight_layout()
     #fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
@@ -176,13 +231,13 @@ def plot_combined_split(custom_depth,
     max_overall_val = max(max(general_over_vals), max(custom_over_vals), max(sabre_over_vals))
 
     # Add a small padding to the upper y-limit for better visualization
-    upper_ylim = max_overall_val*1.01 # 1.015
+    upper_ylim = 66000#max_overall_val*1.01 # 1.015
 
 
     #fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
     fig = plt.figure(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     
-    gs = gridspec.GridSpec(2, 1, height_ratios=[12, 15], hspace=0.1) # Swapped height_ratios
+    gs = gridspec.GridSpec(2, 1, height_ratios=[12, 20], hspace=0.1) # Swapped height_ratios
 
     # Top subplot (for values above the break, e.g., 60,000 to max)
     ax_top = plt.subplot(gs[0]) # Now gs[0] for the top part
@@ -198,7 +253,7 @@ def plot_combined_split(custom_depth,
 
 
     # Limit for upper
-    ax_top.set_ylim(65600, upper_ylim)
+    ax_top.set_ylim(66000, upper_ylim)
     ax_top.set_xticks(x)
     ax_top.set_xticklabels([])
     ax_top.tick_params(axis='y', length=5)
@@ -216,10 +271,10 @@ def plot_combined_split(custom_depth,
                                      label="LightSABRE", color=pastel_orange,
                                      hatch='o', edgecolor='black')
 
-    ax_top.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)
-    ax_bottom.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)
-    ax_top.bar_label(bars_gates_sabre, labels = overhead_gates_sabre, padding = 9, rotation = 90)
-    ax_bottom.bar_label(bars_gates_sabre, labels = overhead_gates_sabre, padding = 9, rotation = 90)
+    #ax_top.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)
+    #ax_bottom.bar_label(bars_gates_ours, labels = overhead_gates_ours, padding = 9, rotation = 90)
+    #ax_top.bar_label(bars_gates_sabre, labels = overhead_gates_sabre, padding = 9, rotation = 90)
+    #ax_bottom.bar_label(bars_gates_sabre, labels = overhead_gates_sabre, padding = 9, rotation = 90)
 
     # Limit for bottom
     ax_bottom.set_ylim(0, 40000)
@@ -248,19 +303,73 @@ def plot_combined_split(custom_depth,
     # Top-right split
     ax_top.plot((1 - d, 1 + d), (0, 0), **kwargs)
 
+    # Arrow and text for first bars
+    ax_bottom.text(
+        0.16, .4, "-10x",
+        transform=ax_bottom.transAxes,
+        color="green",
+    )
+    plt.annotate(
+        '',                      
+        xy=(-0.04, 4000),              
+        xytext=(0.3, 12000),          
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.6",
+            color="green",
+            lw=1.5
+        )
+    )
+    
+    # Arrow and text for second bars
+    ax_bottom.text(
+        0.39, .8, "-12x",
+        transform=ax_bottom.transAxes,
+        color="green",
+    )
+    plt.annotate(
+        '',                     
+        xy=(.95, 15000),              
+        xytext=(1.25, 38000),          
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.4", 
+            color="green",
+            lw=1.5
+        )
+    )
 
-    fig.text(0.025, 0.5, "#2q Gates", va='center', rotation='vertical', fontsize=FONTSIZE*1.5)
-    fig.text(0.48, 0.04, "Circuit Size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
+    # Arrow and text for third bars
+    ax_bottom.text(
+        0.72, 1.3, "-12x",
+        transform=ax_bottom.transAxes,
+        color="green",
+    )
+    plt.annotate(
+        '',                      
+        xy=(1.95, 30000),              
+        xytext=(2.25, 59000),          
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.4",
+            color="green",
+            lw=1.5
+        )
+    )
+
+
+    fig.text(0.025, 0.5, "#2q gates", va='center', rotation='vertical', fontsize=FONTSIZE*1.5)
+    fig.text(0.48, 0.04, "Circuit size", va='center', rotation='horizontal', fontsize=FONTSIZE*1.5)
     ax_top.text(0.24, 1.6, 'Lower is better ↓',
                 transform=ax_top.transAxes,
                 #fontsize=FONTSIZE,
-                fontweight='bold',
+                fontweight='bold', 
                 color=plot_lib_color,
                 va='top',
                 ha='left')
     
     ax_top.text(
-        -0.025, 1.3, "c) Compilation affecting #2q gates",
+        -0.075, 1.3, "c) Compilation overhead on #2q gates",
         transform=ax_top.transAxes,
         fontweight="bold",
         va='top',
@@ -284,7 +393,8 @@ def plot_combined_split(custom_depth,
     legend = legend_fig.legend(handles = [bars_ideal, bars_gates_ours, bars_gates_sabre],
                                loc = 'center',
                                frameon = False,
-                               ncols = 3)
+                               ncols = 3,
+                               columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
     

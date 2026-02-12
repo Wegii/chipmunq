@@ -55,17 +55,6 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     d_values = sorted(d_values)
     physical_error_rates = sorted(list(physical_error_rates))
 
-
-
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
-    # Plot identity (x = y)
-    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
-
-    colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
-    color_list = [colors_default, colors_transpiled]
-
     tex_fonts = {
         # Use LaTeX to write all text
         # "text.usetex": True,
@@ -87,6 +76,18 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     }
     plt.rcParams.update(tex_fonts)
 
+
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    # Plot identity (x = y)
+    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
+
+    colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
+    colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
+    color_list = [colors_default, colors_transpiled]
+
+
+
     inter_markers = ['x', 'o', 's']
     handles = []
     for ti, t in enumerate(["default", "compiled"]):
@@ -99,7 +100,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
             if t == "default":
                 l = "ideal"
             else:
-                l = ti
+                l = t
             ys_custom = [errors[p] for p in physical_error_rates]
             h = plt.plot(physical_error_rates,
                         ys_custom,
@@ -132,7 +133,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     )
 
     ax.text(
-        0.3, 1.13, "Lower is better ↓",
+        0.3, 1.15, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -184,7 +185,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     )
 
     ax.text(
-        0.57, 1.02, "Lower is better ↓",
+        0.57, 1.08, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -209,7 +210,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 2)
+                               ncols = 6)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
 

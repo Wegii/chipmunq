@@ -59,11 +59,11 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     plt.rcParams.update(tex_fonts)
 
     # Pastel colors
-    pastel_blue = '#A7D9ED'
-    pastel_orange = '#6476AD'#'#F7C6A2'
+    pastel_orange = 'lightcoral' #'#A7D9ED'
+    pastel_blue = '#A7D9ED'#'#F7C6A2'
 
     # Create depth statistics
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     
     ax.bar(x - width/2, low_depth_vals, width,
            label = r"$p_{inter}$ = $1e^{-4}$",
@@ -78,32 +78,32 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
     ax.set_xlabel("Circuit size")
-    ax.set_ylabel("Circuit Depth Overhead")
+    ax.set_ylabel("Depth Overhead")
     ax.legend()
 
     # Add annotation
 
     ax.text(
-        -0.02, 1.02, "Effect of inter-chiplet noise",
+        -0.1, 1.04, "a) Connectivity affecting circuit depth",
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.3, 1.14, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
+    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
 
     # Create 2q gate overhead
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
 
     ax.bar(x - width/2, low_over_vals, width,
@@ -119,8 +119,8 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
     ax.set_xlabel("Circuit size")
-    ax.set_ylabel("2q Gate Overhead ")
-    ax.legend()
+    ax.set_ylabel("#2q gate overhead ")
+    #ax.legend()
 
     # Add annotation
     #ax.text(0.57, 1.04, "Lower is better ↓",
@@ -132,20 +132,21 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     #    ha='left')
     
     ax.text(
-        -0.02, 1.02, "Effect of inter-chiplet noise",
+        -0.03, 1.04, "b) Connectivity affecting #2q gates",
         transform=ax.transAxes,
         fontweight="bold"
     )
 
     ax.text(
-        0.3, 1.07, "Lower is better ↓",
+        0.3, 1.14, "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
     #fig.tight_layout()
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.9, bottom=0.12)
+    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
