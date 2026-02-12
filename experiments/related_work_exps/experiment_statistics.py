@@ -9,6 +9,7 @@ import time
 import pickle
 
 # MECH
+"""
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
 from external.baseline.MECH.Circuit import *
 from external.baseline.MECH.Chiplet import *
@@ -26,7 +27,7 @@ from external.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth impo
 # SABRE
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/SABRE"))
 from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
-
+"""
 
 # Plotting
 from experiments.utils import *
@@ -117,7 +118,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     plt.tick_params(axis='both', labelsize=14)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    plt.xlabel("Surface Code Distance", fontsize=16)
+    plt.xlabel("Surface code distance", fontsize=16)
     if type == "gate_overhead":
         description = "#2q-gate overhead"
     else:

@@ -150,7 +150,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 6)
+                               ncols = 6,
+                               columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
 
