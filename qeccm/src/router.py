@@ -58,24 +58,23 @@ class BasicSwapRouter(GenericRouter):
             new_dag.add_qreg(qreg)
         for creg in dag.cregs.values():
             new_dag.add_creg(creg)
-        
+
+        # Utilize mapping of physical qubit to partition mapping to check if qubits need routing. Qubits part of the
+        # same partition do not need any routing
+        pq_to_partition = self.property_set["pq_to_partition"]
+
         for node in dag.topological_op_nodes():
+            
             if len(node.qargs) == 2:
                 q0, q1 = node.qargs[0]._index, node.qargs[1]._index
-                #q0 = node.qargs[0]#current_layout[node.qargs[0]]
-                #q1 = node.qargs[1]#current_layout[node.qargs[1]]
                 
                 # Check distance in coupling map
-                if not self.coupling_map.distance(q0, q1) == 1:
+                #if not self.coupling_map.distance(q0, q1) == 1:
+                if pq_to_partition[q0] != pq_to_partition[q1]:
                     # Find shortest path connecting both qubits
                     path = self.coupling_map.shortest_undirected_path(q0, q1)
                     # TODO: this can be replaced with a easier calculation, by considering the grid layout of the
                     #       backend. Note: only works for grid layout then.
-                    # TODO: remote gates need the shortest_undirected_path function again
-
-                    # TODO: Split the rout into two parts. Route from both the target and source
-                    #       have a look at the rust implementation of sabre, since there is a code snipplet that does
-                    #       this. This should halve the distance
                     
                     # Insert swaps along path except last edge
                     mid = len(path) // 2

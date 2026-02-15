@@ -44,7 +44,8 @@ class BackendChipletV2(BackendV2):
                  inter_chiplet_amplification: float = None,
                  inter_chiplet_noise_type: str = "",
                  inter_chiplet_rfactor : int = 10,
-                 num_defective_qubits: int = 0
+                 num_defective_qubits: int = 0,
+                 chiplet_seed: int = 42,
                  ) -> None:
         """Instantiate new multi-chip backend.
 
@@ -95,6 +96,7 @@ class BackendChipletV2(BackendV2):
         # Store index of all defective qubits
         self.all_defective_qubits = []
         # The coupling map without the defective qubits will be stored in the _target and then coupling_map
+        self.defective_rng = np.random.default_rng(seed=chiplet_seed)
 
 
         # Dictionary mapping chiplet index to list of nodes on chiplet 
@@ -284,8 +286,10 @@ class BackendChipletV2(BackendV2):
             if (self.num_defective_qubits_per_chiplet > 0):
                 # Define which qubits should be defective
                 num_qubits_on_chip = self.n * self.m
-                rng = np.random.default_rng(seed=12345678944)
-                defective_q = rng.choice(num_qubits_on_chip, size=self.num_defective_qubits_per_chiplet, replace=False).tolist()
+
+                defective_q = self.defective_rng.choice(num_qubits_on_chip,
+                                                        size = self.num_defective_qubits_per_chiplet,
+                                                        replace = False).tolist()
 
                 """
                 defective_q = []

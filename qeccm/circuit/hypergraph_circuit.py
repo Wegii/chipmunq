@@ -15,7 +15,7 @@ from qiskit.transpiler.basepasses import AnalysisPass
 from collections import defaultdict
 
 import networkx as nx
-
+import pandas as pd
 
 
 class PartitionedHyperGraph:
@@ -82,8 +82,11 @@ class PartitionedHyperGraph:
         else:
             if partitions != None:
                 block_to_nodes = {"b:" + str(b): [] for b in range(len(partitions))}
+                #block_to_nodes = {b: [] for b in range(len(partitions))}
+                
                 for i, partition in enumerate(partitions):
                     block_to_nodes["b:" + str(i)].extend(partition['indices'][:])
+                    #block_to_nodes[i].extend(partition['indices'][:])
                 
                 (index_vector, edge_vector) = hgc
                 available_nodes = set(edge_vector)

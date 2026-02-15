@@ -223,6 +223,8 @@ class TrivialMapper(GenericMapper):
             
         # Dictionary with virtual_qubit to physical_qubit mapping
         placement = {}
+        # Map from physical qubits to partition
+        pq_to_partition = {}
 
         # Iterate over all QPUs
         for qpu, qpu_partitions in utilized_qpus.items():
@@ -292,7 +294,10 @@ class TrivialMapper(GenericMapper):
                             i = 0
                             while index < len(nodes_of_partition):
                                 #print((row-i)*self.backend.m)
-                                placement[nodes_of_partition[index]] = nodes_on_qpu[(row-i)*self.backend.m + col]
+                                p_index = nodes_on_qpu[(row-i)*self.backend.m + col]
+                                placement[nodes_of_partition[index]] = p_index
+                                pq_to_partition[p_index] = pre_defined_partitions[partition_id]
+
                                 i += 2
                                 index += 1
                         elif patch_height == 1 and patch_width > 1:
@@ -306,7 +311,10 @@ class TrivialMapper(GenericMapper):
                             while index < len(nodes_of_partition):
                                 #print((row-i)*self.backend.m)
                                 # TODO: Fix this
-                                placement[nodes_of_partition[index]] = nodes_on_qpu[(row)*self.backend.m + col]
+                                p_index = nodes_on_qpu[(row)*self.backend.m + col]
+                                placement[nodes_of_partition[index]] = p_index
+                                pq_to_partition[p_index] = pre_defined_partitions[partition_id]
+
                                 index += 1
                                 col += 1
                         
@@ -317,7 +325,12 @@ class TrivialMapper(GenericMapper):
                             index = 0
                             
                             while index < len(nodes_of_partition):
-                                placement[nodes_of_partition[index]] = nodes_on_qpu[(row-i)*self.backend.m + col]
+                                p_index = nodes_on_qpu[(row-i)*self.backend.m + col]
+                                # Assign virtual to physical qubit
+                                placement[nodes_of_partition[index]] = p_index
+                                # Assign physical qubit to partition
+                                pq_to_partition[p_index] = pre_defined_partitions[partition_id]
+
                                 i += 2
                                 index += 1
 
@@ -332,6 +345,9 @@ class TrivialMapper(GenericMapper):
                                     col_iter += 1
                                     i = 0
 
+        # Save the physical qubit to partition mapping
+        self.property_set["pq_to_partition"] = pq_to_partition
+        
         return placement
 
     def assign_partition_to_qpu(self,
