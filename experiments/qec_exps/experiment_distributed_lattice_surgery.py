@@ -80,37 +80,42 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     # Plot identity (x = y)
-    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label=f'x=y')
+    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.2, color="#000000B3", label=f'x=y')
 
+    colors_sabre = ([ "#E38E8A", "#C85E59", "#9F3B36"])
     colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_default = ([ "#C85E59", "#9F3B36", "#7F2E2A"])
-    color_list = [colors_default, colors_transpiled]
+    colors_default = ["#000", "#000", "#000"]#([ "#C85E59", "#9F3B36", "#7F2E2A"])
+    color_list = [colors_default, colors_transpiled, colors_sabre]
 
 
-
+    # TODO: Add sabre to the plots
     inter_markers = ['x', 'o', 's']
     handles = []
-    for ti, t in enumerate(["default", "compiled"]):
-        for i, d in enumerate(d_values):
+    d_values_reduced = ['5', '7']
+
+    for ti, t in enumerate(["default", "compiled", "sabre"]):
+        for i, d in enumerate(d_values_reduced):
+        
             errors = defaultdict(dict)
 
             for p in physical_error_rates:
                 errors[p] = error_rates[t][d][p][0]
                 
             if t == "default":
-                l = "ideal"
-            else:
-                l = t
+                l = "Ideal"
+            elif t == "compiled":
+                l = "Chipmunq"
+            elif t == "sabre":
+                l = "LightSABRE"
             ys_custom = [errors[p] for p in physical_error_rates]
             h = plt.plot(physical_error_rates,
                         ys_custom,
-                        linewidth = 2,
+                        linewidth = 1.5 if t == "default" else 1.5,
                         marker = inter_markers[i],
-                        markersize = 3,
                         markerfacecolor="none",
-                        linestyle= "--" if t == "default" else "solid",
+                        linestyle= "solid", #"--" if t == "default" else "solid",
                         color = color_list[ti][i],
-                        label = f'({l}, d = {d})')
+                        label = f'{l}, d={d}')
             handles.extend(h)
             
     if inter_chiplet_noise == 0.0001:
@@ -126,6 +131,44 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     #    transform=ax.transAxes,
     #    fontweight="bold"
     #)
+    """
+    ax.text(
+        0.23, .42, "-95x",
+        transform=ax.transAxes,
+        color="red",
+        fontsize=10,
+    )
+    plt.annotate(
+        '',                      # No text
+        xy=(2.3e-4, 7e-4),              # Tip: Pointing to the bottom
+        xytext=(2.3e-4, 7e-7),          # Base: Starting at the top
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=.6", # Positive = curve up/left
+            color="red",
+            lw=1
+        )
+    )
+
+    ax.text(
+        0.1, .28, "-3x",
+        transform=ax.transAxes,
+        color="red",
+        fontsize=8,
+    )
+    plt.annotate(
+        '',                      # No text
+        xy=(2.2e-4, 5e-6),              # Tip: Pointing to the bottom
+        xytext=(2.2e-4, 7e-7),          # Base: Starting at the top
+        arrowprops=dict(
+            arrowstyle="->",
+            connectionstyle="arc3,rad=-.6", # Positive = curve up/left
+            color="red",
+            lw=1
+        )
+    )
+    """
+
     ax.text(
         -0., 1.04, "a) Effect of compilation on the LER",
         transform=ax.transAxes,
@@ -162,9 +205,20 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     for i, d in enumerate(d_values):
         errors = defaultdict(dict)
+        errors_sabre = defaultdict(dict)
+        errors_average = []
+        errors_average_sabre = []
 
         for p in physical_error_rates:
             errors[p] = error_rates["compiled"][d][p][0]/error_rates["default"][d][p][0]
+            errors_sabre[p] = error_rates["sabre"][d][p][0]/error_rates["default"][d][p][0]
+
+            if p < 1e-2:
+                errors_average.append(errors[p])
+                errors_average_sabre.append(errors_sabre[p])
+
+        print(f"Relative increase for compiled {d} for icc {inter_chiplet_noise}: {np.mean(errors_average)}")
+        print(f"Relative increase for sabre {d} for icc {inter_chiplet_noise}: {np.mean(errors_average_sabre)}")
                 
         ys_custom = [errors[p] for p in physical_error_rates]
         plt.plot(physical_error_rates,
@@ -210,14 +264,12 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 6)
+                               ncols = 3,
+                               columnspacing = 1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
 
     
-
-
-
 def run_exp_distributed_lattice_surgery() -> None:
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
@@ -227,11 +279,12 @@ def run_exp_distributed_lattice_surgery() -> None:
     for ps_inter in inter_chiplet_noise:
 
         # Transpilation
-        ts = ["default", "compiled"]# + [str(i) for i in num_inter_chiplet_connections]
+        ts = ["default", "compiled", "sabre"]# + [str(i) for i in num_inter_chiplet_connections]
         ks = [1, 2, 3]
         
         transpiled_circuits = {}
         """
+        
         def get_circuit(distance_scale: int, p_icc, amp_icc, t: str) -> StimCircuit:
             # Reference circuit
             
@@ -246,34 +299,41 @@ def run_exp_distributed_lattice_surgery() -> None:
                                     amp_icc = amp_icc, 
                                     d = distance_scale)
 
-                if (distance_scale, n_icc, p_icc, amp_icc) in transpiled_circuits:
+                if (distance_scale, n_icc, p_icc, amp_icc, t) in transpiled_circuits:
                     # Circuit does not need to be transpiled again
                     print("Found")
-                    return transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc)]
+                    return transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, t)]
                 else:
                     circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
                                                             n1 = 1,
                                                             n2 = 0)
                     
                     # Transpile circuit to backend
-                    _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
-                                                                    backend,
-                                                                    pre_defined_partitions = partitions,
-                                                                    routing_type = "cost",
-                                                                    routing_alpha = 0,
-                                                                    routing_beta = 0)
+                    if t == "compiled":
+                        # Custom compilation
+                        _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
+                                                                        backend,
+                                                                        pre_defined_partitions = partitions,
+                                                                        routing_type = "cost",
+                                                                        routing_alpha = 0,
+                                                                        routing_beta = 0)
+                    elif t == "sabre":
+                        # Compilation using SABRRE
+                        stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                        custom_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+                        
                     # Convert circuit to stim
                     custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
                     # Add circuit to dictionary, in order to not transpile this circuit configuration again
-                    transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc)] = custom_circuit_stim
+                    transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, t)] = custom_circuit_stim
 
                     plot_circuit_layout(custom_circuit,
                                         backend,
-                                        filename=f"experiments/evaluation/qec_evaluation/backend_mapping/layout_{distance_scale}.png")
+                                        filename=f"experiments/evaluation/qec_evaluation/backend_mapping/layout_{t}_{distance_scale}.png")
                     
                     plot_circuit_layout_utilization(custom_circuit,
                                                     backend,
-                                                    filename=f"experiments/evaluation/qec_evaluation/backend_mapping/mapping_{distance_scale}.png")
+                                                    filename=f"experiments/evaluation/qec_evaluation/backend_mapping/mapping_{t}_{distance_scale}.png")
 
                     return custom_circuit_stim
 
@@ -346,7 +406,8 @@ def run_exp_distributed_lattice_surgery() -> None:
 
         with open(f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.pkl", "wb") as f:
             pickle.dump(stats, f)
-        """
+
+        """    
         
         with open(f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.pkl", "rb") as f:
             stats = pickle.load(f)

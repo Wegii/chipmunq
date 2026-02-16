@@ -54,7 +54,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
         # Line and marker styles
-        "lines.linewidth": 2,
+        "lines.linewidth": 1.5,
         "lines.markersize": 6,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
@@ -78,8 +78,9 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     inter_markers = ['x', 'o', 's']
     #plot_label = ["Basic, Low Variance", "Basic, High Variance", "Cost, Low Variance", "Cost, High Variance", "Tradeoff, High Variance", "Tradeoff, High Variance"]
     #for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
-    plot_label = ["Basic, Low Variance",  "Cost, Low Variance",  "Tradeoff, Low Variance", "Basic, High Variance", "Cost, High Variance", "Tradeoff, High Variance"]
-    for ti, t in enumerate(["basic10", "cost_inter10", "cost_tradeoff10", "basic100", "cost_inter100", "cost_tradeoff100"]):
+    plot_label = ["Basic, Low Variance",  "Basic, High Variance", "Focus, Low Variance", "Focus, High Variance",  "Tradeoff, Low Variance", "Tradeoff, High Variance"]
+    
+    for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
         for i, d in enumerate(d_values):
             errors = defaultdict(dict)
 
@@ -107,7 +108,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
                         linestyle= line_style,
                         color = line_color,
                         label = plot_label[ti])
-            handles.extend(h)
+            handles.append(h[0])
             
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
@@ -118,7 +119,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     description = (r"$p_{inter}$ = " + f"{ps_inter_text}, d = 5")
 
     ax.text(
-        .05, 1.02, "a) Effect of cost_routing on LER",
+        .05, 1.02, "b) Effect of cost_routing on LER",
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -150,7 +151,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 6,
+                               ncols = 3,
                                columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
@@ -182,11 +183,11 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
 
     for d in d_values:
         for p in physical_error_rates:
-            diff_low_cost[d][p] = error_rates['cost_inter10'][d][p][0] - error_rates['basic10'][d][p][0]
-            diff_low_cost_tradeoff[d][p] = error_rates['cost_tradeoff10'][d][p][0]  - error_rates['basic10'][d][p][0]
+            diff_low_cost[d][p] = error_rates['basic10'][d][p][0]/ error_rates['cost_inter10'][d][p][0]# - error_rates['basic10'][d][p][0]
+            diff_low_cost_tradeoff[d][p] = error_rates['basic10'][d][p][0]/error_rates['cost_tradeoff10'][d][p][0]#  - error_rates['basic10'][d][p][0]
 
-            diff_high_cost[d][p] = error_rates['cost_inter100'][d][p][0] - error_rates['basic100'][d][p][0]
-            diff_high_cost_tradeoff[d][p] = error_rates['cost_tradeoff100'][d][p][0] - error_rates['basic100'][d][p][0]
+            diff_high_cost[d][p] = error_rates['basic100'][d][p][0]/error_rates['cost_inter100'][d][p][0]# - error_rates['basic100'][d][p][0]
+            diff_high_cost_tradeoff[d][p] = error_rates['basic100'][d][p][0]/error_rates['cost_tradeoff100'][d][p][0]# - error_rates['basic100'][d][p][0]
 
 
     tex_fonts = {
@@ -201,7 +202,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
         # Line and marker styles
-        "lines.linewidth": 2,
+        "lines.linewidth": 1.5,
         "lines.markersize": 6,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
@@ -214,11 +215,11 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6*1.5, WIDTH_FIGSIZE/1.5))
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
-    ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
+    #ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
 
     ps_rates = sorted(diff_low_cost[5].keys())
     ys_custom = [diff_low_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', color='#2A5687', linestyle='--', label=f'Cost, Low Variance')
+    plt.plot(ps_rates, ys_custom, marker='x', color='#2A5687', linestyle='--', label=f'Focus, Low Variance')
 
     ps_rates = sorted(diff_low_cost_tradeoff[5].keys())
     ys_custom = [diff_low_cost_tradeoff[5][p] for p in physical_error_rates]
@@ -226,7 +227,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
 
     ps_rates = sorted(diff_high_cost[5].keys())
     ys_custom = [diff_high_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', color="#7F2E2A", linestyle='--', label=f'Cost, High Variance')
+    plt.plot(ps_rates, ys_custom, marker='x', color="#7F2E2A", linestyle='--', label=f'Focus, High Variance')
 
     ps_rates = sorted(diff_high_cost_tradeoff[5].keys())
     ys_custom = [diff_high_cost_tradeoff[5][p] for p in physical_error_rates]
@@ -246,7 +247,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     #)
 
     ax.text(
-        -.1, 1.02, "b) Relative effect of cost_routing on LER",
+        -.1, 1.02, "c) Relative effect of cost_routing on LER",
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -259,15 +260,18 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     )
         
     
-    plt.ylim(-10e-1, 0.5)
-    plt.xlim(1e-4, 1e-2)
+    #plt.ylim(-10e-1, 0.5)
+    #plt.xlim(1e-4, 1e-2)
+    plt.ylim(0, 11)
     plt.xscale('log')
     #plt.yscale('log')
-    plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
+    #plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
 
     plt.xlabel("Physical error rate")
     #plt.ylabel(r"Δ($LER_{Routing Method} - LER_{Basic}$)")
     plt.ylabel(r"Δ$LER_{Routing}$")
+    plt.ylabel(r"$LER_{Cost}/LER_{Basic}$")
+
     #plt.legend(loc="lower right", ncol=2)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     #fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)

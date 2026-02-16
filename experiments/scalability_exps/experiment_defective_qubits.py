@@ -102,7 +102,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("Depth Overhead")
+    ax.set_ylabel("Depth overhead")
     #ax.legend(loc='upper left')
     ax.set_ylim(0, 1250)
 
@@ -143,7 +143,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("2q Gate Overhead")
+    ax.set_ylabel("#2q gate overhead")
     #ax.legend(loc='upper left')
     ax.set_ylim(0, 5500)
 
@@ -240,7 +240,14 @@ def ci95_bootstrap(values, df_values, mode, ks):
     return means, [err_low, err_high]
 
 
-def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, filename: str = ""):
+def plot_combined_backends(custom_depth,
+                           custom_overhead,
+                           custom_utilization,
+                           sabre_depth,
+                           sabre_overhead,
+                           sabre_utilization,
+                           filename: str = ""):
+    
     # placement modes (outer keys)
     placement_modes = list(custom_depth[0].keys())  # ["default", "size_aware"]
 
@@ -253,7 +260,7 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     x = np.arange(len(df_values))  # [0,1,2]
 
     # Two bars per group
-    width = 0.35/2
+    width = 0.4/4#0.35/4#0.35/2
 
     title_left = ""
 
@@ -284,48 +291,78 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     plt.rcParams.update(tex_fonts)
 
 
-    labels = ["center", "size_aware"]  # ["default", "size_aware"]
-
+    labels = ["center", "size-aware"]
+    
     # ----------- Depth Overhead -------------
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
     for i, mode in enumerate(placement_modes):
-        print([(list(custom_depth[0][mode][df][ks].values())) for df in df_values])
         # Single patch
-        values_mean, values_err = ci95_bootstrap(custom_depth[0], df_values, mode, ks)
+        values_mean_custom, values_err_custom = ci95_bootstrap(custom_depth[0], df_values, mode, ks)
+        values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_depth[0], df_values, mode, ks)
 
+        # Custom
         ax.bar(
-            x + i * width - 1.5*width,
-            values_mean,
+            x + i * 2*width - 3.5*width,
+            values_mean_custom,
             width,
-            yerr=values_err,          
+            yerr=values_err_custom,          
             capsize=2,      
             error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i],
             color=colors[i],
-            hatch=hatches[i],
+            hatch=hatches[0],
             edgecolor='black'
         )
+        # SABRE
+        ax.bar(
+            x + i * 2*width - 2.5*width,
+            values_mean_sabre,
+            width,
+            yerr=values_err_sabre,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            label=labels[i],
+            color=colors[i],
+            hatch=hatches[1],
+            edgecolor='black'
+        )
+        
 
         # Multi patch
-        values_mean, values_err = ci95_bootstrap(custom_depth[1], df_values, mode, ks)
+        values_mean_custom, values_err_custom = ci95_bootstrap(custom_depth[1], df_values, mode, ks)
+        values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_depth[1], df_values, mode, ks)
+        # Custom
         ax.bar(
-            x + (2+i) * width - 1.5*width,
-            values_mean,
+            x + (2+i) * width*2 - 3.5*width,#1.5*width,
+            values_mean_custom,
             width,
-            yerr=values_err,          
+            yerr=values_err_custom,          
             capsize=2,      
             error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i] + "multi",
             color=colors[2+i],
-            hatch=hatches[i],
+            hatch=hatches[0],
+            edgecolor='black'
+        )
+        # SABRE
+        ax.bar(
+            x + (2+i) * width*2 - 2.5*width,
+            values_mean_sabre,
+            width,
+            yerr=values_err_sabre,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            label=labels[i] + "multi",
+            color=colors[2+i],
+            hatch=hatches[1],
             edgecolor='black'
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("Depth Overhead")
+    ax.set_ylabel("Depth overhead")
     #ax.legend(loc='upper left')
     #ax.set_ylim(0, 1250)
 
@@ -354,39 +391,72 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
 
     for i, mode in enumerate(placement_modes):
         # Single patch
-        values_mean, values_err = ci95_bootstrap(custom_overhead[0], df_values, mode, ks)
+        values_mean_custom, values_err_custom = ci95_bootstrap(custom_overhead[0], df_values, mode, ks)
+        values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_overhead[0], df_values, mode, ks)
+
+        # Custom
         ax.bar(
-            x + i * width - 1.5*width,
-            values_mean,
+            x + i * 2*width - 3.5*width,
+            values_mean_custom,
             width,
-            yerr=values_err,          
+            yerr=values_err_custom,          
             capsize=2,      
             error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i],
             color=colors[i],
-            hatch=hatches[i],
+            hatch=hatches[0],
             edgecolor='black'
         )
+        # SABRE
+        ax.bar(
+            x + i * 2*width - 2.5*width,
+            values_mean_sabre,
+            width,
+            yerr=values_err_sabre,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            label=labels[i],
+            color=colors[i],
+            hatch=hatches[1],
+            edgecolor='black'
+        )
+        
 
         # Multi patch
-        values_mean, values_err = ci95_bootstrap(custom_overhead[1], df_values, mode, ks)
+        values_mean_custom, values_err_custom = ci95_bootstrap(custom_overhead[1], df_values, mode, ks)
+        values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_overhead[1], df_values, mode, ks)
+        # Custom
         ax.bar(
-            x + (2+i) * width - 1.5*width,
-            values_mean,
+            x + (2+i) * width*2 - 3.5*width,#1.5*width,
+            values_mean_custom,
             width,
-            yerr=values_err,          
+            yerr=values_err_custom,          
             capsize=2,      
             error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
             label=labels[i] + "multi",
             color=colors[2+i],
-            hatch=hatches[i],
+            hatch=hatches[0],
             edgecolor='black'
         )
+        # SABRE
+        ax.bar(
+            x + (2+i) * width*2 - 2.5*width,
+            values_mean_sabre,
+            width,
+            yerr=values_err_sabre,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            label=labels[i] + "multi",
+            color=colors[2+i],
+            hatch=hatches[1],
+            edgecolor='black'
+        )
+
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("2q Gate Overhead")
+    ax.set_ylabel("#2q gate overhead")
     #ax.legend(loc='upper left')
     #ax.set_ylim(0, 5500)
 
@@ -417,36 +487,73 @@ def plot_combined_backends(custom_depth, custom_overhead, custom_utilization, fi
     handles = []
     for i, mode in enumerate(placement_modes):
         # Single patch
-        values_mean, values_err = ci95_bootstrap(custom_utilization[0], df_values, mode, ks)
+        values_mean_custom, values_err_custom = ci95_bootstrap(custom_utilization[0], df_values, mode, ks)
+        values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[0], df_values, mode, ks)
+
+        # Custom
         h = ax.bar(
-            x + i * width - 1.5*width,
-            values_mean,
+            x + i * 2*width - 3.5*width,
+            values_mean_custom,
             width,
-            yerr=values_err,          
+            yerr=values_err_custom,          
             capsize=2,      
             error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
-            label="single patch: " + labels[i],
+            label="Chipmunq Single patch: " + labels[i],
             color=colors[i],
-            hatch=hatches[i],
+            hatch=hatches[0],
+            edgecolor='black'
+        )
+        handles.append(h)
+        # SABRE
+        h = ax.bar(
+            x + i * 2*width - 2.5*width,
+            values_mean_sabre,
+            width,
+            yerr=values_err_sabre,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            label="LightSABRE Single patch: " + labels[i],
+            color=colors[i],
+            hatch=hatches[1],
+            edgecolor='black'
+        )
+        handles.append(h)
+        
+
+        # Multi patch
+        values_mean_custom, values_err_custom = ci95_bootstrap(custom_utilization[1], df_values, mode, ks)
+        values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[1], df_values, mode, ks)
+        # Custom
+        h = ax.bar(
+            x + (2+i) * width*2 - 3.5*width,#1.5*width,
+            values_mean_custom,
+            width,
+            yerr=values_err_custom,          
+            capsize=2,      
+            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            label="Chipmunq Multi patch: " + labels[i],
+            color=colors[2+i],
+            hatch=hatches[0],
             edgecolor='black'
         )
         handles.append(h)
 
-        # Multi patch
-        values_mean, values_err = ci95_bootstrap(custom_utilization[1], df_values, mode, ks)
+
+        # SABRE
         h = ax.bar(
-            x + (2+i) * width - 1.5*width,
-            values_mean,
+            x + (2+i) * width*2 - 2.5*width,
+            values_mean_sabre,
             width,
-            yerr=values_err,          
+            yerr=values_err_sabre,          
             capsize=2,      
             error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
-            label="multi patch: " + labels[i],
+            label="LightSABRE Multi patch: " + labels[i],
             color=colors[2+i],
-            hatch=hatches[i],
+            hatch=hatches[1],
             edgecolor='black'
         )
         handles.append(h)
+
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -529,6 +636,9 @@ def run_exp_defective():
     num_inter_chiplet_connections = 8
     ps_inter = 1e-4
 
+    # Compilation configuration
+    compilation = ["sabre", "custom"]
+
     # Placement location of patches on a 
     patch_placement = ["center", "size_aware"]
 
@@ -536,91 +646,96 @@ def run_exp_defective():
     # - Backend fits single patch 
     # - Backend fits multiple patches
     backend_config = ["single_patch", "multi_patch"]
-
+    
     """
-    for bc in backend_config:
+    for comp in compilation:
+        for bc in backend_config:
 
-        custom_depth = {}
-        custom_overhead = {}
+            custom_depth = {}
+            custom_overhead = {}
 
-        custom_depth = recursive_dict()
-        custom_overhead = recursive_dict()
-        custom_utilization = recursive_dict()
+            custom_depth = recursive_dict()
+            custom_overhead = recursive_dict()
+            custom_utilization = recursive_dict()
 
-        defective_qubits = [0, 1, 2, 3]
-        num_iterations = 10
-        num_dupl = 1
+            defective_qubits = [0, 1, 2, 3]
+            num_iterations = 10
+            num_dupl = 1
 
-        if bc == "single_patch":
-            nx, nm = 15, 8
-        elif bc == "multi_patch":
-            nx, nm = 23, 14
+            if bc == "single_patch":
+                nx, nm = 15, 8
+            elif bc == "multi_patch":
+                nx, nm = 23, 14
 
-        # Compile a circuit to the defect free backend during the first iteration
-        defect_free_compilation = True
+            # Compile a circuit to the defect free backend during the first iteration
+            defect_free_compilation = True
+            
+            # Iterate over placement methods
+            for pp in patch_placement:
+                # Iterate over code size
+                for ks in [2]:#[1, 2, 3, 4]
+                    # Generate circuit
+                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
+                                                                n1 = 1,
+                                                                n2 = 0)
+                    # Stim to qiskit
+                    stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                    
+                    # Iterate over number of defective qubits
+                    for df in defective_qubits:
+                        # Perform multiple iterations, since defective qubits are selected randomly
+                        for run in range(0, num_iterations):
+                            ic = 0
+                            while True:
+                                try:
+                                    backend = BackendChipletV2(size = (num_dupl*6, num_dupl*6, nx, nm),
+                                                        n_inter = num_inter_chiplet_connections,
+                                                        connectivity = "nn",
+                                                        topology = "rotated_grid",
+                                                        inter_chiplet_noise = ps_inter,
+                                                        inter_chiplet_amplification = 1,
+                                                        inter_chiplet_noise_type = "constant",
+                                                        num_defective_qubits=df,
+                                                        chiplet_seed = run + 42 + ic,
+                                                        sabre_defective = comp == "sabre"
+                                                    )
+
+                                    # Custom transpilation
+                                    if comp == "sabre":
+                                        # In order to tackle defects into account, it is necessary to 
+                                        defective_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+                                    else:
+                                        defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                                                      backend,
+                                                                                      pre_defined_partitions = partitions,
+                                                                                      patch_initialization = pp)
+                                    break                                
+                                except Exception as e:
+                                    ic += 1
+                                    print("Unable to place patches given location of defective qubits!")
+                                    print("Retrying...")
+                            
+
+                            def num_2q_gates(circuit):
+                                ops = circuit.count_ops()
+                                two_qubit_gate_names = ["cx", "cz", "swap"]
+                                return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+
+                            # Calculate qpu utilization
+                            custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(defective_circuit, backend)
+
+                            custom_depth[pp][df][ks][run] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
+                            custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
+
         
-        # Iterate over placement methods
-        for pp in patch_placement:
-            # Iterate over code size
-            for ks in [2]:#[1, 2, 3, 4]
-                # Generate circuit
-                circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                            n1 = 1,
-                                                            n2 = 0)
-                # Stim to qiskit
-                stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
-                
-                # Iterate over number of defective qubits
-                for df in defective_qubits:
-                    # Perform multiple iterations, since defective qubits are selected randomly
-                    for run in range(0, num_iterations):
-                        ic = 0
-                        while True:
-                            try:
-                                backend = BackendChipletV2(size = (num_dupl*6, num_dupl*6, nx, nm),
-                                                    n_inter = num_inter_chiplet_connections,
-                                                    connectivity = "nn",
-                                                    topology = "rotated_grid",
-                                                    inter_chiplet_noise = ps_inter,
-                                                    inter_chiplet_amplification = 1,
-                                                    inter_chiplet_noise_type = "constant",
-                                                    num_defective_qubits=df,
-                                                    chiplet_seed = run + 42 + ic
-                                                )
-
-                                # Custom transpilation
-                                defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                                                backend,
-                                                                                pre_defined_partitions = partitions,
-                                                                                patch_initialization = pp)
-                                break                                
-                            except Exception as e:
-                                ic += 1
-                                print("Unable to place patches given location of defective qubits!")
-                                print("Retrying...")
-                        
-
-                        def num_2q_gates(circuit):
-                            ops = circuit.count_ops()
-                            two_qubit_gate_names = ["cx", "cz", "swap"]
-                            return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
-                        # Calculate qpu utilization
-                        custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(defective_circuit, backend)
-
-                        custom_depth[pp][df][ks][run] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
-                        custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
-
-    
-        with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "wb") as f:
-            pickle.dump(custom_depth, f)
-        with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "wb") as f:
-            pickle.dump(custom_overhead, f)
-        with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "wb") as f:
-            pickle.dump(custom_utilization, f)
-
+            with open(f"experiments/evaluation/defective_qubits/{comp}_depth_{bc}.pkl", "wb") as f:
+                pickle.dump(custom_depth, f)
+            with open(f"experiments/evaluation/defective_qubits/{comp}_overhead_{bc}.pkl", "wb") as f:
+                pickle.dump(custom_overhead, f)
+            with open(f"experiments/evaluation/defective_qubits/{comp}_utilization_{bc}.pkl", "wb") as f:
+                pickle.dump(custom_utilization, f)
     """
-    
+
     """
         with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
             custom_depth = pickle.load(f)
@@ -641,7 +756,23 @@ def run_exp_defective():
     custom_depth_combined = []
     custom_overhead_combined = []
     custom_utilization_combined = []
-    for bc in backend_config:            
+    sabre_depth_combined = []
+    sabre_overhead_combined = []
+    sabre_utilization_combined = []
+    for bc in backend_config:       
+        # SABRE
+        with open(f"experiments/evaluation/defective_qubits/sabre_depth_{bc}.pkl", "rb") as f:
+            sabre_depth = pickle.load(f)
+        with open(f"experiments/evaluation/defective_qubits/sabre_overhead_{bc}.pkl", "rb") as f:
+            sabre_overhead = pickle.load(f)
+        with open(f"experiments/evaluation/defective_qubits/sabre_utilization_{bc}.pkl", "rb") as f:
+            sabre_utilization = pickle.load(f)
+
+        sabre_depth_combined.append(sabre_depth)
+        sabre_overhead_combined.append(sabre_overhead)
+        sabre_utilization_combined.append(sabre_utilization)
+
+        # Custom
         with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
             custom_depth = pickle.load(f)
         with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "rb") as f:
@@ -656,6 +787,9 @@ def run_exp_defective():
     plot_combined_backends(custom_depth_combined,
                             custom_overhead_combined,
                             custom_utilization_combined,
+                            sabre_depth_combined,
+                            sabre_overhead_combined,
+                            sabre_utilization_combined,
                             filename = f"experiments/evaluation/defective_qubits/combined_overhead")
 
             

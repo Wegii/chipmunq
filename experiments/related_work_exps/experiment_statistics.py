@@ -96,7 +96,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
 
     # Add annotation
     if type == "gate_overhead":
-        title = "b) Effect of distance on #2q-gate overhead"
+        title = "b) Effect of distance on #2q gate overhead"
         shift = -0.09
     else:
         title = "c) Effect of distance on #inter-chiplet gates"
@@ -120,7 +120,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
 
     plt.xlabel("Surface code distance", fontsize=16)
     if type == "gate_overhead":
-        description = "#2q-gate overhead"
+        description = "#2q gate overhead"
     else:
         description = "#inter-chiplet gates"
     plt.ylabel(description, fontsize=16)

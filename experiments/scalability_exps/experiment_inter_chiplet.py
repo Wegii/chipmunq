@@ -33,6 +33,11 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     low_over_vals = [low_overhead[np][ks] for np in np_values]
     high_over_vals = [high_overhead[np][ks] for np in np_values]
 
+    print(low_depth_vals)
+    print(high_depth_vals)
+    print(low_over_vals)
+    print(high_over_vals)
+
     x = np.arange(len(np_values))
     width = 0.35
 
@@ -48,7 +53,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
         # Line and marker styles
-        "lines.linewidth": 2,
+        "lines.linewidth": 1.5,
         "lines.markersize": 6,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
@@ -60,7 +65,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     # Pastel colors
     pastel_orange = 'lightcoral' #'#A7D9ED'
-    pastel_blue = '#A7D9ED'#'#F7C6A2'
+    pastel_blue = '#4682B4'#'#A7D9ED'#'#F7C6A2'
 
     # Create depth statistics
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
@@ -79,7 +84,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     ax.set_xticklabels(section_titles)
     ax.set_xlabel("Circuit size")
     ax.set_ylabel("Depth Overhead")
-    ax.legend()
+    #ax.legend()
 
     # Add annotation
 
@@ -105,22 +110,26 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     # Create 2q gate overhead
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
+    handles = []
 
-    ax.bar(x - width/2, low_over_vals, width,
+    h = ax.bar(x - width/2, low_over_vals, width,
            label = r"$p_{inter}$ = $1e^{-4}$",
            color = pastel_blue,
            hatch = '/', edgecolor = 'black')
+    handles.append(h)
 
-    ax.bar(x + width/2, high_over_vals, width,
+    h = ax.bar(x + width/2, high_over_vals, width,
            label = r"$p_{inter}$ = $1e^{-2}$",
            color = pastel_orange,
            hatch = 'o', edgecolor = 'black')
+    handles.append(h)
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
     ax.set_xlabel("Circuit size")
     ax.set_ylabel("#2q gate overhead ")
     #ax.legend()
+    ax.set_ylim(0, 6100)
 
     # Add annotation
     #ax.text(0.57, 1.04, "Lower is better ↓",
@@ -132,7 +141,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     #    ha='left')
     
     ax.text(
-        -0.03, 1.04, "b) Connectivity affecting #2q gates",
+        -0.05, 1.04, "a) Effect of cost-routing on #2q gates",
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -149,6 +158,15 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles = handles,
+                               loc = 'center',
+                               frameon = False,
+                               ncols = 6,
+                               columnspacing=1.5)
+    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    plt.close(legend_fig)
 
     
 
@@ -179,6 +197,7 @@ def run_exp_inter_chiplet():
                                                         n1 = np,
                                                         n2 = 0)
 
+
             backend_1e4 = BackendChipletV2(size = (np*2, np*2, 15, 8),
                             n_inter = ni,
                             connectivity = "nn",
@@ -203,6 +222,7 @@ def run_exp_inter_chiplet():
             stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 
             # Low error transpilation
+        
             low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
                                                           backend_1e4,
                                                           pre_defined_partitions=partitions,
@@ -215,11 +235,16 @@ def run_exp_inter_chiplet():
                                                           pre_defined_partitions=partitions,
                                                           routing_alpha = 1,##1e-4,
                                                           routing_beta = 1)
-
+            
             def num_2q_gates(circuit):
                 ops = circuit.count_ops()
                 two_qubit_gate_names = ["cx", "cz", "swap"]
                 return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+
+            # Estimated two-qubit gates: 17120
+            print(num_2q_gates(stim_code_circuit.qc))
+            # Estimated depth: 5261
+            print((stim_code_circuit.qc).depth())
 
             low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
             low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(stim_code_circuit.qc)
@@ -228,6 +253,7 @@ def run_exp_inter_chiplet():
             high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(stim_code_circuit.qc)
 
 
+    
     with open(f"experiments/evaluation/inter_chiplet/low_error_depth.pkl", "wb") as f:
         pickle.dump(low_error_depth, f)
     with open(f"experiments/evaluation/inter_chiplet/low_error_overhead.pkl", "wb") as f:
@@ -236,6 +262,7 @@ def run_exp_inter_chiplet():
         pickle.dump(high_error_depth, f)
     with open(f"experiments/evaluation/inter_chiplet/high_error_overhead.pkl", "wb") as f:
         pickle.dump(high_error_overhead, f)
+    
     """
 
     with open(f"experiments/evaluation/inter_chiplet/low_error_depth.pkl", "rb") as f:

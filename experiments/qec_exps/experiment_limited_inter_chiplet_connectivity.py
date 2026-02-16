@@ -61,7 +61,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
         # Line and marker styles
-        "lines.linewidth": 2,
+        "lines.linewidth": 1.5,
         "lines.markersize": 6,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
@@ -80,7 +80,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     handles.extend(h)
 
     colors_5 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
+    colors_7 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
+    #colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
 
     inter_markers = ['', 'x', 'o', 's','^']
     color_list = [colors_7, colors_5]
@@ -100,7 +101,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
                      marker = inter_markers[ni],
                      linestyle= "solid" if d == "5" else "solid",
                      color = color_list[i][ni],
-                     label = f'(d={d}, ' +  r'$n_{inter}$' + f' = {n})')
+                     label = f'd={d}, ' +  r'$n_{inter}$' + f' = {n}')
             handles.extend(h)
             
 
@@ -152,7 +153,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 6)
+                               ncols = 3,
+                               columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
 
@@ -182,7 +184,8 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     #print(physical_error_rates)
 
     colors_5 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
+    colors_7 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
+    # colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
 
     diff_1 = defaultdict(dict)
     diff_2 = defaultdict(dict)
@@ -209,7 +212,7 @@ def plot_difference(stats, filename, inter_chiplet_noise):
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
         # Line and marker styles
-        "lines.linewidth": 2,
+        "lines.linewidth": 1.5,
         "lines.markersize": 6,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
@@ -238,16 +241,16 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     
 
     ys_custom = [diff_1['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='', color=colors_7[0], label=r'(d=7, $n_{inter}$=1)')
+    plt.plot(physical_error_rates, ys_custom, marker='', color=colors_7[0], label=r'd=7, $n_{inter}$=1')
 
     ys_custom = [diff_2['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_7[1], label=r'(d=7, $n_{inter}$=2)')
+    plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_7[1], label=r'd=7, $n_{inter}$=2')
 
     ys_custom = [diff_4['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='o', color=colors_7[2], label=r'(d=7, $n_{inter}$=4)')
+    plt.plot(physical_error_rates, ys_custom, marker='o', color=colors_7[2], label=r'd=7, $n_{inter}$=4')
 
     ys_custom = [diff_6['7'][p] for p in physical_error_rates]
-    plt.plot(physical_error_rates, ys_custom, marker='s', color=colors_7[3], label=r'(d=7, $n_{inter}$=6)')
+    plt.plot(physical_error_rates, ys_custom, marker='s', color=colors_7[3], label=r'd=7, $n_{inter}$=6')
 
 
     if inter_chiplet_noise == 0.0001:

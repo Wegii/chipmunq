@@ -65,9 +65,17 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
         # SABRE
         y_sabre = [sabre_time_storage[np].get(ks, None) for np in np_values]
         h = plt.plot(x_val, y_sabre, marker=inter_markers[i], linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
+        # TODO: Calculate correct variance
+       #y_std = np.array([2, 2, 2, 2, 2])
+       # plt.fill_between(x_val, 
+       #          y_sabre - y_std, 
+       #          y_sabre + y_std, 
+       #          color="#E38E8A", 
+       #          alpha=0.3, 
+       #          edgecolor="none")
         handles.extend(h)
 
-    for i, ks in enumerate(ks_values):
+    #for i, ks in enumerate(ks_values):
         # Custom
         y_custom = [custom_time_storage[np].get(ks, None) for np in np_values]
         h = plt.plot(x_val, y_custom, marker=inter_markers[i], linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
@@ -116,7 +124,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 6,
+                               ncols = 3,
                                columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
@@ -161,8 +169,6 @@ def run_exp_scalability():
                 custom_time_storage[num_p] = {}
                 sabre_time_storage[num_p] = {}
 
-            # TODO: Calculate necessary backend given number of patches
-
             # Generate circuit
             print("Generating circuit")
             circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
@@ -170,19 +176,24 @@ def run_exp_scalability():
                                                         n2 = 0)
             
             # Calculate required number of chiplets given the number of patches that we want to place
-            backend_size_chiplets = 2*(num_p+1)
+            bx = num_p
+            by = num_p
+            #if num_p <= 4: bx, by = 4, 4
+            #if num_p == 6: bx, by = 6, 4
+            #if num_p == 8: bx, by = 8, 4
+            
+            bx, by = 2*(num_p+1), 2*(num_p+1)
+
             if ks == 1:
-                chiplet_size = (backend_size_chiplets, backend_size_chiplets, 11, 6)
+                chiplet_size = (bx, by, 11, 6)
                 nic = 5
             elif ks == 2:
-                chiplet_size = (backend_size_chiplets, backend_size_chiplets, 15, 8)
+                chiplet_size = (bx, by, 15, 8)
                 nic = 7
             elif ks == 3:
-                chiplet_size = (backend_size_chiplets, backend_size_chiplets, 19, 10)
+                chiplet_size = (bx, by, 19, 10)
                 nic = 9
-            elif ks == 4:
-                chiplet_size = (num_p, num_p, 23, 12)
-                nic = 11
+                
             print("Generating backend")
             backend = BackendChipletV2(size = chiplet_size,
                             n_inter = nic,
@@ -226,8 +237,8 @@ def run_exp_scalability():
 
     with open(f"experiments/evaluation/scalability/timing_sabre.pkl", "wb") as f:
         pickle.dump(sabre_time_storage, f)
-    
     """
+    
     # Load pre-computed results
     with open(f"experiments/evaluation/scalability/timing_custom.pkl", "rb") as f:
         custom_time_storage = pickle.load(f)
@@ -247,5 +258,83 @@ def run_exp_scalability():
                       sabre_time_storage,
                       "experiments/evaluation/scalability/cnot_scaling_speedup.pdf")
 
+
+# Backend configuration
+def run_single_run():
+    ps_inter = 1e-4
+
+    num_p = 8 #[1, 2, 4, 6, 8]#range(1, 8, 2)#10, 2) 
+    ks = 3
+
+    # ks=2, num_p=8,
+    # Original: 17.47
+    # No routing: 
+
+    print("Generating circuit")
+    circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
+                                                n1 = num_p,
+                                                n2 = 0)
+    
+    # Calculate required number of chiplets given the number of patches that we want to place
+    bx = num_p
+    by = num_p
+    if num_p <= 4: bx, by = 4, 4
+    if num_p == 6: bx, by = 6, 4
+    if num_p == 8: bx, by = 8, 4
+
+    bx, by = 2*(num_p+1), 2*(num_p+1)
+
+    if ks == 1:
+        chiplet_size = (bx, by, 11, 6)
+        nic = 5
+    elif ks == 2:
+        chiplet_size = (bx, by, 15, 8)
+        nic = 7
+    elif ks == 3:
+        chiplet_size = (bx, by, 19, 10)
+        nic = 9
+    print("Generating backend")
+    backend = BackendChipletV2(size = chiplet_size,
+                    n_inter = nic,
+                    connectivity = "nn",
+                    topology = "rotated_grid",
+                    inter_chiplet_noise = ps_inter,
+                    inter_chiplet_amplification = 1,
+                    inter_chiplet_noise_type = "constant",
+                    num_defective_qubits=0,
+                )
+
+    # Stim to qiskit
+    stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+
+    # Custom transpilation
+    print("Custom")
+    start_custom = time.time()
+    custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
+                                                backend,
+                                                pre_defined_partitions=partitions)
+    end_custom = time.time()
+    print("Custom done")
+
+    # Sabre transpilation
+    print("Sabre")
+    start_sabre = time.time()
+    #sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+    end_sabre = time.time()
+    print("SABRE done")
+
+
+    t_dur_custom = end_custom - start_custom
+    t_dur_sabre = end_sabre - start_sabre
+
+
+    print("Custom:")
+    print(t_dur_custom)
+    print("Sabre")
+    print(t_dur_sabre)
+
+
 if __name__ == "__main__":
     run_exp_scalability()
+
+    # run_single_run()
