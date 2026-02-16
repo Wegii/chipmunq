@@ -46,6 +46,7 @@ class BackendChipletV2(BackendV2):
                  inter_chiplet_rfactor : int = 10,
                  num_defective_qubits: int = 0,
                  chiplet_seed: int = 42,
+                 sabre_defective: bool = False,
                  ) -> None:
         """Instantiate new multi-chip backend.
 
@@ -108,16 +109,16 @@ class BackendChipletV2(BackendV2):
 
 
         # Construct target
-        # TODO: Better comment why!
         if self.chiplet_topology == "line":
+            # Construct 1d line
             self.num_qubits_total = self.c1* self.n * self.m
         else:
+            # Construct 2d grid
             self.num_qubits_total = self.c1*self.c2 * self.n * self.m
 
-        #
+        # Construct defect free and defective targets
         self._target = Target("Defect free chiplet backend", num_qubits=self.num_qubits_total)
         self._defective_target = Target("Defective chiplet backend", num_qubits=self.num_qubits_total)
-
 
         # Construct local chip and gates (single- and two-qubit gates)
         self.G, self._target, self._defective_target = self._generate_chiplet()
@@ -132,6 +133,27 @@ class BackendChipletV2(BackendV2):
         
         # Build coupling map for defective_target
         self.defective_coupling_map = self._defective_target.build_coupling_map()
+
+        if sabre_defective:
+            # Sabre can only work with one coupling map, thus we need to pass the defective_target to the normal target,
+            # as otherwise the defective qubits are not taken into account.
+            self._target = self._defective_target
+            interim_coupling_map = self.defective_coupling_map
+            
+            # Extract graph from coupling map
+            graph = interim_coupling_map.graph
+            # Keep nodes that have at least one incoming and outgoing edge. This is necessary in order for the layout
+            # phase to not assign qubits to defective qubits. In the defective qubit coupling map construction the 
+            # defective qubits are still present, but do not have any ingoing or outgoing gates. While this works fine
+            # for our implementation, SABRE still selected these qubits during the initial layout phase. If such a qubit
+            # is picked, it is not possible to proceed, since no connections are available.
+            valid_qubits = [i for i in range(interim_coupling_map.size())
+                            if (graph.in_degree(i) + graph.out_degree(i)) > 0]
+            # Reduce coupling map to valid qubits only
+            self._coupling_map = interim_coupling_map.reduce(valid_qubits)
+
+            # Note: this breaks the visualizations for gate map and circuit utilization!
+
 
     def _generate_chiplet(self) -> rx.PyGraph:
         """_summary_
