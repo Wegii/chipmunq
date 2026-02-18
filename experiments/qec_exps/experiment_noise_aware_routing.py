@@ -25,6 +25,18 @@ import matplotlib.patches as patches
 import matplotlib.tri as tri
 
 
+def ci95_bootstrap(values):
+
+    mean = np.mean(values)
+    # Create fake replications by sampling own data with replacement
+    boot_means = [np.mean(np.random.choice(values, size=len(values), replace=True)) 
+                for _ in range(5000)]
+    # Find the bounds where 95% of those means fall
+    low_perc = np.percentile(boot_means, 2.5)
+    high_perc = np.percentile(boot_means, 97.5)
+    
+    return mean, mean - low_perc, high_perc - mean
+
 def plot_evaluation(stats, filename, inter_chiplet_noise):
     error_rates = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     physical_error_rates = set()
@@ -36,6 +48,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         d = str(s.json_metadata['d'])
         
         error_rates[t][d][p].append(ler)
+
         physical_error_rates.add(p)
         d_values.add(d)
 
@@ -78,16 +91,22 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     inter_markers = ['x', 'o', 's']
     #plot_label = ["Basic, Low Variance", "Basic, High Variance", "Cost, Low Variance", "Cost, High Variance", "Tradeoff, High Variance", "Tradeoff, High Variance"]
     #for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
-    plot_label = ["Basic, Low Variance",  "Basic, High Variance", "Focus, Low Variance", "Focus, High Variance",  "Tradeoff, Low Variance", "Tradeoff, High Variance"]
+    plot_label = ["Basic, Low Variance",  "Basic, High Variance", "Tradeoff, Low Variance", "Tradeoff, High Variance", "Focus, Low Variance", "Focus, High Variance"]
     
-    for ti, t in enumerate(["basic10", "basic100", "cost_inter10", "cost_inter100", "cost_tradeoff10", "cost_tradeoff100"]):
+    for ti, t in enumerate(["basic10", "basic100", "cost_tradeoff10", "cost_tradeoff100", "cost_inter10", "cost_inter100"]):
         for i, d in enumerate(d_values):
             errors = defaultdict(dict)
 
             for p in physical_error_rates:
-                errors[p] = error_rates[t][d][p][0]
+                # Create average over samples
+                errors[p] = error_rates[t][d][p]
                 
-            ys_custom = [errors[p] for p in physical_error_rates]
+            # Calculate mean and error values
+            ys_custom_mean, values_low, values_high = zip(*[ci95_bootstrap(errors[p]) for p in physical_error_rates])
+            # Convert from tuple to arrays
+            ys_custom_mean = np.array(list(ys_custom_mean))
+            values_low = np.array(list(values_low))
+            values_high = np.array(list(values_high))
 
             line_color = ("#2A5687" if (t in ["basic10", "cost_inter10", "cost_tradeoff10"])
                           else "#7F2E2A")
@@ -99,16 +118,25 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
                 marker = "o"
             else:
                 marker = ""
+            # Plot average values
             h = plt.plot(physical_error_rates,
-                        ys_custom,
-                        #linewidth = 1.5,
+                        ys_custom_mean,
+                        linewidth = 1,
                         marker = marker,
                         #markersize = 4,
                         #markerfacecolor="none",
-                        linestyle= line_style,
+                        linestyle = line_style,
                         color = line_color,
                         label = plot_label[ti])
             handles.append(h[0])
+            # Plot shaded area around the average value
+            plt.fill_between(physical_error_rates,
+                             ys_custom_mean - values_low, 
+                             ys_custom_mean + values_high, 
+                             color=line_color, 
+                             alpha=0.2,
+                             edgecolor="none")
+            
             
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
@@ -119,7 +147,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     description = (r"$p_{inter}$ = " + f"{ps_inter_text}, d = 5")
 
     ax.text(
-        .05, 1.02, "b) Effect of cost_routing on LER",
+        .05, 1.02, "b) Effect of cost-routing on LER",
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -141,7 +169,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     plt.xlabel("Physical error rate")
     plt.ylabel("Logical error rate")
     #plt.legend(loc="lower right", ncol=1)
-    #plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.grid(True, which='both', linestyle='--', alpha=0.3)
     #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     plt.savefig(filename, format="pdf")
@@ -183,11 +211,11 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
 
     for d in d_values:
         for p in physical_error_rates:
-            diff_low_cost[d][p] = error_rates['basic10'][d][p][0]/ error_rates['cost_inter10'][d][p][0]# - error_rates['basic10'][d][p][0]
-            diff_low_cost_tradeoff[d][p] = error_rates['basic10'][d][p][0]/error_rates['cost_tradeoff10'][d][p][0]#  - error_rates['basic10'][d][p][0]
+            diff_low_cost[d][p] = np.array(error_rates['basic10'][d][p])/np.array(error_rates['cost_inter10'][d][p])# - error_rates['basic10'][d][p][0]
+            diff_low_cost_tradeoff[d][p] = np.array(error_rates['basic10'][d][p])/np.array(error_rates['cost_tradeoff10'][d][p])#  - error_rates['basic10'][d][p][0]
 
-            diff_high_cost[d][p] = error_rates['basic100'][d][p][0]/error_rates['cost_inter100'][d][p][0]# - error_rates['basic100'][d][p][0]
-            diff_high_cost_tradeoff[d][p] = error_rates['basic100'][d][p][0]/error_rates['cost_tradeoff100'][d][p][0]# - error_rates['basic100'][d][p][0]
+            diff_high_cost[d][p] = np.array(error_rates['basic100'][d][p])/np.array(error_rates['cost_inter100'][d][p])# - error_rates['basic100'][d][p][0]
+            diff_high_cost_tradeoff[d][p] = np.array(error_rates['basic100'][d][p])/np.array(error_rates['cost_tradeoff100'][d][p])# - error_rates['basic100'][d][p][0]
 
 
     tex_fonts = {
@@ -209,29 +237,53 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
         # Error bar cap size
         "errorbar.capsize": 3,
     }
-
+    alpha_fill = 0.15
     plt.rcParams.update(tex_fonts)
-
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6*1.5, WIDTH_FIGSIZE/1.5))
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
 
-    #ax.axhline(0.0, color='black', linestyle='--', linewidth=2, alpha=0.3)
+    ax.axhline(1, color='black', linestyle='--', linewidth=1.5, alpha=0.5)
 
-    ps_rates = sorted(diff_low_cost[5].keys())
-    ys_custom = [diff_low_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', color='#2A5687', linestyle='--', label=f'Focus, Low Variance')
+    for d in d_values:
+        ps_rates = sorted(diff_low_cost[d].keys())
+        ys_custom_mean, values_low, values_high = map(np.array, zip(*[ci95_bootstrap(diff_low_cost[d][p]) for p in ps_rates]))
+    
+        plt.plot(ps_rates, ys_custom_mean, marker='x', color='#2A5687', linestyle='--', label=f'Focus, Low Variance')
+        plt.fill_between(ps_rates,
+                         ys_custom_mean - values_low, 
+                         ys_custom_mean + values_high, 
+                         color='#2A5687', 
+                         alpha=alpha_fill,
+                         edgecolor="none")
 
-    ps_rates = sorted(diff_low_cost_tradeoff[5].keys())
-    ys_custom = [diff_low_cost_tradeoff[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='o', color='#2A5687', linestyle='--', label=f'Tradeoff, Low Variance')
+        ps_rates = sorted(diff_low_cost_tradeoff[d].keys())
+        ys_custom_mean, values_low, values_high = map(np.array, zip(*[ci95_bootstrap(diff_low_cost_tradeoff[d][p]) for p in ps_rates]))
+        plt.plot(ps_rates, ys_custom_mean, marker='o', color='#2A5687', linestyle='--', label=f'Tradeoff, Low Variance')
+        plt.fill_between(ps_rates,
+                         ys_custom_mean - values_low, 
+                         ys_custom_mean + values_high, 
+                         color='#2A5687', 
+                         alpha=alpha_fill,
+                         edgecolor="none")
 
-    ps_rates = sorted(diff_high_cost[5].keys())
-    ys_custom = [diff_high_cost[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='x', color="#7F2E2A", linestyle='--', label=f'Focus, High Variance')
+        ps_rates = sorted(diff_high_cost[d].keys())
+        ys_custom_mean, values_low, values_high = map(np.array, zip(*[ci95_bootstrap(diff_high_cost[d][p]) for p in ps_rates]))
+        plt.plot(ps_rates, ys_custom_mean, marker='x', color="#7F2E2A", linestyle='--', label=f'Focus, High Variance')
+        plt.fill_between(ps_rates,
+                         ys_custom_mean - values_low, 
+                         ys_custom_mean + values_high, 
+                         color="#7F2E2A", 
+                         alpha=alpha_fill,
+                         edgecolor="none")
 
-    ps_rates = sorted(diff_high_cost_tradeoff[5].keys())
-    ys_custom = [diff_high_cost_tradeoff[5][p] for p in physical_error_rates]
-    plt.plot(ps_rates, ys_custom, marker='o', color='#7F2E2A', linestyle='--', label=f'Tradeoff, High Variance')
+        ps_rates = sorted(diff_high_cost_tradeoff[d].keys())
+        ys_custom_mean, values_low, values_high = map(np.array, zip(*[ci95_bootstrap(diff_high_cost_tradeoff[d][p]) for p in ps_rates]))
+        plt.plot(ps_rates, ys_custom_mean, marker='o', color='#7F2E2A', linestyle='--', label=f'Tradeoff, High Variance')
+        plt.fill_between(ps_rates,
+                         ys_custom_mean - values_low, 
+                         ys_custom_mean + values_high, 
+                         color="#7F2E2A", 
+                         alpha=alpha_fill,
+                         edgecolor="none")
 
     description = (r"$p_{inter}$ = " +
                    f"{inter_chiplet_noise}, " +
@@ -247,7 +299,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     #)
 
     ax.text(
-        -.1, 1.02, "c) Relative effect of cost_routing on LER",
+        -.1, 1.02, "c) Relative effect of cost-routing on LER",
         transform=ax.transAxes,
         fontweight="bold"
     )
@@ -262,9 +314,10 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     
     #plt.ylim(-10e-1, 0.5)
     #plt.xlim(1e-4, 1e-2)
-    plt.ylim(0, 11)
+    plt.ylim(0.01, 190)
+    plt.xlim(1e-4, 1e-2)
     plt.xscale('log')
-    #plt.yscale('log')
+    plt.yscale('log')
     #plt.yscale('symlog', linthresh=1e-3)  # linear within ±0.001
 
     plt.xlabel("Physical error rate")
@@ -273,7 +326,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta):
     plt.ylabel(r"$LER_{Cost}/LER_{Basic}$")
 
     #plt.legend(loc="lower right", ncol=2)
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.grid(True, which='both', linestyle='--', alpha=0.3)
     #fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
     fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     
@@ -479,7 +532,7 @@ def plot_hyperparameter_search(folder_path: str, filename: str):
     plt.close(fig)
 
 
-def perform_noise_aware_routing():
+def perform_noise_aware_routing_sweep():
     # Noise strength:
     #   - Low noise: 1e-4
     #   - Medium noise: 1e-3
@@ -629,18 +682,169 @@ def perform_noise_aware_routing():
             pickle.dump(stats, f)
         
 
+def perform_noise_aware_routing():
+    # Noise strength:
+    #   - Low noise: 1e-4
+    #   - Medium noise: 1e-3
+    # Setup:
+    #   - Distributed CNOT
+    #   - Distance: 5
+    #   - Full connectivity
+
+    # Minimize depth
+    # TODO: alpha = beta = 0
+
+    # Cost routing completely focusing on taking the best inter-chiplet connection
+    # TODO: alpha should be quite high
+
+    # Tradeoff between inter-chiplet noise and depth
+    # TODO: figure out what is a good value for alpha and beta
+
+    routing_alpha = [0.5, 1, 2, 3]
+
+    # Noise level
+    ps = list(np.logspace(-4, -1, 10))
+
+    # Inter-chiplet noise level
+    inter_chiplet_noise = [1e-3] #[1e-4, 1e-3, 1e-2]
+
+    # Distance 7
+    k = 3
+
+    # Routing types
+    rts = ["basic", "cost_inter", "cost_tradeoff"]
+
+    # Iterations
+    n_iter = 10
+    
+    # Inter chiplet noise variance
+    #   - Low variance: [1, 10]*inter_connect_noise
+    #   - High variance: [1, 100]*inter_connect_noise
+    ic_noise_model = [10, 100]#[10, 100]#[5, 10]#[5, 10]
+
+    circuit, partitions = get_tqec_cnot_rotated(distance_scale = k,
+                                        n1 = 1,
+                                        n2 = 0)
+
+    for ra in routing_alpha:
+        for ps_inter in inter_chiplet_noise:
+
+            transpiled_circuits = {}
+            
+            def get_circuit(routing_type: str, inter_noise_factor: int, distance_scale: int, seed: int) -> StimCircuit:
+
+                if (routing_type, inter_noise_factor, seed) in transpiled_circuits:
+                    # Circuit does not need to be transpiled again
+                    print("Found")
+                    return transpiled_circuits[(routing_type, inter_noise_factor, seed)]
+                else:
+                    n_icc, backend = get_backend(inter_noise_factor = inter_noise_factor,
+                                                 d = distance_scale,
+                                                 seed = seed)
+                    
+                    # Transpile circuit to backend
+                    if routing_type == "cost_inter":
+                        routing_type_u = "cost"
+                        routing_alpha = 3*ra*1/ps_inter #3*ps_inter
+                        routing_beta = 1
+                    elif routing_type == "cost_tradeoff":
+                        routing_type_u = "cost"
+                        routing_alpha = ra*1/ps_inter #1*ps_inter
+                        routing_beta = 1
+                    else:
+                        routing_type_u = "cost"
+                        routing_alpha = 0
+                        routing_beta = 0
+
+                    _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
+                                                                    backend,
+                                                                    pre_defined_partitions = partitions,
+                                                                    routing_type = routing_type_u,
+                                                                    routing_alpha = routing_alpha,
+                                                                    routing_beta = routing_beta)
+                    # Convert circuit to stim
+                    custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
+                    # Add circuit to dictionary, in order to not transpile this circuit configuration again
+                    transpiled_circuits[(routing_type, inter_noise_factor, seed)] = custom_circuit_stim
+                    #transpiled_circuits[(routing_type)] = custom_circuit_stim
+
+                    return custom_circuit_stim
+
+            def get_backend(inter_noise_factor: int, d: int, seed: int) -> BackendChipletV2:
+                
+                # Depending on the distance, each chiplet needs to be scaled
+                if d == 1:
+                    chiplet_size = (2, 2, 11, 6)
+                    nic = 5
+                elif d == 2:
+                    chiplet_size = (2, 2, 15, 8)
+                    nic = 7
+                elif d == 3:
+                    chiplet_size = (2, 2, 19, 10)
+                    nic = 9
+                elif d == 4:
+                    chiplet_size = (2, 2, 23, 12)
+                    nic = 11
+
+                backend = BackendChipletV2(size = chiplet_size,
+                                            n_inter = nic,
+                                            connectivity = "nn",
+                                            topology = "rotated_grid",
+                                            inter_chiplet_noise = ps_inter,
+                                            inter_chiplet_amplification = 1,
+                                            inter_chiplet_rfactor = inter_noise_factor,
+                                            inter_chiplet_noise_type = "random",
+                                            num_defective_qubits = 0,
+                                            rng_seed = seed
+                                            )
+
+                return nic, backend
+
+            def _get_sinter_task():
+                # Construct sinter task for multiple code distances and noise levels
+                yield from (
+                    sinter.Task(
+                        circuit=circuit,
+                        # TODO: the naming is incorrect
+                        json_metadata={"d": 2 * k + 1, "p": p, "run_name": rt + str(icnm), "iter": iter_seed},
+                    )
+                    for circuit, k, p, rt, icnm, iter_seed in (
+                        (get_noise_model("modsi1000",
+                                        None,
+                                        p,
+                                        None, 
+                                        remote = (get_backend(inter_noise_factor = icnm,
+                                                            d = k, seed=iter_seed)[1].inter_chiplet_connections)
+                                        ).noisy_circuit(
+                                            get_circuit(routing_type = rt,
+                                                        inter_noise_factor = icnm,
+                                                        distance_scale = k,
+                                                        seed = iter_seed)
+                                            ), k, p, rt, icnm, iter_seed)
+
+                        for p in ps
+                        for icnm in ic_noise_model
+                        for rt in rts
+                        for iter_seed in range(0, n_iter)
+                    )
+                )
+            
+            stats = run_sinter_simulation(_get_sinter_task, [k], ps)
+
+            with open(f"experiments/evaluation/qec_routing/routing_{ra}_{ps_inter}_sweep.pkl", "wb") as f:
+                pickle.dump(stats, f)
+
 if __name__ == "__main__":
-    # perform_noise_aware_routing()
-
-    # TODO: implement this
-    #using https://datavizproject.com/data-type/hexagonal-binning/
-
+    # Complete routing sweep over hyperparameters
+    # perform_noise_aware_routing_sweep()
     #plot_hyperparameter_search('experiments/evaluation/qec_routing/sweep/',
     #                           "experiments/evaluation/qec_routing/routing_sweep.pdf")
     
-    
+    # Routing for specific configurations
+    #perform_noise_aware_routing()
+
     for ra in [0.5, 1, 2, 3]:
-        for ps in [0.0001, 0.001, 0.01]:
+        for ps in [0.001]: #[0.0001, 0.001, 0.01]:
 
             if ps == 0.0001:
                 ps_inter_text = r"$1e^{-4}$"

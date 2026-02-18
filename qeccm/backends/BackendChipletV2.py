@@ -45,7 +45,7 @@ class BackendChipletV2(BackendV2):
                  inter_chiplet_noise_type: str = "",
                  inter_chiplet_rfactor : int = 10,
                  num_defective_qubits: int = 0,
-                 chiplet_seed: int = 42,
+                 rng_seed: int = 42,
                  sabre_defective: bool = False,
                  ) -> None:
         """Instantiate new multi-chip backend.
@@ -97,7 +97,9 @@ class BackendChipletV2(BackendV2):
         # Store index of all defective qubits
         self.all_defective_qubits = []
         # The coupling map without the defective qubits will be stored in the _target and then coupling_map
-        self.defective_rng = np.random.default_rng(seed=chiplet_seed)
+
+        # Initialize number generations
+        self.rng_generator = np.random.default_rng(seed = rng_seed)
 
 
         # Dictionary mapping chiplet index to list of nodes on chiplet 
@@ -255,7 +257,7 @@ class BackendChipletV2(BackendV2):
         # Single-qubit gates
         # Generate instruction properties for single qubit gates and a measurement, delay,
         #  and reset operation to every qubit in the backend.
-        rng = np.random.default_rng(seed=12345678942)
+        rng = self.rng_generator #np.random.default_rng(seed=12345678942)
         rz_props = {}
         x_props = {}
         sx_props = {}
@@ -309,7 +311,7 @@ class BackendChipletV2(BackendV2):
                 # Define which qubits should be defective
                 num_qubits_on_chip = self.n * self.m
 
-                defective_q = self.defective_rng.choice(num_qubits_on_chip,
+                defective_q = self.rng_generator.choice(num_qubits_on_chip,
                                                         size = self.num_defective_qubits_per_chiplet,
                                                         replace = False).tolist()
 
@@ -364,7 +366,7 @@ class BackendChipletV2(BackendV2):
         :param g: _description_
         :type g: _type_
         """
-        rng = np.random.default_rng(seed=12345678942)
+        rng = self.rng_generator # np.random.default_rng(seed=12345678942)
 
         # Add inter-chip two-qubit gates (CX)
         cx_props = {}

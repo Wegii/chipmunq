@@ -13,6 +13,7 @@ import time
 # Custom utils
 from experiments.exp_utils.transpilation_utils import *
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
+from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,25 +22,32 @@ from experiments.utils import *
 
 
 def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: str = ""):
-    ks = list(next(iter(low_depth.values())).keys())[0]
-    np_values = low_depth.keys()#sorted(low_depth.keys())
+    ks = list(next(iter(low_depth[0].values())).keys())[0]
+    np_values = [8, 4, 1]#low_depth.keys()#sorted(low_depth.keys())
 
     section_titles = ["Full", "Half", "Limited"]
 
     # Extract values
-    low_depth_vals = [low_depth[np][ks] for np in np_values]
-    high_depth_vals = [high_depth[np][ks] for np in np_values]
+    low_depth_vals = [low_depth[0][np][ks] for np in np_values]
+    high_depth_vals = [high_depth[0][np][ks] for np in np_values]
+    low_over_vals = [low_overhead[0][np][ks] for np in np_values]
+    high_over_vals = [high_overhead[0][np][ks] for np in np_values]
 
-    low_over_vals = [low_overhead[np][ks] for np in np_values]
-    high_over_vals = [high_overhead[np][ks] for np in np_values]
+    low_depth_vals_tradeoff = [low_depth[1][np][ks] for np in np_values]
+    high_depth_vals_tradeoff = [high_depth[1][np][ks] for np in np_values]
+    low_over_vals_tradeoff = [low_overhead[1][np][ks] for np in np_values]
+    high_over_vals_tradeoff = [high_overhead[1][np][ks] for np in np_values]
 
-    print(low_depth_vals)
-    print(high_depth_vals)
-    print(low_over_vals)
-    print(high_over_vals)
+    low_depth_vals_focus = [low_depth[2][np][ks] for np in np_values]
+    high_depth_vals_focus = [high_depth[2][np][ks] for np in np_values]
+    low_over_vals_focus = [low_overhead[2][np][ks] for np in np_values]
+    high_over_vals_focus = [high_overhead[2][np][ks] for np in np_values]
 
     x = np.arange(len(np_values))
-    width = 0.35
+    width = 0.35/3
+
+    colors = [ '#A7D9ED', '#F7C6A2', "#4682B4", "#F08080"]
+    hatches = ['o', 'xx',]
 
     tex_fonts = {
         # Use LaTeX to write all text
@@ -52,6 +60,8 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
         "xtick.labelsize": (FONTSIZE - 1)*1.5,
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
+        # Hatches
+        "hatch.linewidth": 0.5,
         # Line and marker styles
         "lines.linewidth": 1.5,
         "lines.markersize": 6,
@@ -64,21 +74,50 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     plt.rcParams.update(tex_fonts)
 
     # Pastel colors
-    pastel_orange = 'lightcoral' #'#A7D9ED'
-    pastel_blue = '#4682B4'#'#A7D9ED'#'#F7C6A2'
+    pastel_blue = '#A7D9ED'
+    pastel_blue_dark = '#4682B4'
+    pastel_orange = '#F7C6A2'
+    pastel_orange_dark = '#F08080'
+    pastel_red = "#F7A2A2"
+    pastel_red_dark = "#FF5C5C"
 
     # Create depth statistics
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     
-    ax.bar(x - width/2, low_depth_vals, width,
-           label = r"$p_{inter}$ = $1e^{-4}$",
+    handles = []
+    # Basic
+    h = ax.bar(x - 2.5*width, low_depth_vals, width,
+           label = r"Basic, $p_{inter}$ = $1e^{-4}$",
            color = pastel_blue,
-           hatch = '/', edgecolor = 'black')
-
-    ax.bar(x + width/2, high_depth_vals, width,
-           label = r"$p_{inter}$ = $1e^{-2}$",
+           hatch = hatches[0], edgecolor = 'black')
+    handles.append(h)
+    h = ax.bar(x + .5*width, high_depth_vals, width,
+           label = r"Basic, $p_{inter}$ = $1e^{-2}$",
+           color = pastel_blue,
+           hatch = hatches[1], edgecolor = 'black')
+    handles.append(h)
+    # Tradeoff
+    h = ax.bar(x - 1.5*width, low_depth_vals_tradeoff, width,
+           label = r"Tradeoff, $p_{inter}$ = $1e^{-4}$",
            color = pastel_orange,
-           hatch = 'o', edgecolor = 'black')
+           hatch = hatches[0], edgecolor = 'black')
+    handles.append(h)
+    h = ax.bar(x + 1.5*width, high_depth_vals_tradeoff, width,
+           label = r"Tradeoff, $p_{inter}$ = $1e^{-2}$",
+           color = pastel_orange,
+           hatch = hatches[1], edgecolor = 'black')
+    handles.append(h)
+    # Focus
+    h = ax.bar(x - .5*width, low_depth_vals_focus, width,
+           label = r"Focus, $p_{inter}$ = $1e^{-4}$",
+           color = pastel_red,
+           hatch = hatches[0], edgecolor = 'black')
+    handles.append(h)
+    h = ax.bar(x + 2.5*width, high_depth_vals_focus, width,
+           label = r"Focus, $p_{inter}$ = $1e^{-2}$",
+           color = pastel_red,
+           hatch = hatches[1], edgecolor = 'black')
+    handles.append(h)
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
@@ -112,16 +151,38 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     handles = []
 
-    h = ax.bar(x - width/2, low_over_vals, width,
-           label = r"$p_{inter}$ = $1e^{-4}$",
+    # Basic
+    h = ax.bar(x - 2.5*width, low_over_vals, width,
+           label = r"Basic, $p_{inter}$ = $1e^{-4}$",
            color = pastel_blue,
-           hatch = '/', edgecolor = 'black')
+           hatch = hatches[0], edgecolor = 'black')
     handles.append(h)
-
-    h = ax.bar(x + width/2, high_over_vals, width,
-           label = r"$p_{inter}$ = $1e^{-2}$",
+    h = ax.bar(x + .5*width, high_over_vals, width,
+           label = r"Basic, $p_{inter}$ = $1e^{-2}$",
+           color = pastel_blue,
+           hatch = hatches[1], edgecolor = 'black')
+    handles.append(h)
+    # Tradeoff
+    h = ax.bar(x - 1.5*width, low_over_vals_tradeoff, width,
+           label = r"Tradeoff, $p_{inter}$ = $1e^{-4}$",
            color = pastel_orange,
-           hatch = 'o', edgecolor = 'black')
+           hatch = hatches[0], edgecolor = 'black')
+    handles.append(h)
+    h = ax.bar(x + 1.5*width, high_over_vals_tradeoff, width,
+           label = r"Tradeoff, $p_{inter}$ = $1e^{-2}$",
+           color = pastel_orange,
+           hatch = hatches[1], edgecolor = 'black')
+    handles.append(h)
+    # Focus
+    h = ax.bar(x - .5*width, low_over_vals_focus, width,
+           label = r"Focus, $p_{inter}$ = $1e^{-4}$",
+           color = pastel_red,
+           hatch = hatches[0], edgecolor = 'black')
+    handles.append(h)
+    h = ax.bar(x + 2.5*width, high_over_vals_focus, width,
+           label = r"Focus, $p_{inter}$ = $1e^{-2}$",
+           color = pastel_red,
+           hatch = hatches[1], edgecolor = 'black')
     handles.append(h)
 
     ax.set_xticks(x)
@@ -129,7 +190,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     ax.set_xlabel("Circuit size")
     ax.set_ylabel("#2q gate overhead ")
     #ax.legend()
-    ax.set_ylim(0, 6100)
+    #ax.set_ylim(0, 6100)
 
     # Add annotation
     #ax.text(0.57, 1.04, "Lower is better ↓",
@@ -163,7 +224,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     legend = legend_fig.legend(handles = handles,
                                loc = 'center',
                                frameon = False,
-                               ncols = 6,
+                               ncols = 3,
                                columnspacing=1.5)
     legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
     plt.close(legend_fig)
@@ -177,110 +238,160 @@ def run_exp_inter_chiplet():
     high_error_depth = {}
     high_error_overhead = {}
 
-    np = 4
+    # Number of circuits
+    np = 1
+    # Number of interconnects
     num_inter_chiplet_connections = [8, 4, 1]
+    # Number of iterations
+    n_iter = 1
 
-    """
-    for ks in [2]:#[1, 2, 3, 4]
-        for ni in num_inter_chiplet_connections:
-
-            if ni not in low_error_depth:
-                low_error_depth[ni] = {}
-                low_error_overhead[ni] = {}
-                high_error_depth[ni] = {}
-                high_error_overhead[ni] = {}
-
-            # TODO: Calculate necessary backend given number of patches
-
-            # Generate circuit
-            circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                        n1 = np,
-                                                        n2 = 0)
-
-
-            backend_1e4 = BackendChipletV2(size = (np*2, np*2, 15, 8),
-                            n_inter = ni,
-                            connectivity = "nn",
-                            topology = "rotated_grid",
-                            inter_chiplet_noise = 1e-4,
-                            inter_chiplet_amplification = 1,
-                            inter_chiplet_noise_type = "random",
-                            num_defective_qubits = 0,
-                        )
-            
-            backend_1e2 = BackendChipletV2(size = (np*2, np*2, 15, 8),
-                            n_inter = ni,
-                            connectivity = "nn",
-                            topology = "rotated_grid",
-                            inter_chiplet_noise = 1e-2,
-                            inter_chiplet_amplification = 1,
-                            inter_chiplet_noise_type = "random",
-                            num_defective_qubits = 0,
-                        )
-
-            # Stim to qiskit
-            stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
-
-            # Low error transpilation
-        
-            low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                          backend_1e4,
-                                                          pre_defined_partitions=partitions,
-                                                          routing_alpha = 0,##1e-4,
-                                                          routing_beta = 0)
-
-            # High error transpilation
-            high_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                          backend_1e2,
-                                                          pre_defined_partitions=partitions,
-                                                          routing_alpha = 1,##1e-4,
-                                                          routing_beta = 1)
-            
-            def num_2q_gates(circuit):
-                ops = circuit.count_ops()
-                two_qubit_gate_names = ["cx", "cz", "swap"]
-                return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
-            # Estimated two-qubit gates: 17120
-            print(num_2q_gates(stim_code_circuit.qc))
-            # Estimated depth: 5261
-            print((stim_code_circuit.qc).depth())
-
-            low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
-            low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(stim_code_circuit.qc)
-
-            high_error_depth[ni][ks] = high_error_circuit.depth() - (stim_code_circuit.qc).depth()
-            high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(stim_code_circuit.qc)
-
-
+    # Cost routing configurations
+    # Focus
+    config_focus = [3, 1]
+    # Tradeoff
+    config_tradeoff = [1, 1]
+    # Basic
+    config_basic = [0, 0]
     
-    with open(f"experiments/evaluation/inter_chiplet/low_error_depth.pkl", "wb") as f:
-        pickle.dump(low_error_depth, f)
-    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead.pkl", "wb") as f:
-        pickle.dump(low_error_overhead, f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_depth.pkl", "wb") as f:
-        pickle.dump(high_error_depth, f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead.pkl", "wb") as f:
-        pickle.dump(high_error_overhead, f)
-    
-    """
+    for config in ["basic", "tradeoff", "focus"]:
+        for ks in [3]:#[1, 2, 3, 4]
+            for ni in num_inter_chiplet_connections:
+                for iter_c in range(0, n_iter):
 
-    with open(f"experiments/evaluation/inter_chiplet/low_error_depth.pkl", "rb") as f:
-        low_error_depth = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead.pkl", "rb") as f:
-        low_error_overhead = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_depth.pkl", "rb") as f:
-        high_error_depth = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead.pkl", "rb") as f:
-        high_error_overhead = pickle.load(f)
+                    if ni not in low_error_depth:
+                        low_error_depth[ni] = {}
+                        low_error_overhead[ni] = {}
+                        high_error_depth[ni] = {}
+                        high_error_overhead[ni] = {}
 
+                    if ks not in low_error_depth[ni]:
+                        low_error_depth[ni][ks] = 0
+                        low_error_overhead[ni][ks] = 0
+                        high_error_depth[ni][ks] = 0
+                        high_error_overhead[ni][ks] = 0
 
-    plot_combined(low_error_depth,
-                  low_error_overhead,
-                  high_error_depth,
-                  high_error_overhead,
-                  "experiments/evaluation/inter_chiplet/cnot_inter_chiplet_overhead")
+                    # Generate circuit
+                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
+                                                                n1 = np,
+                                                                n2 = 0)
+
+                    backend_1e4 = BackendChipletV2(size = (np*2, np*2, 19, 10),
+                                    n_inter = ni,
+                                    connectivity = "nn",
+                                    topology = "rotated_grid",
+                                    inter_chiplet_noise = 1e-4,
+                                    inter_chiplet_amplification = 1,
+                                    inter_chiplet_noise_type = "random",
+                                    num_defective_qubits = 0,
+                                    rng_seed = iter_c
+                                )
+                    
+                    backend_1e2 = BackendChipletV2(size = (np*2, np*2, 19, 10),
+                                    n_inter = ni,
+                                    connectivity = "nn",
+                                    topology = "rotated_grid",
+                                    inter_chiplet_noise = 1e-2,
+                                    inter_chiplet_amplification = 1,
+                                    inter_chiplet_noise_type = "random",
+                                    num_defective_qubits = 0,
+                                    rng_seed = iter_c
+                                )
+
+                    # Stim to qiskit
+                    stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+
+                    if config == "basic":
+                        cost_config = config_basic
+                    elif config == "tradeoff":
+                        cost_config = config_tradeoff
+                    elif config == "focus":
+                        cost_config = config_focus
+
+                    # Low error transpilation
+                    low_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                                backend_1e4,
+                                                                pre_defined_partitions=partitions,
+                                                                routing_alpha = cost_config[0]*1e4,##1e-4,
+                                                                routing_beta = cost_config[1])
+
+                    # High error transpilation
+                    high_error_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                                backend_1e2,
+                                                                pre_defined_partitions=partitions,
+                                                                routing_alpha = cost_config[0]*1e2,##1e-4,
+                                                                routing_beta = cost_config[1])
+
+                    plot_circuit_layout_utilization(low_error_circuit,
+                                backend_1e4,
+                                filename=f"experiments/evaluation/inter_chiplet/layout_utilization/mapping_{config}_{ni}.png")
+                    
+                    def num_2q_gates(circuit):
+                        ops = circuit.count_ops()
+                        two_qubit_gate_names = ["cx", "cz", "swap"]
+                        return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+
+                    # Estimated two-qubit gates: 17120
+                    print(num_2q_gates(stim_code_circuit.qc))
+                    # Estimated depth: 5261
+                    print((stim_code_circuit.qc).depth())
+
+                    low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
+                    low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(stim_code_circuit.qc)
+
+                    high_error_depth[ni][ks] = high_error_circuit.depth() - (stim_code_circuit.qc).depth()
+                    high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(stim_code_circuit.qc)
+
+                # Calculate average
+                #low_error_depth[ni][ks] /= n_iter
+                #low_error_overhead[ni][ks] /= n_iter
+                #high_error_depth[ni][ks] /= n_iter
+                #high_error_overhead[ni][ks] /= n_iter
+
+        # Store values for evaluation        
+        with open(f"experiments/evaluation/inter_chiplet/low_error_depth_{config}.pkl", "wb") as f:
+            pickle.dump(low_error_depth, f)
+        with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_{config}.pkl", "wb") as f:
+            pickle.dump(low_error_overhead, f)
+        with open(f"experiments/evaluation/inter_chiplet/high_error_depth_{config}.pkl", "wb") as f:
+            pickle.dump(high_error_depth, f)
+        with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_{config}.pkl", "wb") as f:
+            pickle.dump(high_error_overhead, f)
 
             
 if __name__ == "__main__":
     run_exp_inter_chiplet()
+
+    # Load circuit statistics for the three runs
+    with open(f"experiments/evaluation/inter_chiplet/low_error_depth_basic.pkl", "rb") as f:
+        low_error_depth_basic = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_basic.pkl", "rb") as f:
+        low_error_overhead_basic = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/high_error_depth_basic.pkl", "rb") as f:
+        high_error_depth_basic = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_basic.pkl", "rb") as f:
+        high_error_overhead_basic = pickle.load(f)
+
+    with open(f"experiments/evaluation/inter_chiplet/low_error_depth_tradeoff.pkl", "rb") as f:
+        low_error_depth_tradeoff = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_tradeoff.pkl", "rb") as f:
+        low_error_overhead_tradeoff = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/high_error_depth_tradeoff.pkl", "rb") as f:
+        high_error_depth_tradeoff = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_tradeoff.pkl", "rb") as f:
+        high_error_overhead_tradeoff = pickle.load(f)
+
+    with open(f"experiments/evaluation/inter_chiplet/low_error_depth_focus.pkl", "rb") as f:
+        low_error_depth_focus = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_focus.pkl", "rb") as f:
+        low_error_overhead_focus = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/high_error_depth_focus.pkl", "rb") as f:
+        high_error_depth_focus = pickle.load(f)
+    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_focus.pkl", "rb") as f:
+        high_error_overhead_focus = pickle.load(f)
+
+    plot_combined([low_error_depth_basic, low_error_depth_tradeoff, low_error_depth_focus],
+                  [low_error_overhead_basic, low_error_overhead_tradeoff, low_error_overhead_focus],
+                  [high_error_depth_basic, high_error_depth_tradeoff, high_error_depth_focus],
+                  [high_error_overhead_basic, high_error_overhead_tradeoff, high_error_overhead_focus],
+                  "experiments/evaluation/inter_chiplet/cnot_inter_chiplet_overhead")
+    

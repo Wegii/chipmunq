@@ -101,7 +101,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
                      marker = inter_markers[ni],
                      linestyle= "solid" if d == "5" else "solid",
                      color = color_list[i][ni],
-                     label = f'd={d}, ' +  r'$n_{inter}$' + f' = {n}')
+                     label = r'$n_{inter}$' + f' = {n}')
             handles.extend(h)
             
 

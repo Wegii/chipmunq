@@ -68,7 +68,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
-        "lines.markersize": 6,
+        "lines.markersize": 3,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
         # Error bar cap size
@@ -266,7 +266,8 @@ def plot_combined_backends(custom_depth,
 
     # Colors
     colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
-    hatches = ['//', 'o']  # one hatch per placement mode
+    colors = [ '#A7D9ED', '#F7C6A2', "#4682B4", "#F08080"]
+    hatches = ['...', '//', 'xxx', 'ooo']  # one hatch per placement mode
    
     tex_fonts = {
         # Use LaTeX to write all text
@@ -279,9 +280,11 @@ def plot_combined_backends(custom_depth,
         "xtick.labelsize": (FONTSIZE - 1)*1.5,
         "ytick.labelsize": (FONTSIZE - 1)*1.5,
         "axes.titlesize": 10,
+        # Hatches
+        "hatch.linewidth": 0.5,
         # Line and marker styles
         "lines.linewidth": 2,
-        "lines.markersize": 6,
+        "lines.markersize": 3,
         "lines.markeredgewidth": 1.5,
         "lines.markeredgecolor": "black",
         # Error bar cap size
@@ -308,10 +311,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i],
-            color=colors[i],
-            hatch=hatches[0],
+            color=colors[0],
+            hatch=hatches[i],
             edgecolor='black'
         )
         # SABRE
@@ -321,10 +324,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i],
-            color=colors[i],
-            hatch=hatches[1],
+            color=colors[1],
+            hatch=hatches[i],
             edgecolor='black'
         )
         
@@ -339,10 +342,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i] + "multi",
-            color=colors[2+i],
-            hatch=hatches[0],
+            color=colors[2],
+            hatch=hatches[i+2],
             edgecolor='black'
         )
         # SABRE
@@ -352,10 +355,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i] + "multi",
-            color=colors[2+i],
-            hatch=hatches[1],
+            color=colors[3],
+            hatch=hatches[i+2],
             edgecolor='black'
         )
 
@@ -401,10 +404,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i],
-            color=colors[i],
-            hatch=hatches[0],
+            color=colors[0],
+            hatch=hatches[i],
             edgecolor='black'
         )
         # SABRE
@@ -414,10 +417,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i],
-            color=colors[i],
-            hatch=hatches[1],
+            color=colors[1],
+            hatch=hatches[i],
             edgecolor='black'
         )
         
@@ -432,10 +435,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i] + "multi",
-            color=colors[2+i],
-            hatch=hatches[0],
+            color=colors[2],
+            hatch=hatches[i+2],
             edgecolor='black'
         )
         # SABRE
@@ -445,10 +448,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
             label=labels[i] + "multi",
-            color=colors[2+i],
-            hatch=hatches[1],
+            color=colors[3],
+            hatch=hatches[i+2],
             edgecolor='black'
         )
 
@@ -497,10 +500,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
-            label="Chipmunq Single patch: " + labels[i],
-            color=colors[i],
-            hatch=hatches[0],
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            label="Chipmunq, single patch, " + labels[i],
+            color=colors[0],
+            hatch=hatches[i],
             edgecolor='black'
         )
         handles.append(h)
@@ -511,10 +514,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
-            label="LightSABRE Single patch: " + labels[i],
-            color=colors[i],
-            hatch=hatches[1],
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            label="LightSABRE, single patch, " + labels[i],
+            color=colors[1],
+            hatch=hatches[i],
             edgecolor='black'
         )
         handles.append(h)
@@ -530,10 +533,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
-            label="Chipmunq Multi patch: " + labels[i],
-            color=colors[2+i],
-            hatch=hatches[0],
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            label="Chipmunq, multi patch, " + labels[i],
+            color=colors[2],
+            hatch=hatches[i+2],
             edgecolor='black'
         )
         handles.append(h)
@@ -546,10 +549,10 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1.5, 'ecolor': 'black'},
-            label="LightSABRE Multi patch: " + labels[i],
-            color=colors[2+i],
-            hatch=hatches[1],
+            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            label="LightSABRE, multi patch, " + labels[i],
+            color=colors[3],
+            hatch=hatches[i+2],
             edgecolor='black'
         )
         handles.append(h)
@@ -696,7 +699,7 @@ def run_exp_defective():
                                                         inter_chiplet_amplification = 1,
                                                         inter_chiplet_noise_type = "constant",
                                                         num_defective_qubits=df,
-                                                        chiplet_seed = run + 42 + ic,
+                                                        rng_seed = run + 42 + ic,
                                                         sabre_defective = comp == "sabre"
                                                     )
 
