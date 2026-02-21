@@ -4,5 +4,5 @@
 
 def check_valid_1q_2q_gates(circuit):
     # Check if only 1 and 2 qubit gates are used
-    
+
     return False

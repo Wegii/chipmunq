@@ -38,8 +38,8 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     width = 0.35
 
     # Colors
-    pastel_blue = "#A7D9ED" #'#A7D9ED'
-    pastel_orange = "lightcoral" # '#6476AD' # '#F7C6A2'
+    pastel_blue = "#A7D9ED"  #'#A7D9ED'
+    pastel_orange = "lightcoral"  # '#6476AD' # '#F7C6A2'
     if title_left == "Single patch configuration":
         tl_label = ["a) ", "b) ", "c) "]
     else:
@@ -50,11 +50,11 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.5,
-        "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.5,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.labelsize": FONTSIZE * 1.5,
+        "font.size": FONTSIZE * 1.2,
+        "legend.fontsize": (FONTSIZE - 2) * 1.5,
+        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
+        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
@@ -73,78 +73,74 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     labels = placement_modes  # ["default", "size_aware"]
 
     # ----------- Depth Overhead -------------
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_depth[mode][df][ks] for df in df_values]
         ax.bar(
-            x + i * width - width/2,
+            x + i * width - width / 2,
             vals,
             width,
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Depth overhead")
-    #ax.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     ax.set_ylim(0, 1250)
 
-    ax.text(
-        .1, 1.02, tl_label[0] + title_left,
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    ax.text(0.1, 1.02, tl_label[0] + title_left, transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.27, 1.15, "Lower is better ↓",
+        0.27,
+        1.15,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
     fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
-    #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
+    # fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
     # ----------- 2Q Gate Overhead -------------
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):
         vals = [custom_overhead[mode][df][ks] for df in df_values]
         ax.bar(
-            x + i * width - width/2,
+            x + i * width - width / 2,
             vals,
             width,
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("#2q gate overhead")
-    #ax.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     ax.set_ylim(0, 5500)
 
-    ax.text(
-        .1, 1.02, tl_label[1] + title_left,
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    ax.text(0.1, 1.02, tl_label[1] + title_left, transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.27, 1.15, "Lower is better ↓",
+        0.27,
+        1.15,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -154,25 +150,24 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
-
     # ----------- Backend Utilization -------------
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     handles = []
     for i, mode in enumerate(placement_modes):
         vals = [custom_utilization[mode][df][ks] for df in df_values]
         handle = ax.bar(
-            x + i * width - width/2,
+            x + i * width - width / 2,
             vals,
             width,
-            yerr=0.1,          
-            capsize=4,      
+            yerr=0.1,
+            capsize=4,
             error_kw={"elinewidth": 2, "ecolor": "black"},
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
         handles.append(handle)
 
@@ -180,17 +175,15 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Utilization")
-    #ax.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     ax.set_ylim(0, 1)
 
-    ax.text(
-        .1, 1.02, tl_label[2] + title_left,
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    ax.text(0.1, 1.02, tl_label[2] + title_left, transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.27, 1.15, "Higher is better ↑",
+        0.27,
+        1.15,
+        "Higher is better ↑",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -201,10 +194,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles = [handles[0], handles[1]],
-                               loc = "center",
-                               frameon = False,
-                               ncols = 3)
+    legend = legend_fig.legend(handles=[handles[0], handles[1]], loc="center", frameon=False, ncols=3)
     legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
@@ -217,27 +207,28 @@ def ci95_bootstrap(values, df_values, mode, ks):
         val = list(values[mode][df][ks].values())
         mean = np.mean(val)
         # Create fake replications by sampling own data with replacement
-        boot_means = [np.mean(np.random.choice(val, size=len(val), replace=True)) 
-                    for _ in range(5000)]
+        boot_means = [np.mean(np.random.choice(val, size=len(val), replace=True)) for _ in range(5000)]
         # Find the bounds where 95% of those means fall
         low_perc = np.percentile(boot_means, 2.5)
         high_perc = np.percentile(boot_means, 97.5)
-        
+
         means.append(mean)
         err_low.append(mean - low_perc)
         err_high.append(high_perc - mean)
-    
+
     return means, [err_low, err_high]
 
 
-def plot_combined_backends(custom_depth,
-                           custom_overhead,
-                           custom_utilization,
-                           sabre_depth,
-                           sabre_overhead,
-                           sabre_utilization,
-                           filename: str = ""):
-    
+def plot_combined_backends(
+    custom_depth,
+    custom_overhead,
+    custom_utilization,
+    sabre_depth,
+    sabre_overhead,
+    sabre_utilization,
+    filename: str = "",
+):
+
     # placement modes (outer keys)
     placement_modes = list(custom_depth[0].keys())  # ["default", "size_aware"]
 
@@ -250,25 +241,25 @@ def plot_combined_backends(custom_depth,
     x = np.arange(len(df_values))  # [0,1,2]
 
     # Two bars per group
-    width = 0.4/4#0.35/4#0.35/2
+    width = 0.4 / 4  # 0.35/4#0.35/2
 
     title_left = ""
 
     # Colors
     colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
-    colors = [ "#A7D9ED", "#F7C6A2", "#4682B4", "#F08080"]
+    colors = ["#A7D9ED", "#F7C6A2", "#4682B4", "#F08080"]
     hatches = ["...", "//", "xxx", "ooo"]  # one hatch per placement mode
-   
+
     tex_fonts = {
         # Use LaTeX to write all text
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.5,
-        "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.5,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.labelsize": FONTSIZE * 1.5,
+        "font.size": FONTSIZE * 1.2,
+        "legend.fontsize": (FONTSIZE - 2) * 1.5,
+        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
+        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
         "axes.titlesize": 10,
         # Hatches
         "hatch.linewidth": 0.5,
@@ -283,11 +274,10 @@ def plot_combined_backends(custom_depth,
 
     plt.rcParams.update(tex_fonts)
 
-
     labels = ["center", "size-aware"]
-    
+
     # ----------- Depth Overhead -------------
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):
         # Single patch
@@ -296,77 +286,74 @@ def plot_combined_backends(custom_depth,
 
         # Custom
         ax.bar(
-            x + i * 2*width - 3.5*width,
+            x + i * 2 * width - 3.5 * width,
             values_mean_custom,
             width,
-            yerr=values_err_custom,          
-            capsize=2,      
+            yerr=values_err_custom,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[0],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
         # SABRE
         ax.bar(
-            x + i * 2*width - 2.5*width,
+            x + i * 2 * width - 2.5 * width,
             values_mean_sabre,
             width,
-            yerr=values_err_sabre,          
-            capsize=2,      
+            yerr=values_err_sabre,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[1],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
-        
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_depth[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_depth[1], df_values, mode, ks)
         # Custom
         ax.bar(
-            x + (2+i) * width*2 - 3.5*width,#1.5*width,
+            x + (2 + i) * width * 2 - 3.5 * width,  # 1.5*width,
             values_mean_custom,
             width,
-            yerr=values_err_custom,          
-            capsize=2,      
+            yerr=values_err_custom,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[2],
-            hatch=hatches[i+2],
-            edgecolor="black"
+            hatch=hatches[i + 2],
+            edgecolor="black",
         )
         # SABRE
         ax.bar(
-            x + (2+i) * width*2 - 2.5*width,
+            x + (2 + i) * width * 2 - 2.5 * width,
             values_mean_sabre,
             width,
-            yerr=values_err_sabre,          
-            capsize=2,      
+            yerr=values_err_sabre,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[3],
-            hatch=hatches[i+2],
-            edgecolor="black"
+            hatch=hatches[i + 2],
+            edgecolor="black",
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Depth overhead")
-    #ax.legend(loc='upper left')
-    #ax.set_ylim(0, 1250)
+    # ax.legend(loc='upper left')
+    # ax.set_ylim(0, 1250)
+
+    ax.text(-0.1, 1.02, "a) Defective qubits affecting circuit depth", transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        -0.1, 1.02, "a) Defective qubits affecting circuit depth",
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
-
-    ax.text(
-        0.27, 1.15, "Lower is better ↓",
+        0.27,
+        1.15,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -376,11 +363,8 @@ def plot_combined_backends(custom_depth,
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
-
-
-    
     # ----------- 2Q Gate Overhead -------------
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):
         # Single patch
@@ -389,78 +373,74 @@ def plot_combined_backends(custom_depth,
 
         # Custom
         ax.bar(
-            x + i * 2*width - 3.5*width,
+            x + i * 2 * width - 3.5 * width,
             values_mean_custom,
             width,
-            yerr=values_err_custom,          
-            capsize=2,      
+            yerr=values_err_custom,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[0],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
         # SABRE
         ax.bar(
-            x + i * 2*width - 2.5*width,
+            x + i * 2 * width - 2.5 * width,
             values_mean_sabre,
             width,
-            yerr=values_err_sabre,          
-            capsize=2,      
+            yerr=values_err_sabre,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[1],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
-        
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_overhead[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_overhead[1], df_values, mode, ks)
         # Custom
         ax.bar(
-            x + (2+i) * width*2 - 3.5*width,#1.5*width,
+            x + (2 + i) * width * 2 - 3.5 * width,  # 1.5*width,
             values_mean_custom,
             width,
-            yerr=values_err_custom,          
-            capsize=2,      
+            yerr=values_err_custom,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[2],
-            hatch=hatches[i+2],
-            edgecolor="black"
+            hatch=hatches[i + 2],
+            edgecolor="black",
         )
         # SABRE
         ax.bar(
-            x + (2+i) * width*2 - 2.5*width,
+            x + (2 + i) * width * 2 - 2.5 * width,
             values_mean_sabre,
             width,
-            yerr=values_err_sabre,          
-            capsize=2,      
+            yerr=values_err_sabre,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[3],
-            hatch=hatches[i+2],
-            edgecolor="black"
+            hatch=hatches[i + 2],
+            edgecolor="black",
         )
-
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("#2q gate overhead")
-    #ax.legend(loc='upper left')
-    #ax.set_ylim(0, 5500)
+    # ax.legend(loc='upper left')
+    # ax.set_ylim(0, 5500)
+
+    ax.text(-0.05, 1.02, "b) Defective qubits affecting #2q gates", transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        -0.05, 1.02, "b) Defective qubits affecting #2q gates",
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
-
-    ax.text(
-        0.27, 1.15, "Lower is better ↓",
+        0.27,
+        1.15,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -470,12 +450,9 @@ def plot_combined_backends(custom_depth,
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
-
-
-    
     # ----------- Backend Utilization -------------
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     handles = []
     for i, mode in enumerate(placement_modes):
@@ -485,84 +462,79 @@ def plot_combined_backends(custom_depth,
 
         # Custom
         h = ax.bar(
-            x + i * 2*width - 3.5*width,
+            x + i * 2 * width - 3.5 * width,
             values_mean_custom,
             width,
-            yerr=values_err_custom,          
-            capsize=2,      
+            yerr=values_err_custom,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label="Chipmunq, single patch, " + labels[i],
             color=colors[0],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
         handles.append(h)
         # SABRE
         h = ax.bar(
-            x + i * 2*width - 2.5*width,
+            x + i * 2 * width - 2.5 * width,
             values_mean_sabre,
             width,
-            yerr=values_err_sabre,          
-            capsize=2,      
+            yerr=values_err_sabre,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label="LightSABRE, single patch, " + labels[i],
             color=colors[1],
             hatch=hatches[i],
-            edgecolor="black"
+            edgecolor="black",
         )
         handles.append(h)
-        
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_utilization[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[1], df_values, mode, ks)
         # Custom
         h = ax.bar(
-            x + (2+i) * width*2 - 3.5*width,#1.5*width,
+            x + (2 + i) * width * 2 - 3.5 * width,  # 1.5*width,
             values_mean_custom,
             width,
-            yerr=values_err_custom,          
-            capsize=2,      
+            yerr=values_err_custom,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label="Chipmunq, multi patch, " + labels[i],
             color=colors[2],
-            hatch=hatches[i+2],
-            edgecolor="black"
+            hatch=hatches[i + 2],
+            edgecolor="black",
         )
         handles.append(h)
-
 
         # SABRE
         h = ax.bar(
-            x + (2+i) * width*2 - 2.5*width,
+            x + (2 + i) * width * 2 - 2.5 * width,
             values_mean_sabre,
             width,
-            yerr=values_err_sabre,          
-            capsize=2,      
+            yerr=values_err_sabre,
+            capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label="LightSABRE, multi patch, " + labels[i],
             color=colors[3],
-            hatch=hatches[i+2],
-            edgecolor="black"
+            hatch=hatches[i + 2],
+            edgecolor="black",
         )
         handles.append(h)
-
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
     ax.set_xlabel("#Defective qubits")
     ax.set_ylabel("Utilization")
-    #ax.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     ax.set_ylim(0, 1.2)
 
-    ax.text(
-        -0.22, 1.02, "c) Defective qubits affecting chiplet utilization",
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    ax.text(-0.22, 1.02, "c) Defective qubits affecting chiplet utilization", transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.27, 1.15, "Higher is better ↑",
+        0.27,
+        1.15,
+        "Higher is better ↑",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
@@ -573,14 +545,10 @@ def plot_combined_backends(custom_depth,
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles = handles,
-                               loc = "center",
-                               frameon = False,
-                               ncols = 4,
-                               columnspacing=1.5)
+    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=4, columnspacing=1.5)
     legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
-    
+
 
 def calculate_qpu_utilization(circuit, backend):
 
@@ -616,8 +584,8 @@ def calculate_qpu_utilization(circuit, backend):
             utilized_qubits += 1
 
     print(utilized_chiplets)
-    print(f"Calculated utilization of {utilized_qubits/(len(utilized_chiplets)*num_qubits_per_chiplet)    }")
-    return utilized_qubits/(len(utilized_chiplets)*num_qubits_per_chiplet)  
+    print(f"Calculated utilization of {utilized_qubits / (len(utilized_chiplets) * num_qubits_per_chiplet)}")
+    return utilized_qubits / (len(utilized_chiplets) * num_qubits_per_chiplet)
 
 
 def recursive_dict():
@@ -633,14 +601,14 @@ def run_exp_defective():
     # Compilation configuration
     compilation = ["sabre", "custom"]
 
-    # Placement location of patches on a 
+    # Placement location of patches on a
     patch_placement = ["center", "size_aware"]
 
     # Run for two backend configuration:
-    # - Backend fits single patch 
+    # - Backend fits single patch
     # - Backend fits multiple patches
     backend_config = ["single_patch", "multi_patch"]
-    
+
     """
     for comp in compilation:
         for bc in backend_config:
@@ -744,7 +712,7 @@ def run_exp_defective():
                       title_left = ("Multi patch configuration" if bc == "multi_patch"
                                     else "Single patch configuration"),
                       filename = f"experiments/evaluation/defective_qubits/{bc}_overhead")
-    """        
+    """
 
     backend_config = ["single_patch", "multi_patch"]
     custom_depth_combined = []
@@ -753,7 +721,7 @@ def run_exp_defective():
     sabre_depth_combined = []
     sabre_overhead_combined = []
     sabre_utilization_combined = []
-    for bc in backend_config:       
+    for bc in backend_config:
         # SABRE
         with open(f"experiments/evaluation/defective_qubits/sabre_depth_{bc}.pkl", "rb") as f:
             sabre_depth = pickle.load(f)
@@ -778,14 +746,16 @@ def run_exp_defective():
         custom_overhead_combined.append(custom_overhead)
         custom_utilization_combined.append(custom_utilization)
 
-    plot_combined_backends(custom_depth_combined,
-                            custom_overhead_combined,
-                            custom_utilization_combined,
-                            sabre_depth_combined,
-                            sabre_overhead_combined,
-                            sabre_utilization_combined,
-                            filename = "experiments/evaluation/defective_qubits/combined_overhead")
+    plot_combined_backends(
+        custom_depth_combined,
+        custom_overhead_combined,
+        custom_utilization_combined,
+        sabre_depth_combined,
+        sabre_overhead_combined,
+        sabre_utilization_combined,
+        filename="experiments/evaluation/defective_qubits/combined_overhead",
+    )
 
-            
+
 if __name__ == "__main__":
     run_exp_defective()

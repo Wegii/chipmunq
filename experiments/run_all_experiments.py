@@ -15,7 +15,6 @@ run_runtime_scaling()
 run_statistics()
 
 
-
 # How does the performance of the proposed implementation scale as circuit complexity increases?
 run_exp_scalability()
 
@@ -27,7 +26,6 @@ run_exp_statistics()
 # How does the number of inter-chiplet connections influence circuit routing?
 # How does the error of inter-chiplet connections influence circuit routing?
 run_exp_inter_chiplet()
-
 
 
 # How do defective qubits affect the resulting circuit?
@@ -46,5 +44,5 @@ run_exp_distributed_lattice_surgery()
 run_exp_distributed_inter_chiplet()
 
 
-# How is the logical error rate influenced by focusing on different metrics during routing 
+# How is the logical error rate influenced by focusing on different metrics during routing
 perform_noise_aware_routing()

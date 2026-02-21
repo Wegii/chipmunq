@@ -6,22 +6,24 @@ import numpy as np
 class QPUBlock:
     """Class representing a QPU chiplet with no-placement zones"""
 
-    def __init__(self,
-                 width: int,
-                 height: int,
-                 block_coord: tuple,
-                 no_placement_zones: list[tuple] = None,
-                 patch_initialization: str = "center"):
-        
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        block_coord: tuple,
+        no_placement_zones: list[tuple] = None,
+        patch_initialization: str = "center",
+    ):
+
         self.width = width
         self.height = height
         self.coord = block_coord
 
-        #print(f"block has width {width} and height {height}")
+        # print(f"block has width {width} and height {height}")
 
         # List of (x, y) points that cannot be used
         self.no_placement_zones = no_placement_zones if no_placement_zones is not None else []
-        
+
         # free rectangles inside block
         self.free_rects = [(0, 0, width, height)]
         # list of (partition_id, x, y, w, h)
@@ -35,7 +37,6 @@ class QPUBlock:
         else:
             self.patch_initialization = patch_initialization
 
-    
     def _overlaps_partitions(self, x, y, w, h):
         for pid, px, py, pw, ph in self.placed_partitions:
             if not (x + w <= px or px + pw <= x or y + h <= py or py + ph <= y):
@@ -59,7 +60,7 @@ class QPUBlock:
         for fx, fy in self.no_placement_zones:
             if x <= fx < x + w and y <= fy < y + h:
                 return True
-            
+
         print("not allowed")
         return False
 
@@ -68,9 +69,7 @@ class QPUBlock:
 
     def _find_covering_free_rect(self, x, y, w, h):
         for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
-            if (x >= fx and y >= fy and 
-                x + w <= fx + fw and 
-                y + h <= fy + fh):
+            if x >= fx and y >= fy and x + w <= fx + fw and y + h <= fy + fh:
                 return i, (fx, fy, fw, fh)
         return None, None
 
@@ -92,9 +91,9 @@ class QPUBlock:
         # bottom side (below the partition) - constrained to partition's width
         if y + h < fy + fh:
             self.free_rects.append((x, y + h, w, (fy + fh) - (y + h)))
-    
+
     def place_partition(self, partition_id, pw, ph):
-        
+
         if self.patch_initialization == "center":
             # Preferred center-based placement
             preferred_x = (self.width - pw) // 2
@@ -102,8 +101,7 @@ class QPUBlock:
         elif self.patch_initialization == "size_aware":
             # Preferred origin placement
             preferred_x = 0
-            preferred_y = (self.height - ph)
-
+            preferred_y = self.height - ph
 
         idx, rect = self._find_covering_free_rect(preferred_x, preferred_y, pw, ph)
         if idx is not None and not self._overlaps(preferred_x, preferred_y, pw, ph):
@@ -117,7 +115,6 @@ class QPUBlock:
         # Iterate over free rectangles to search for a free place
         for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
             if pw <= fw and ph <= fh:
-
                 # Use preferred_y if it fits vertically into this free-rect
                 if fy <= preferred_y and preferred_y + ph <= fy + fh:
                     y_to_check = preferred_y
@@ -144,7 +141,6 @@ class QPUBlock:
 
         for y in range(self.height - ph + 1):
             for x in range(self.width - pw + 1):
-
                 # Check for overlaps
                 if self._overlaps(x, y, pw, ph):
                     continue
@@ -169,7 +165,7 @@ class QPUBlock:
             raise ValueError(f"Anchor partition {anchor_id} not found.")
 
         _, ax, ay, aw, ah = anchor
-        
+
         # Initial target position (shift=0)
         if direction == "right":
             base_x, base_y = ax + aw, ay
@@ -184,17 +180,15 @@ class QPUBlock:
 
         # Search starting from 0 shift up to max_shift
         for shift in range(max_shift + 1):
-            
             # Calculate current placement attempt (x, y) based on shift
             x, y = base_x, base_y
-            
+
             if shift > 0:
-                if direction in ("below", "above"):#("right", "left"):
+                if direction in ("below", "above"):  # ("right", "left"):
                     # Shift vertically (up first)
-                    y += shift 
-                    
-                
-                elif direction in ("right", "left"):#("below", "above"):
+                    y += shift
+
+                elif direction in ("right", "left"):  # ("below", "above"):
                     # Shift horizontally (right first)
                     x += shift
 
@@ -204,12 +198,12 @@ class QPUBlock:
 
             # Overlap check (with partitions AND forbidden zones)
             if self._overlaps(x, y, pw, ph):
-                continue # Try next shift
+                continue  # Try next shift
 
             # Find free rect that fully contains this placement
             idx, rect = self._find_covering_free_rect(x, y, pw, ph)
             if idx is None:
-                continue # Try next shift
+                continue  # Try next shift
 
             # Valid placement found
             fx, fy, fw, fh = rect
@@ -219,7 +213,7 @@ class QPUBlock:
 
             # Split the free rectangle
             self._split_free_rect(idx, fx, fy, fw, fh, x, y, pw, ph)
-            
+
             print(f"Placed {partition_id} at ({x}, {y}) with shift {shift} (Direction: {direction})")
 
             return (self.coord[0] + x, self.coord[1] + y)
@@ -227,13 +221,9 @@ class QPUBlock:
         # If the loop finishes without finding a valid position
         print(f"Placement for {partition_id} failed: No valid position found within {max_shift} units of shift.")
         return None
-    
 
-def plot_block_counts(width: int,
-                      height: int,
-                      block_assignments: dict,
-                      filename: str
-                    ) -> None:
+
+def plot_block_counts(width: int, height: int, block_assignments: dict, filename: str) -> None:
     """Plot 2D grid of QPUs with the number of assigned partitions shown
 
     :param width: _description_
@@ -251,8 +241,7 @@ def plot_block_counts(width: int,
     for y in range(height):
         for x in range(width):
             count = len(block_assignments.get((x, y), []).placed_partitions)
-            ax.text(x + 0.5, height - y - 0.5, str(count),
-                    ha="center", va="center", fontsize=12)
+            ax.text(x + 0.5, height - y - 0.5, str(count), ha="center", va="center", fontsize=12)
 
     # Draw grid lines
     ax.set_xticks(np.arange(0, width + 1, 1))
@@ -270,10 +259,11 @@ def plot_block_counts(width: int,
 
 
 def dimension_to_linear_index(x, w, h):
-    x1, x2 = x 
+    x1, x2 = x
 
     idx = x2 * h + x1
     return idx
+
 
 def linear_index_to_dimension(idx, w):
     x = idx % w

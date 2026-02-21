@@ -30,7 +30,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
         p = s.json_metadata["p"]
         t = str(s.json_metadata["run_name"])
         d = str(s.json_metadata["d"])
-        
+
         error_rates[t][d][p].append(ler)
         physical_error_rates.add(p)
         d_values.add(d)
@@ -42,11 +42,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.5,
-        "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.3,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.labelsize": FONTSIZE * 1.5,
+        "font.size": FONTSIZE * 1.2,
+        "legend.fontsize": (FONTSIZE - 2) * 1.3,
+        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
+        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 1.5,
@@ -59,23 +59,24 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
 
     plt.rcParams.update(tex_fonts)
 
-    #fig, ax = plt.subplots(figsize=(6, 5))
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    # fig, ax = plt.subplots(figsize=(6, 5))
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
     handles = []
     # Plot identity (x = y)
-    h = plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label="x=y")
-    #handles.extend(h)
+    h = plt.plot(
+        physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label="x=y"
+    )
+    # handles.extend(h)
 
-    colors_5 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_7 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
-    #colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
+    colors_5 = ["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"]
+    colors_7 = ["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"]
+    # colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
 
-    inter_markers = ["", "x", "o", "s","^"]
+    inter_markers = ["", "x", "o", "s", "^"]
     color_list = [colors_7, colors_5]
 
     d_values = ["7"]
-
 
     for i, d in enumerate(d_values):
         errors = defaultdict(dict)
@@ -84,14 +85,15 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
                 errors[p] = error_rates[str(n)][d][p][0]
 
             ys_custom = [errors[p] for p in physical_error_rates]
-            h = plt.plot(physical_error_rates,
-                     ys_custom,
-                     marker = inter_markers[ni],
-                     linestyle= "solid" if d == "5" else "solid",
-                     color = color_list[i][ni],
-                     label = r"$n_{inter}$" + f" = {n}")
+            h = plt.plot(
+                physical_error_rates,
+                ys_custom,
+                marker=inter_markers[ni],
+                linestyle="solid" if d == "5" else "solid",
+                color=color_list[i][ni],
+                label=r"$n_{inter}$" + f" = {n}",
+            )
             handles.extend(h)
-            
 
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
@@ -99,38 +101,34 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
         ps_inter_text = r"$1e^{-3}$"
     elif inter_chiplet_noise == 0.01:
         ps_inter_text = r"$1e^{-2}$"
-    description = (r"$p_{inter}$ = " + f"{ps_inter_text}")
+    description = r"$p_{inter}$ = " + f"{ps_inter_text}"
 
-    #ax.text(
+    # ax.text(
     #    0, 1.02, description,
     #    transform=ax.transAxes,
     #    #fontsize=9,
     #    fontweight="bold"
-    #)
-    ax.text(
-        .05, 1.02, "b) Effect of connectivity on LER",
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    # )
+    ax.text(0.05, 1.02, "b) Effect of connectivity on LER", transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.3, 1.13, "Lower is better ↓",
+        0.3,
+        1.13,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
 
-    
-    #plt.ylim(-0.01, 0.9)
+    # plt.ylim(-0.01, 0.9)
     plt.ylim(5e-8, 2e0)
     plt.xlim(1e-4, 1e-2)
     plt.xscale("log")
     plt.yscale("log")
 
-
     plt.xlabel("Physical error rate")
     plt.ylabel("LER")
-    #plt.legend(loc="lower right", ncol=2)
+    # plt.legend(loc="lower right", ncol=2)
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
 
@@ -138,11 +136,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles = handles,
-                               loc = "center",
-                               frameon = False,
-                               ncols = 5,
-                               columnspacing=1.5)
+    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=5, columnspacing=1.5)
     legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
@@ -163,16 +157,16 @@ def plot_difference(stats, filename, inter_chiplet_noise):
         p = s.json_metadata["p"]
         t = str(s.json_metadata["run_name"])
         d = str(s.json_metadata["d"])
-        
+
         error_rates[t][d][p].append(ler)
         physical_error_rates.add(p)
         d_values.add(d)
 
-    physical_error_rates = sorted(list(physical_error_rates)) #sorted(physical_error_rates)
-    #print(physical_error_rates)
+    physical_error_rates = sorted(list(physical_error_rates))  # sorted(physical_error_rates)
+    # print(physical_error_rates)
 
-    colors_5 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_7 = (["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"])
+    colors_5 = ["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"]
+    colors_7 = ["#B7D1EC", "#8FB7E1", "#5E97CC", "#3B6FA8", "#2A5687"]
     # colors_7 = (["#F0B3B0", "#E38E8A", "#C85E59", "#9F3B36", "#7F2E2A"])
 
     diff_1 = defaultdict(dict)
@@ -182,22 +176,23 @@ def plot_difference(stats, filename, inter_chiplet_noise):
 
     for d in d_values:
         for p in physical_error_rates:
-            diff_1[d][p] = (error_rates["1"][d][p][0]/error_rates["8"][d][p][0])#(error_rates['1'][d][p][0] / error_rates['8'][d][p][0])
-            diff_2[d][p] = (error_rates["2"][d][p][0] / error_rates["8"][d][p][0])
-            diff_4[d][p] = (error_rates["4"][d][p][0] / error_rates["8"][d][p][0])
-            diff_6[d][p] = (error_rates["6"][d][p][0] / error_rates["8"][d][p][0])
-
+            diff_1[d][p] = (
+                error_rates["1"][d][p][0] / error_rates["8"][d][p][0]
+            )  # (error_rates['1'][d][p][0] / error_rates['8'][d][p][0])
+            diff_2[d][p] = error_rates["2"][d][p][0] / error_rates["8"][d][p][0]
+            diff_4[d][p] = error_rates["4"][d][p][0] / error_rates["8"][d][p][0]
+            diff_6[d][p] = error_rates["6"][d][p][0] / error_rates["8"][d][p][0]
 
     tex_fonts = {
         # Use LaTeX to write all text
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.5,
-        "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.3,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.labelsize": FONTSIZE * 1.5,
+        "font.size": FONTSIZE * 1.2,
+        "legend.fontsize": (FONTSIZE - 2) * 1.3,
+        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
+        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 1.5,
@@ -210,9 +205,9 @@ def plot_difference(stats, filename, inter_chiplet_noise):
 
     plt.rcParams.update(tex_fonts)
 
-    #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*3, WIDTH_FIGSIZE/1.5))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
-    
+    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*3, WIDTH_FIGSIZE/1.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+
     """
     ys_custom = [diff_1['5'][p] for p in physical_error_rates]
     plt.plot(physical_error_rates, ys_custom, marker='x', color=colors_5[0], label=r'(d=5, $n_{inter}$=1)')
@@ -226,7 +221,6 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     ys_custom = [diff_6['5'][p] for p in physical_error_rates]
     plt.plot(physical_error_rates, ys_custom, marker='^', color=colors_5[3], label=r'(d=5, $n_{inter}$=6)')
     """
-    
 
     ys_custom = [diff_1["7"][p] for p in physical_error_rates]
     plt.plot(physical_error_rates, ys_custom, marker="", color=colors_7[0], label=r"d=7, $n_{inter}$=1")
@@ -240,39 +234,35 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     ys_custom = [diff_6["7"][p] for p in physical_error_rates]
     plt.plot(physical_error_rates, ys_custom, marker="s", color=colors_7[3], label=r"d=7, $n_{inter}$=6")
 
-
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
     elif inter_chiplet_noise == 0.001:
         ps_inter_text = r"$1e^{-3}$"
     elif inter_chiplet_noise == 0.01:
         ps_inter_text = r"$1e^{-2}$"
-    description = (r"$p_{inter}$ = " + f"{ps_inter_text}")
+    description = r"$p_{inter}$ = " + f"{ps_inter_text}"
 
-
-    ax.text(
-        -.05, 1.02, "c) Relative effect of connectivity on LER",
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    ax.text(-0.05, 1.02, "c) Relative effect of connectivity on LER", transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.3, 1.13, "Lower is better ↓",
+        0.3,
+        1.13,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
-    
+
     plt.ylim(0.9, 130)
-    #plt.xlim(1e-4, 1e-1)
+    # plt.xlim(1e-4, 1e-1)
     plt.xlim(1e-4, 1e-2)
 
     plt.xscale("log")
     plt.yscale("log")
     plt.xlabel("Physical error rate")
-    #plt.ylabel(r"Δ($LER_{Reduced} - LER_{Full}$)")
+    # plt.ylabel(r"Δ($LER_{Reduced} - LER_{Full}$)")
     plt.ylabel(r"$LER_{Reduced} / LER_{Full}$")
-    #plt.legend(loc = "upper right", ncol = 2)
+    # plt.legend(loc = "upper right", ncol = 2)
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
     fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
 
@@ -280,24 +270,22 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     plt.close(fig)
 
 
-
 def run_exp_distributed_inter_chiplet() -> None:
 
     # Number of inter_chiplet_connections
     num_inter_chiplet_connections = [8, 6, 4, 2, 1]
-    
+
     # Noise level
-    ps = list(np.logspace(-4, -1, 10)) #list(np.logspace(-4, -1, 10))
+    ps = list(np.logspace(-4, -1, 10))  # list(np.logspace(-4, -1, 10))
 
     # Inter-chiplet noise level
     inter_chiplet_noise = [1e-4, 1e-3, 1e-2]
-    
+
     for ps_inter in inter_chiplet_noise:
-        
         # Transpilation
         ts = [str(i) for i in num_inter_chiplet_connections]
         ks = [2, 3]
-        routing_types = ["default"] #["cost", "default"]
+        routing_types = ["default"]  # ["cost", "default"]
 
         transpiled_circuits = {}
         """
@@ -393,18 +381,20 @@ def run_exp_distributed_inter_chiplet() -> None:
         with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "rb") as f:
             stats = pickle.load(f)
 
-        plot_evaluation(stats,
-                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.pdf",
-                        inter_chiplet_noise = ps_inter,
-                        num_inter = num_inter_chiplet_connections)
-        
-        plot_difference(stats,
-                        filename = f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_difference.pdf",
-                        inter_chiplet_noise = ps_inter)
-        
-        
-        
-    #plot_interconnect_sweep(stats,
+        plot_evaluation(
+            stats,
+            filename=f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.pdf",
+            inter_chiplet_noise=ps_inter,
+            num_inter=num_inter_chiplet_connections,
+        )
+
+        plot_difference(
+            stats,
+            filename=f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_difference.pdf",
+            inter_chiplet_noise=ps_inter,
+        )
+
+    # plot_interconnect_sweep(stats,
     #                        filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet_sweep.png")
 
 

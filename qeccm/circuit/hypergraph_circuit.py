@@ -9,7 +9,7 @@ import kahypar
 import matplotlib.pyplot as plt
 import networkx as nx
 
-#from qecc_mapping.experiments.utils.circuit_statistics import *
+# from qecc_mapping.experiments.utils.circuit_statistics import *
 # Hypergraph
 import rustworkx as rx
 
@@ -25,31 +25,26 @@ class PartitionedHyperGraph:
     """Partitioned Hypergraph after partitioning a HyperGraph object
 
     Visualization of hypergraph given kahypar partitioning using hypernetx. Translates partitioning format to dict
-    structure to then construct a hypergraph 
+    structure to then construct a hypergraph
 
     Tasks:
         - TODO: Potentially also use the hypergraph from hypernetx as hypergraph object, instead of using the rustworkx
-                pygraph. 
+                pygraph.
     """
 
-    def __init__(self,
-                 partitioned_hgc: kahypar.Hypergraph = None,
-                 num_nodes = None,
-                 hgc = None,
-                 partitions = None,
-                 dag = None):
-        
-        #"""Generate hypernetx hypergraph given a partitioned kahypar hypergraph
+    def __init__(self, partitioned_hgc: kahypar.Hypergraph = None, num_nodes=None, hgc=None, partitions=None, dag=None):
+
+        # """Generate hypernetx hypergraph given a partitioned kahypar hypergraph
 
         #:param partitioned_hgc: Hypergraph after partitioning. If None, assume that only one block exists
         #:type partitioned_hgc: kahypar.Hypergraph
-        #"""
+        # """
 
         if partitioned_hgc is not None:
             # Generate dictionary for each block as key containing all nodes
             num_blocks = partitioned_hgc.numBlocks()
             block_to_nodes = {"b:" + str(b): [] for b in range(num_blocks)}
-            
+
             # Assign each block all nodes
             (index_vector, edge_vector) = hgc
             available_nodes = set(edge_vector)
@@ -58,7 +53,7 @@ class PartitionedHyperGraph:
                 # out nodes that do not belong to the hypergraph at all
                 if node in available_nodes:
                     block_to_nodes["b:" + str(partitioned_hgc.blockID(node))].append(node)
-                
+
             # Construct collapsed hypergraph
             # All blocks are collapsed to singular nodes, while edges between blocks are kept
             ch = nx.MultiGraph()
@@ -84,11 +79,11 @@ class PartitionedHyperGraph:
                         ch.add_edge(blocks[i], blocks[j])
         elif partitions != None:
             block_to_nodes = {"b:" + str(b): [] for b in range(len(partitions))}
-            #block_to_nodes = {b: [] for b in range(len(partitions))}
+            # block_to_nodes = {b: [] for b in range(len(partitions))}
 
             for i, partition in enumerate(partitions):
                 block_to_nodes["b:" + str(i)].extend(partition["indices"][:])
-                #block_to_nodes[i].extend(partition['indices'][:])
+                # block_to_nodes[i].extend(partition['indices'][:])
 
             (index_vector, edge_vector) = hgc
             available_nodes = set(edge_vector)
@@ -144,22 +139,22 @@ class PartitionedHyperGraph:
             ch.add_node(0)
 
         # Construct hypergraph from partitioned hypergraph
-        #print(block_to_nodes)
+        # print(block_to_nodes)
         self._phg = hnx.Hypergraph(block_to_nodes)
 
         plt.figure(figsize=(6, 6))
         nx.draw(ch, with_labels=True, node_size=600)
         plt.savefig("data/backends/mapping/hx_contracted_graph_of_circuit.png", dpi=300)
         plt.close()
-        
+
         self._collapsed_phg = ch
 
         self._btn = block_to_nodes
         # Save kahypar hypergraph
         self._kahypar_hgc = partitioned_hgc
 
-        #print("Found partitions:")
-        #print(block_to_nodes)
+        # print("Found partitions:")
+        # print(block_to_nodes)
 
     def draw_phg(self, graph: hnx.Hypergraph, filename: str = "") -> None:
         """Draw partitioned hypergraph
@@ -181,15 +176,15 @@ class PartitionedHyperGraph:
 
         # Contract all nodes of one group
         pass
-        
+
 
 class HyperGraph:
-    """Hypergraph build upon rustworx graph."""             
+    """Hypergraph build upon rustworx graph."""
 
     def __init__(self, multigraph=False):
         self._hg = rx.PyGraph(multigraph=multigraph)
         # Mapping of qubit id to graph id
-        self.node_idx = defaultdict(int)   
+        self.node_idx = defaultdict(int)
 
     def add_hyperedge(self, root: int, targets: list) -> None:
         if root not in self.node_idx:
@@ -216,33 +211,32 @@ class HypergraphCircuit(AnalysisPass):
     """Quantum circuit represented as hypergraph.
 
     TODO: Description
-    
+
     References:
     [1] Felix Burt, Kuan-Cheng Chen, Kin Leung, "Generalised Circuit Partitioning for Distributed Quantum Computing"
-    `arXiv:2408.01424 <https://arxiv.org/abs/2408.01424>` 
+    `arXiv:2408.01424 <https://arxiv.org/abs/2408.01424>`
 
     [2] Pablo Andres-Martinez, Tim Forrer, Daniel Mills, Jun-Yi Wu, Luciana Henaut, Kentaro Yamamoto, Mio Murao,
     Ross Duncan, "Distributing circuits over heterogeneous, modular quantum computing network architectures".
     `arXiv:2305.14148 <https://arxiv.org/abs/2305.14148>`
     """
-    
+
     def __init__(self):
         """Hypergraph initializer"""
         super().__init__()
 
     def run(self, dag: DAGCircuit) -> None:
-        #print("Start circuit to hg transformation")
+        # print("Start circuit to hg transformation")
         # Circuit to hypergraph
-        #self._qc_to_hypergraph(dag)
-        # Translate hypergraph to Kahypar. 
-        #self.hg_to_kahypar()
+        # self._qc_to_hypergraph(dag)
+        # Translate hypergraph to Kahypar.
+        # self.hg_to_kahypar()
 
         # Fast conversion of dag to KaHyPar CSR format. Note: hyper_dag property is not available, since no real
         # hypergraph is constructed.
         self._dag_to_kahypar(dag)
 
         # TODO: possibility to create hypergraph (for visualization only) from KaHyPar CSR format
-
 
     def _qc_to_hypergraph(self, dag: DAGCircuit) -> None:
         """Create hypergraph given circuit as DAG.
@@ -251,7 +245,7 @@ class HypergraphCircuit(AnalysisPass):
         grouping mechanism.
         """
         # Use multigraph option for e. g. statistics. For partitioning, duplicate edges can be removed
-        hgc = HyperGraph(multigraph = True)
+        hgc = HyperGraph(multigraph=True)
 
         # Check if circuit consists of 1q and 2q gates only
         if check_valid_1q_2q_gates(dag):
@@ -279,20 +273,20 @@ class HypergraphCircuit(AnalysisPass):
     def hg_to_kahypar(self):
         """Translate hypergraph to kahypar format
 
-        The hypergraph is converted into  a format that is similar to the CSR (Compressed Sparse Row) format. The 
+        The hypergraph is converted into  a format that is similar to the CSR (Compressed Sparse Row) format. The
         edge_vector list defines all vertices of a hyperedge. The idx_vector marks where each hyperedge starts in the
         edge_vector list
 
         Reference:
         - https://github.com/kahypar/kahypar/blob/master/python/module.cpp
-        
+
         :return: _description_
         :rtype: _type_
         """
         hgc = self.property_set["hyper_dag"]
 
         # Construct edge_vector and index_vector
-        
+
         edge_vector = []
         idx_vector = []
         pos = 0
@@ -310,7 +304,7 @@ class HypergraphCircuit(AnalysisPass):
             edge_vector.extend([root_node] + out_edges_target)
             pos += len(out_edges_target) + 1
 
-            #print(f"{root_node}: {out_edges_target}")
+            # print(f"{root_node}: {out_edges_target}")
 
         # Set property for later usage
         self.property_set["hyper_dag_kahypar"] = (idx_vector, edge_vector)
@@ -326,7 +320,7 @@ class HypergraphCircuit(AnalysisPass):
         """
         edge_vector = []
         num_qubits = len(dag.qubits)
-        #print(num_qubits)
+        # print(num_qubits)
         connectivity = [set() for _ in range(num_qubits)]
 
         # Build connectivity map from all 2-qubit gates
@@ -348,13 +342,13 @@ class HypergraphCircuit(AnalysisPass):
                 edge_vector.extend(edge)
                 idx_vector.append(pos)
                 pos += len(edge)
-            #else:
-                #print(i)
+            # else:
+            # print(i)
 
         self.property_set["hyper_dag_kahypar"] = (idx_vector, edge_vector)
 
-        #print(idx_vector)
-        #print(edge_vector)
+        # print(idx_vector)
+        # print(edge_vector)
 
     def multigraph_to_singular(self):
         # Remove all duplicate edges added due to multigraph setting
@@ -379,9 +373,9 @@ class HypergraphCircuit(AnalysisPass):
 
     def cost_analysis(self):
         # calculate gates (swap, two-qubits, etc.)
-        
+
         # calc depth
-        
+
         # calc num qubits
 
         # calculate_gates()
@@ -405,16 +399,16 @@ class HypergraphCircuit(AnalysisPass):
         def node_attr_fn(node):
             attr_dict = {
                 "fontcolor": "white",
-                "color": "darkcyan", 
+                "color": "darkcyan",
                 "fill_color": "darkcyan",
                 "style": "filled",
                 "shape": "circle",
                 "label": str(node),
                 "width": ".5",
                 "height": ".5",
-                "rank": "same"
+                "rank": "same",
             }
             return attr_dict
-        
+
         hgc = self.property_set["hyper_dag"]
         graphviz_draw(hgc._hg, filename=filename, node_attr_fn=node_attr_fn)

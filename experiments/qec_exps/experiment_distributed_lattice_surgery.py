@@ -34,7 +34,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         p = s.json_metadata["p"]
         t = str(s.json_metadata["run_name"])
         d = str(s.json_metadata["d"])
-        
+
         error_rates[t][d][p].append(ler)
         physical_error_rates.add(p)
         d_values.add(d)
@@ -47,11 +47,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         # "text.usetex": True,
         "font.family": "serif",
         # Font sizes
-        "axes.labelsize": FONTSIZE*1.5,
-        "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.3,
-        "xtick.labelsize": (FONTSIZE - 1)*1.3,
-        "ytick.labelsize": (FONTSIZE - 1)*1.3,
+        "axes.labelsize": FONTSIZE * 1.5,
+        "font.size": FONTSIZE * 1.2,
+        "legend.fontsize": (FONTSIZE - 2) * 1.3,
+        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
+        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
@@ -63,17 +63,15 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     }
     plt.rcParams.update(tex_fonts)
 
-
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
     # Plot identity (x = y)
     plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.2, color="#000000B3", label="x=y")
 
-    colors_sabre = ([ "#E38E8A", "#C85E59", "#9F3B36"])
-    colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
-    colors_default = ["#000", "#000", "#000"]#([ "#C85E59", "#9F3B36", "#7F2E2A"])
+    colors_sabre = ["#E38E8A", "#C85E59", "#9F3B36"]
+    colors_transpiled = ["#5E97CC", "#3B6FA8", "#2A5687"]
+    colors_default = ["#000", "#000", "#000"]  # ([ "#C85E59", "#9F3B36", "#7F2E2A"])
     color_list = [colors_default, colors_transpiled, colors_sabre]
-
 
     # TODO: Add sabre to the plots
     inter_markers = ["x", "o", "s"]
@@ -82,12 +80,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
 
     for ti, t in enumerate(["default", "compiled", "sabre"]):
         for i, d in enumerate(d_values_reduced):
-        
             errors = defaultdict(dict)
 
             for p in physical_error_rates:
                 errors[p] = error_rates[t][d][p][0]
-                
+
             if t == "default":
                 l = "Ideal"
             elif t == "compiled":
@@ -95,29 +92,31 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
             elif t == "sabre":
                 l = "LightSABRE"
             ys_custom = [errors[p] for p in physical_error_rates]
-            h = plt.plot(physical_error_rates,
-                        ys_custom,
-                        linewidth = 1.5 if t == "default" else 1.5,
-                        marker = inter_markers[i],
-                        markerfacecolor="none",
-                        linestyle= "solid", #"--" if t == "default" else "solid",
-                        color = color_list[ti][i],
-                        label = f"{l}, d={d}")
+            h = plt.plot(
+                physical_error_rates,
+                ys_custom,
+                linewidth=1.5 if t == "default" else 1.5,
+                marker=inter_markers[i],
+                markerfacecolor="none",
+                linestyle="solid",  # "--" if t == "default" else "solid",
+                color=color_list[ti][i],
+                label=f"{l}, d={d}",
+            )
             handles.extend(h)
-            
+
     if inter_chiplet_noise == 0.0001:
         ps_inter_text = r"$1e^{-4}$"
     elif inter_chiplet_noise == 0.001:
         ps_inter_text = r"$1e^{-3}$"
     elif inter_chiplet_noise == 0.01:
         ps_inter_text = r"$1e^{-2}$"
-    description = (r"$p_{inter}$ = " + f"{ps_inter_text}")
+    description = r"$p_{inter}$ = " + f"{ps_inter_text}"
 
-    #ax.text(
+    # ax.text(
     #    0, 1.02, description,
     #    transform=ax.transAxes,
     #    fontweight="bold"
-    #)
+    # )
     """
     ax.text(
         0.23, .42, "-95x",
@@ -156,40 +155,35 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     )
     """
 
-    ax.text(
-        -0., 1.04, "a) Effect of compilation on the LER",
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+    ax.text(-0.0, 1.04, "a) Effect of compilation on the LER", transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.3, 1.15, "Lower is better ↓",
+        0.3,
+        1.15,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
-    
-    #plt.ylim(-0.01, 0.9)
+
+    # plt.ylim(-0.01, 0.9)
     plt.ylim(5e-9, 2e0)
     plt.xlim(1e-4, 1e-2)
     plt.xscale("log")
     plt.yscale("log")
 
-
     plt.xlabel("Physical error rate")
     plt.ylabel("Logical error rate")
-    #plt.legend(loc="lower right", ncol=2)
-    #plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2)
+    # plt.legend(loc="lower right", ncol=2)
+    # plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2)
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    #plt.tight_layout()
-    #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
+    # plt.tight_layout()
+    # fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     fig.subplots_adjust(left=0.24, right=0.95, top=0.8, bottom=0.21)
     plt.savefig(filename + ".pdf", format="pdf", bbox_inches="tight")
     plt.close(fig)
 
-
-
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.6, WIDTH_FIGSIZE))
     for i, d in enumerate(d_values):
         errors = defaultdict(dict)
         errors_sabre = defaultdict(dict)
@@ -197,8 +191,8 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         errors_average_sabre = []
 
         for p in physical_error_rates:
-            errors[p] = error_rates["compiled"][d][p][0]/error_rates["default"][d][p][0]
-            errors_sabre[p] = error_rates["sabre"][d][p][0]/error_rates["default"][d][p][0]
+            errors[p] = error_rates["compiled"][d][p][0] / error_rates["default"][d][p][0]
+            errors_sabre[p] = error_rates["sabre"][d][p][0] / error_rates["default"][d][p][0]
 
             if p < 1e-2:
                 errors_average.append(errors[p])
@@ -206,41 +200,39 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
 
         print(f"Relative increase for compiled {d} for icc {inter_chiplet_noise}: {np.mean(errors_average)}")
         print(f"Relative increase for sabre {d} for icc {inter_chiplet_noise}: {np.mean(errors_average_sabre)}")
-                
+
         ys_custom = [errors[p] for p in physical_error_rates]
-        plt.plot(physical_error_rates,
-                    ys_custom,
-                    linewidth = 1.5,
-                    marker = inter_markers[i],
-                    markersize = 5,
-                    markerfacecolor = "none",
-                    linestyle= "--",
-                    color = colors_transpiled[i],
-                    label = f"({d})")
-            
-    
-    ax.text(
-        0, 1.02, description,
-        transform=ax.transAxes,
-        fontweight="bold"
-    )
+        plt.plot(
+            physical_error_rates,
+            ys_custom,
+            linewidth=1.5,
+            marker=inter_markers[i],
+            markersize=5,
+            markerfacecolor="none",
+            linestyle="--",
+            color=colors_transpiled[i],
+            label=f"({d})",
+        )
+
+    ax.text(0, 1.02, description, transform=ax.transAxes, fontweight="bold")
 
     ax.text(
-        0.57, 1.08, "Lower is better ↓",
+        0.57,
+        1.08,
+        "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
     )
-    
-    #plt.ylim(-0.01, 0.9)
-    #plt.ylim(5e-9, 1e0)
-    plt.xscale("log")
-    #plt.yscale('log')
 
+    # plt.ylim(-0.01, 0.9)
+    # plt.ylim(5e-9, 1e0)
+    plt.xscale("log")
+    # plt.yscale('log')
 
     plt.xlabel("Physical error rate")
     plt.ylabel(r"$LER_{Compiled} / LER_{Default}$")
-    #plt.legend(loc="upper right", ncol=1)
+    # plt.legend(loc="upper right", ncol=1)
     plt.grid(True, which="both", linestyle="--", alpha=0.5)
 
     fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
@@ -248,15 +240,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     plt.close()
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles = handles,
-                               loc = "center",
-                               frameon = False,
-                               ncols = 3,
-                               columnspacing = 1.5)
+    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=3, columnspacing=1.5)
     legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
-    
+
 def run_exp_distributed_lattice_surgery() -> None:
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
@@ -264,11 +252,10 @@ def run_exp_distributed_lattice_surgery() -> None:
     # Inter-chiplet noise level
     inter_chiplet_noise = [1e-4, 1e-3, 1e-2]
     for ps_inter in inter_chiplet_noise:
-
         # Transpilation
-        ts = ["default", "compiled", "sabre"]# + [str(i) for i in num_inter_chiplet_connections]
+        ts = ["default", "compiled", "sabre"]  # + [str(i) for i in num_inter_chiplet_connections]
         ks = [1, 2, 3]
-        
+
         transpiled_circuits = {}
         """
         
@@ -394,15 +381,17 @@ def run_exp_distributed_lattice_surgery() -> None:
         with open(f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.pkl", "wb") as f:
             pickle.dump(stats, f)
 
-        """    
-        
+        """
+
         with open(f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}.pkl", "rb") as f:
             stats = pickle.load(f)
 
-        plot_evaluation(stats,
-                        filename = f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}",
-                        inter_chiplet_noise=ps_inter)
-    
+        plot_evaluation(
+            stats,
+            filename=f"experiments/evaluation/qec_evaluation/single_cnot_rotated_{ps_inter}",
+            inter_chiplet_noise=ps_inter,
+        )
+
 
 if __name__ == "__main__":
     run_exp_distributed_lattice_surgery()

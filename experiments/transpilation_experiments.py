@@ -65,7 +65,9 @@ def generate_simple_dqc_backend(x_num: int, y_num: int, cross_link_sparsity: int
     qubit_num = len(G.nodes)
     data_qubit_num = len(G.nodes) - len(get_highway_qubits(G))
 
-    print(f"Generated backend! \n #qubits: {len(G.nodes)} \n #qubits considering highway (only relevant for MECH): {data_qubit_num}")
+    print(
+        f"Generated backend! \n #qubits: {len(G.nodes)} \n #qubits considering highway (only relevant for MECH): {data_qubit_num}"
+    )
 
     return G, qubit_num, data_qubit_num
 
@@ -80,9 +82,9 @@ def generate_qiskit_backend_from_mech(G: nx.graph) -> CouplingMap:
         CouplingMap: _description_
     """
     qubit_idx_dict = gen_qubit_idx_dict(G)
-    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
-    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
-    
+    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1, n2 in G.edges)
+    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1, n2 in G.edges)
+
     return CouplingMap(regular_coupling)
 
 
@@ -105,7 +107,7 @@ def coupling_to_adjacency(coupling_map: list) -> np.array:
     for a, b in coupling_map:
         i, j = qubit_index[a], qubit_index[b]
         matrix[i][j] = 1
-        matrix[j][i] = 1 # Assuming undirected graph
+        matrix[j][i] = 1  # Assuming undirected graph
 
     return np.array(matrix)
 
@@ -149,8 +151,8 @@ def generate_qecc_synth_backend_from_mech(G: nx.graph) -> tuple[np.array, list]:
         tuple[np.array, list]: Adjacency graph and qubit index list
     """
     qubit_idx_dict = gen_qubit_idx_dict(G)
-    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
-    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
+    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1, n2 in G.edges)
+    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1, n2 in G.edges)
 
     CG = coupling_to_adjacency(regular_coupling)
     qubit_idx_dict = idx_dict_to_list(qubit_idx_dict)
@@ -166,8 +168,8 @@ def display_simple_backend(backend: nx.Graph, filename: str) -> None:
         filename (str): _description_
     """
     qubit_idx_dict = gen_qubit_idx_dict(backend)
-    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in backend.edges)
-    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in backend.edges)
+    regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1, n2 in backend.edges)
+    regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1, n2 in backend.edges)
 
     cm = CouplingMap(couplinglist=regular_coupling)
     plot_coupling_map(cm.size(), None, cm.get_edges(), filename=filename)
@@ -180,7 +182,7 @@ def write_to_file(object, filename: str) -> None:
         object (_type_): Object to write
         filename (str): Destination
     """
-    filehandler = open(f"{filename}.pkl", "wb") 
+    filehandler = open(f"{filename}.pkl", "wb")
     pickle.dump(object, filehandler)
 
 
@@ -189,9 +191,9 @@ if __name__ == "__main__":
     code_name = "surface"
 
     # Generate square backend of different size and chiplet connectivity
-    #nnx = [4, 6, 8]
-    #cl = [4]
-    #cl = [4, 2, 1]
+    # nnx = [4, 6, 8]
+    # cl = [4]
+    # cl = [4, 2, 1]
     nnx = [8]
     cl = [4]
 
@@ -202,13 +204,14 @@ if __name__ == "__main__":
         simple_dqc_backend, qubit_num, data_qubit_num = generate_simple_dqc_backend(n, n, c)
         # Print backend to file
         display_simple_backend(simple_dqc_backend, f"data/backends/square_{n}_{n}_{c}.png")
-        
+
         # Calculate size of code based on backend size
         d = get_max_d(code_name, data_qubit_num)
         logging.info(f"Max distance for {code_name} is {d}")
         if d < 3:
             logging.error(
-                f"Code distance too small! {code_name} with distance {d} and {data_qubit_num} qubits: Execution not possible")
+                f"Code distance too small! {code_name} with distance {d} and {data_qubit_num} qubits: Execution not possible"
+            )
             exit(1)
         cycles = d
         # Generate code
@@ -226,12 +229,12 @@ if __name__ == "__main__":
         architecture = generate_qecc_synth_backend_from_mech(simple_dqc_backend)
         # Perform algorithm
         circuit_qecc_synth = transpile_circuit_QECCSynth(d, architecture, f"square_{n}_{n}_{c}")
-        write_to_file(circuit_qecc_synth, f"data/transpiled_circuit/{code_name}_d_square_{n}_{n}_{c}_qecc_synth")  
-        # Found optimium: 6, 6, 4  
+        write_to_file(circuit_qecc_synth, f"data/transpiled_circuit/{code_name}_d_square_{n}_{n}_{c}_qecc_synth")
+        # Found optimium: 6, 6, 4
 
         # Qiskit-SABRE
         # Generate backend for qiskit
         cm = generate_qiskit_backend_from_mech(simple_dqc_backend)
         # Perform algorithm
-        circuit_qiskit = transpile_circuit_SABRE(circuit = code.qc, coupling_map = cm)
+        circuit_qiskit = transpile_circuit_SABRE(circuit=code.qc, coupling_map=cm)
         write_to_file(circuit_qiskit, f"data/transpiled_circuit/{code_name}_d_square_{n}_{n}_{c}_qiskit")

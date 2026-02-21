@@ -36,16 +36,16 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         - https://github.com/kahypar/mt-kahypar
     """
 
-    def __init__(self, backend: BackendChipletV2, partitions = None):
+    def __init__(self, backend: BackendChipletV2, partitions=None):
         """KaHyPar partitioning initializer"""
         super().__init__()
 
         self.backend = backend
 
         # Method for calculating the number of partitions
-        #self._calculate_partitions_method = "full"
+        # self._calculate_partitions_method = "full"
         self._calculate_partitions_method = "patch-aware"
-        #self._calculate_partitions_method = "patch-splitting-aware"
+        # self._calculate_partitions_method = "patch-splitting-aware"
 
         # Initialize KaHyPar
         self.khp_context = kahypar.Context()
@@ -67,18 +67,15 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         # Utilize pre-defined partitions
         if self.partitions != None:
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
-                    partitioned_hgc = None,
-                    hgc = self.property_set["hyper_dag_kahypar"],
-                    partitions = self.partitions,
-                    dag = dag)
-            
+                partitioned_hgc=None, hgc=self.property_set["hyper_dag_kahypar"], partitions=self.partitions, dag=dag
+            )
+
             # Store the pre-defined partitions for all other passes to access
             self.property_set["pre_defined_partitions"] = self.partitions
         else:
-
             # Get hypergraph representation of dag
             hgc = self.property_set["hyper_dag"]
-            
+
             # Calculate number of partitions
             self.kp, partition_sizes = self.calculate_number_partitions(dag, hgc)
 
@@ -88,16 +85,16 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
                 # Hypergraph
                 self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
-                    partitioned_hgc = kahypar_hg,
-                    hgc = self.property_set["hyper_dag_kahypar"])
+                    partitioned_hgc=kahypar_hg, hgc=self.property_set["hyper_dag_kahypar"]
+                )
             else:
-                # Explicit Partitioning not needed 
+                # Explicit Partitioning not needed
                 (index_vector, edge_vector) = self.property_set["hyper_dag_kahypar"]
                 num_vertices = len(index_vector)
-                
+
                 self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
-                    num_nodes = num_vertices,
-                    hgc = self.property_set["hyper_dag_kahypar"])
+                    num_nodes=num_vertices, hgc=self.property_set["hyper_dag_kahypar"]
+                )
                 # self.property_set["partition_to_qpu"] = partition_to_qpu
 
             # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without
@@ -117,8 +114,8 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         """
         # Get vertices and edges in KaHyPar specific format
         (index_vector, edge_vector) = self.property_set["hyper_dag_kahypar"]
-        
-        num_vertices = max(max(edge_vector) + 1, len(set(edge_vector))-1)
+
+        num_vertices = max(max(edge_vector) + 1, len(set(edge_vector)) - 1)
         num_hyperedges = len(index_vector) - 1
 
         # For now, all hyperedges are assumed to have the same weight
@@ -141,7 +138,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             self.kp,
             hyperedge_weights,
             vertex_weights,
-            )
+        )
 
         # Partition hypergraph
         kahypar.partition(kahypar_hg, self.khp_context)
@@ -165,7 +162,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         References:
             - https://networkx.org/documentation/stable/reference/algorithms/community.html
             - https://link.springer.com/article/10.1007/s11227-025-06918-3
-        
+
         :param dag: _description_
         :type dag: DAGCircuit
         :return: _description_
@@ -175,17 +172,16 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         num_qubits_circuit = dag.num_qubits()
 
         print("Calculate optimal k")
-        # Perform partitioning, if circuit does not fit on on chiplet      
+        # Perform partitioning, if circuit does not fit on on chiplet
         if self._calculate_partitions_method == "full":
             # Fill chiplet as much as possible
             k = int(np.ceil(num_qubits_circuit / num_qubits_chiplet))
 
         elif self._calculate_partitions_method == "patch-aware":
             # Try to find all higly connected patches in a circuit
-            
+
             (index_vector, edge_vector) = self.property_set["hyper_dag_kahypar"]
 
-            
             # Create multigraph given index and edge vectors
             H = nx.MultiGraph()
 
@@ -196,7 +192,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
             for h in range(num_hyperedges):
                 start = index_vector[h]
-                end   = index_vector[h+1]
+                end = index_vector[h + 1]
 
                 # Nodes in hyperedge h
                 nodes = edge_vector[start:end]
@@ -211,7 +207,6 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                         H.add_node(u)
                         H.add_edge(h_node, u)
 
-
             plt.figure(figsize=(6, 6))
             # Draw the graph
             nx.draw(H, with_labels=True, node_size=100)
@@ -219,21 +214,19 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             plt.close()
             print("Printed graph")
 
-
             # Girvan–Newman algorithm because this method produces a contractiontree that approximates the optimal
             # solution in terms of spatial cost.
             comp = nx.community.girvan_newman(H)
             communities = tuple(sorted(c) for c in next(comp))
-            
-            #communities = nx.community.greedy_modularity_communities(H, cutoff=5)
+
+            # communities = nx.community.greedy_modularity_communities(H, cutoff=5)
 
             print(f"Found {len(communities)} communities")
             print(communities)
             k = len(communities)
-            #print()
+            # print()
 
         elif self._calculate_partitions_method == "patch-splitting-aware":
-
             # Approach to keep patches together:
             #   - Try to find patches in the circuit
             #   - How many patches can be place on a single chiplet? Calculate
@@ -266,7 +259,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             bipartite_community_detection = []
             bipartite_community_detection.append(G_nx)
             bipartite_communities = []
-            #print(G_nx)
+            # print(G_nx)
             while True:
                 G_iter = bipartite_community_detection.pop(0)
 
@@ -286,20 +279,20 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                 if bipartite_community_detection == []:
                     break
 
-            #print(bipartite_communities)
+            # print(bipartite_communities)
             k = len(bipartite_communities)
 
             # k can be of maximum size backend_num_chiplets
             k = min(k, self.backend.get_num_chips())
         else:
             pass
-        
-        #k = 1#5#3 # 3
+
+        # k = 1#5#3 # 3
         print("!!!Warning: Using hardcoded value!!!")
         print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet
         partition_sizes = [num_qubits_chiplet for c in range(k)]
-        #partition_sizes = [58, 58, 58, 5, 5]
+        # partition_sizes = [58, 58, 58, 5, 5]
 
         """
         (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']

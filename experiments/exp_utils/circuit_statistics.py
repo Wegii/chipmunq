@@ -1,10 +1,10 @@
 import os
 import sys
 
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
-#from qiskit_qec.utils import get_stim_circuits
+# sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
+# sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
+# sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
+# from qiskit_qec.utils import get_stim_circuits
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
 # Typing
@@ -18,16 +18,14 @@ from glue.eccentric_bench.backends import QubitTracking
 # Qiskit to stim translation
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 
-#from glue.eccentric_bench.noise import get_noise_model
-#from glue.eccentric_bench.decoders import decode
+# from glue.eccentric_bench.noise import get_noise_model
+# from glue.eccentric_bench.decoders import decode
 
 
 class QECCircuitStats:
-    """_summary_
-    """
+    """_summary_"""
 
-    def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit = None,
-                backend: BackendV2 = None):
+    def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit=None, backend: BackendV2 = None):
 
         if stim_circuit != None:
             # To perform simulation
@@ -35,9 +33,9 @@ class QECCircuitStats:
 
             # Transpiled stim circuit
             detectors, logicals = self.stim_circuit.stim_detectors()
-            self.transpiled_stim_circuit = get_stim_circuits(transpiled_circuit,
-                                                             detectors=detectors,
-                                                             logicals=logicals)[0][0]
+            self.transpiled_stim_circuit = get_stim_circuits(
+                transpiled_circuit, detectors=detectors, logicals=logicals
+            )[0][0]
 
         if backend != None:
             self.backend = backend
@@ -45,7 +43,6 @@ class QECCircuitStats:
         # For calculating gate statistics. Note: stim_circuit.qc contains the circuit before the transpiler passes,
         # while transpiled_circuit is the transpiled version
         self.circ = transpiled_circuit
-
 
     def get_logical_error_rate(self, num_samples):
 
@@ -73,7 +70,6 @@ class QECCircuitStats:
 
         return logical_error_rate
 
-
     def get_num_qubits(self):
         """Number of qubits in circuit.
 
@@ -91,11 +87,11 @@ class QECCircuitStats:
         """
         # Sum of all gates
         return self.get_num_two_gates() + self.get_num_single_gates()
-        
+
     def get_num_remote_gates(self):
         # Get number of remote gates
         # TODO: Check backend how these are defined
-        
+
         pass
 
     def get_num_two_gates(self) -> int:
@@ -105,7 +101,6 @@ class QECCircuitStats:
         :rtype: int
         """
         return sum(1 for instr, qargs, cargs in self.circ.data if len(qargs) == 2)
-
 
     def get_num_single_gates(self):
         # Get number of single-qubit gates
@@ -118,18 +113,12 @@ class QECCircuitStats:
         :rtype: int
         """
         return self.circ.depth()
-    
-
-
-
 
 
 class SingleLatticeSurgeryStats:
-    """Statistics of a single circuit with Lattice Surgery
-    """
+    """Statistics of a single circuit with Lattice Surgery"""
 
-    def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit = None,
-                backend: BackendV2 = None):
+    def __init__(self, transpiled_circuit: QuantumCircuit, stim_circuit=None, backend: BackendV2 = None):
 
         if stim_circuit != None:
             # To perform simulation
@@ -166,4 +155,3 @@ class SingleLatticeSurgeryStats:
 
         logical_error_rate = error_occured / num_samples
         return logical_error_rate
-

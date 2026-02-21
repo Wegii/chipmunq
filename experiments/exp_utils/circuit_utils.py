@@ -7,17 +7,16 @@ def stim_to_qiskit(stim_circuit) -> QuantumCircuit:
     """Convert stim circuit to qiskit
 
     wrapper around stim_code_circuit
-    
+
     Note:
         - not all stim gates can be represented by a qiskit QuantumCircuit. These gates are simply not used
     """
     # TODO: extract detectors and return them
 
     # Convert stim circuit to qiskit
-    stim_code = StimCodeCircuit(stim_circuit = stim_circuit)
-    
-    return stim_code
+    stim_code = StimCodeCircuit(stim_circuit=stim_circuit)
 
+    return stim_code
 
 
 def get_partitions_stim_tqec(stim_circuit, code_distance):
@@ -29,7 +28,5 @@ def get_partitions_stim_tqec(stim_circuit, code_distance):
     # Parse QUBIT_COORDS(y, x) idx
 
     # Start at min y and min x
-    
+
     pass
-
-

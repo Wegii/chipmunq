@@ -15,10 +15,10 @@ class PartitionedMapRoutePass(TransformationPass):
     Tasks:
         - TODO: Find out how to implement this the best way. Probably rewrite the mar class. This class then returns the
                 multiple stages
-    
+
     References:
     https://quantum.cloud.ibm.com/docs/en/guides/create-transpiler-plugin
-    
+
     """
 
     def __init__(self):
@@ -38,7 +38,7 @@ class PartitionedMapRoutePass(TransformationPass):
         return qc
 
     def _partitioned_mar(circuit: DAGCircuit) -> DAGCircuit:
-    
+
         # TODO: rewrite this in terms of passes
 
         hg_circuit = HypergraphCircuit(circuit)
@@ -58,5 +58,5 @@ class PartitionedMapRoutePass(TransformationPass):
 
         m_circuit = mar.perform_mapping(circuit)
         mr_circuit = mar.perform_routing(m_circuit)
-        
+
         return mr_circuit
