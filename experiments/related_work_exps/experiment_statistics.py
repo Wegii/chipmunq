@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-import time
 import pickle
 
 # MECH
@@ -30,9 +30,10 @@ from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
 """
 
 # Plotting
-from experiments.utils import *
-from experiments.related_work_exps.utils import *
 from matplotlib.ticker import MaxNLocator
+
+from experiments.related_work_exps.utils import *
+from experiments.utils import *
 
 
 def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type: str, filename: str = ""):
@@ -81,15 +82,15 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
 
     qiskit_bar = ax.bar(x-width, qiskit_2q_overhead, width,
            label="LightSABRE", color="lightcoral",
-           hatch='o', edgecolor='black')
+           hatch="o", edgecolor="black")
 
     mech_bar = ax.bar(x, mech_2q_overhead, width,
            label="MECH", color="#A7D9ED",
-           hatch='//', edgecolor='black')
+           hatch="//", edgecolor="black")
     
     qecc_synth_bar = ax.bar(x+width, qeccsynth_2q_overhead, width,
            label="QECC-Synth", color="#B2D8B2",
-           hatch='/', edgecolor='black')
+           hatch="/", edgecolor="black")
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
@@ -115,7 +116,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     )
 
 
-    plt.tick_params(axis='both', labelsize=14)
+    plt.tick_params(axis="both", labelsize=14)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.xlabel("Surface code distance", fontsize=16)
@@ -126,7 +127,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     plt.ylabel(description, fontsize=16)
     plt.yscale("log")
 
-    plt.grid(True, which='major', linestyle='--', alpha=0.5)
+    plt.grid(True, which="major", linestyle="--", alpha=0.5)
 
     # ax.legend(loc='upper left')
 
@@ -138,10 +139,10 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     # Create custom figure for legend
     legend_fig = plt.figure(figsize=(3, 2))
     legend = legend_fig.legend(handles = [qiskit_bar, mech_bar, qecc_synth_bar],
-                               loc = 'center',
+                               loc = "center",
                                frameon = False,
                                ncols = 3)
-    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
@@ -170,7 +171,7 @@ def run_statistics():
         result_mech = calc_circuit_mech_stats(circuit_mech, code.qc)
 
         # QECCsynth
-        circuit_qeccsynth, result = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{m}_{m}')
+        circuit_qeccsynth, result = transpile_circuit_QECCSynth(d, architecture, f"square_{n}_{m}_{m}")
         result_qeccsynth = calc_circuit_qiskit_stats(circuit_qeccsynth, monolithic_backend, result)
 
         # Qiskit
@@ -183,13 +184,13 @@ def run_statistics():
         qiskit_overhead_storage[d] = result_qiskit
 
     # Write results to file
-    with open(f"experiments/evaluation/related_work/overhead_mech.pkl", "wb") as f:
+    with open("experiments/evaluation/related_work/overhead_mech.pkl", "wb") as f:
         pickle.dump(mech_overhead_storage, f)
 
-    with open(f"experiments/evaluation/related_work/overhead_qeccsynth.pkl", "wb") as f:
+    with open("experiments/evaluation/related_work/overhead_qeccsynth.pkl", "wb") as f:
         pickle.dump(qeccsynth_overhead_storage, f)
 
-    with open(f"experiments/evaluation/related_work/overhead_sabre.pkl", "wb") as f:
+    with open("experiments/evaluation/related_work/overhead_sabre.pkl", "wb") as f:
         pickle.dump(qiskit_overhead_storage, f)    
     
     
@@ -197,11 +198,11 @@ if __name__ == "__main__":
     # run_statistics()
 
     # Load pre-computed results
-    with open(f"experiments/evaluation/related_work/overhead_mech.pkl", "rb") as f:
+    with open("experiments/evaluation/related_work/overhead_mech.pkl", "rb") as f:
         mech_overhead_storage = pickle.load(f)
-    with open(f"experiments/evaluation/related_work/overhead_qeccsynth.pkl", "rb") as f:
+    with open("experiments/evaluation/related_work/overhead_qeccsynth.pkl", "rb") as f:
         qeccsynth_overhead_storage = pickle.load(f)
-    with open(f"experiments/evaluation/related_work/overhead_sabre.pkl", "rb") as f:
+    with open("experiments/evaluation/related_work/overhead_sabre.pkl", "rb") as f:
         qiskit_overhead_storage = pickle.load(f)
 
     plot_gate_overhead(mech_overhead_storage,

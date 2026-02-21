@@ -1,15 +1,16 @@
+import math
+
+import matplotlib.pyplot as plt
+import numpy as np
 import qiskit
 from qiskit.visualization import plot_gate_map
 from qiskit.visualization.exceptions import VisualizationError
-import matplotlib.pyplot as plt
 
 from qeccm.backends import BackendChipletV2
-import numpy as np
-import math
 
 
 def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_color: bool = False):
-    """ Custom implementation of qiskit.visualization.plot_gate_map
+    """Custom implementation of qiskit.visualization.plot_gate_map
     
     Creates coordinates based on backend type rectangular, etc.
 
@@ -17,7 +18,6 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
 
     Create coloring for non-local connections (gross code style)
     """
-
     qubit_coordinates = generate_coordinates(backend)
     line_colors, qubit_colors = generate_formatting(backend, qubit_coordinates)
 
@@ -43,21 +43,20 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
 
                 if row % 2 == 0:
                     if i % 2 == 0:
-                        qubit_colors.append('#2A9374')
-                        qubit_shapes.append('s')
+                        qubit_colors.append("#2A9374")
+                        qubit_shapes.append("s")
                     else:
-                        qubit_colors.append('#046494')
-                        qubit_shapes.append('o')
+                        qubit_colors.append("#046494")
+                        qubit_shapes.append("o")
+                elif i % 2 == 0:
+                    qubit_colors.append("#FDD689")
+                    qubit_shapes.append("o")
                 else:
-                    if i % 2 == 0:
-                        qubit_colors.append('#FDD689')
-                        qubit_shapes.append('o')
-                    else:
-                        qubit_colors.append('#E18AAA')
-                        qubit_shapes.append('s')
+                    qubit_colors.append("#E18AAA")
+                    qubit_shapes.append("s")
         else:
             for i, (x, y) in enumerate(qubit_coordinates):
-                qubit_shapes.append('s')
+                qubit_shapes.append("s")
 
         plt.figure()#figsize=(8, 8))
 
@@ -68,11 +67,11 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
             plt.text(
                 x, y,
                 str(i),
-                color='white',
-                ha='center',
-                va='center',
+                color="white",
+                ha="center",
+                va="center",
                 fontsize=10,
-                weight='bold',
+                weight="bold",
                 zorder=4
             )
 
@@ -91,9 +90,9 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
             plt.annotate(
                 "",
                 xy=(x2, y2),
-                xycoords='data',
+                xycoords="data",
                 xytext=(x1, y1),
-                textcoords='data',
+                textcoords="data",
                 arrowprops=dict(
                     arrowstyle="-",
                     color=color,
@@ -112,13 +111,12 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
 
 
 def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV2, filename: str = ""):
-    """ Plot mapping of quantum circuit on backend.
+    """Plot mapping of quantum circuit on backend.
 
     TODO: also show ancilla qubit usage, since this is currently ignored
 
     Modified version of qiskit.visualization.plot_circuit_layout.
     """
-    
     qubit_coordinates = generate_coordinates(backend)
     line_colors, qubit_colors = generate_formatting(backend, qubit_coordinates)
 
@@ -261,7 +259,7 @@ def generate_coordinates(backend):
     #print(len(coordinates))
     total_qubit_coordinates = []
     if backend.c1 > 1 or backend.c2 > 1:
-        if backend.chiplet_topology == 'line':
+        if backend.chiplet_topology == "line":
             for coordinate in coordinates:
                 total_qubit_coordinates.append(coordinate)
         
@@ -272,7 +270,7 @@ def generate_coordinates(backend):
                     total_qubit_coordinates.append(
                         (coordinate[0], coordinate[1] + i*backend.m)
                     )
-        elif backend.chiplet_topology == 'grid':
+        elif backend.chiplet_topology == "grid":
             #for coordinate in coordinates:
             #    total_qubit_coordinates.append(coordinate)
         

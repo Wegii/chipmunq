@@ -1,21 +1,24 @@
 # Circuit verification
-from qeccm.circuit.circuit_verification import check_valid_1q_2q_gates
-#from qecc_mapping.experiments.utils.circuit_statistics import *
-# Hypergraph
-import rustworkx as rx
-from rustworkx.visualization import graphviz_draw
-import kahypar
-# Visualization
-import matplotlib.pyplot as plt
-import hypernetx as hnx
-# Qiskit Transpiler
-from qiskit.dagcircuit import DAGCircuit
-from qiskit.transpiler.basepasses import AnalysisPass
 # Hashmap
 from collections import defaultdict
 
+import hypernetx as hnx
+import kahypar
+
+# Visualization
+import matplotlib.pyplot as plt
 import networkx as nx
-import pandas as pd
+
+#from qecc_mapping.experiments.utils.circuit_statistics import *
+# Hypergraph
+import rustworkx as rx
+
+# Qiskit Transpiler
+from qiskit.dagcircuit import DAGCircuit
+from qiskit.transpiler.basepasses import AnalysisPass
+from rustworkx.visualization import graphviz_draw
+
+from qeccm.circuit.circuit_verification import check_valid_1q_2q_gates
 
 
 class PartitionedHyperGraph:
@@ -79,67 +82,66 @@ class PartitionedHyperGraph:
                 for i in range(len(blocks)):
                     for j in range(i + 1, len(blocks)):
                         ch.add_edge(blocks[i], blocks[j])
+        elif partitions != None:
+            block_to_nodes = {"b:" + str(b): [] for b in range(len(partitions))}
+            #block_to_nodes = {b: [] for b in range(len(partitions))}
+
+            for i, partition in enumerate(partitions):
+                block_to_nodes["b:" + str(i)].extend(partition["indices"][:])
+                #block_to_nodes[i].extend(partition['indices'][:])
+
+            (index_vector, edge_vector) = hgc
+            available_nodes = set(edge_vector)
+            # Construct collapsed hypergraph
+            # All blocks are collapsed to singular nodes, while edges between blocks are kept
+            ch = nx.MultiGraph()
+            # Create a node for each partition
+            for b in range(len(partitions)):
+                ch.add_node(b)
+
+            # Precompute qubit to partition mapping
+            qubit_to_partition = {}
+            for p_index, part in enumerate(partitions):
+                for qubit in part["indices"]:
+                    qubit_to_partition[qubit] = p_index
+
+            interactions = {i: set() for i in range(len(partitions))}
+            # Iterate over all 2-qubit gates in the DAG
+            for node in dag.two_qubit_ops():
+                q_indices = [q._index for q in node.qargs]
+                q0, q1 = q_indices
+
+                # Find the partitions these qubits belong to
+                p0 = qubit_to_partition[q0]
+                p1 = qubit_to_partition[q1]
+
+                # Record direct interactions between adjacent partitions
+                if p0 != p1:
+                    interactions[p0].add(p1)
+                    interactions[p1].add(p0)
+
+            interactions = {k: sorted(v) for k, v in interactions.items()}
+
+            for p, others in interactions.items():
+                for q in others:
+                    ch.add_edge(p, q)
+
         else:
-            if partitions != None:
-                block_to_nodes = {"b:" + str(b): [] for b in range(len(partitions))}
-                #block_to_nodes = {b: [] for b in range(len(partitions))}
-                
-                for i, partition in enumerate(partitions):
-                    block_to_nodes["b:" + str(i)].extend(partition['indices'][:])
-                    #block_to_nodes[i].extend(partition['indices'][:])
-                
-                (index_vector, edge_vector) = hgc
-                available_nodes = set(edge_vector)
-                # Construct collapsed hypergraph
-                # All blocks are collapsed to singular nodes, while edges between blocks are kept
-                ch = nx.MultiGraph()
-                # Create a node for each partition
-                for b in range(len(partitions)):
-                    ch.add_node(b)
+            # Implementation in case only one partition is available
 
-                # Precompute qubit to partition mapping
-                qubit_to_partition = {}
-                for p_index, part in enumerate(partitions):
-                    for qubit in part['indices']:
-                        qubit_to_partition[qubit] = p_index
+            # Generate dictionary with one block
+            block_to_nodes = {"b:" + str(0): []}
 
-                interactions = {i: set() for i in range(len(partitions))}
-                # Iterate over all 2-qubit gates in the DAG
-                for node in dag.two_qubit_ops():
-                    q_indices = [q._index for q in node.qargs]
-                    q0, q1 = q_indices
+            (index_vector, edge_vector) = hgc
+            all_nodes = set(edge_vector)
 
-                    # Find the partitions these qubits belong to
-                    p0 = qubit_to_partition[q0]
-                    p1 = qubit_to_partition[q1]
+            # Assign all nodes to this block
+            for node in all_nodes:
+                block_to_nodes["b:" + str(0)].append(node)
 
-                    # Record direct interactions between adjacent partitions
-                    if p0 != p1:
-                        interactions[p0].add(p1)
-                        interactions[p1].add(p0)
-
-                interactions = {k: sorted(v) for k, v in interactions.items()}
-
-                for p, others in interactions.items():
-                    for q in others:
-                        ch.add_edge(p, q)
-
-            else:
-                # Implementation in case only one partition is available
-
-                # Generate dictionary with one block
-                block_to_nodes = {"b:" + str(0): []}
-
-                (index_vector, edge_vector) = hgc
-                all_nodes = set(edge_vector)
-
-                # Assign all nodes to this block
-                for node in all_nodes:
-                    block_to_nodes["b:" + str(0)].append(node)
-
-                # Create a node for this block
-                ch = nx.MultiGraph()
-                ch.add_node(0)
+            # Create a node for this block
+            ch = nx.MultiGraph()
+            ch.add_node(0)
 
         # Construct hypergraph from partitioned hypergraph
         #print(block_to_nodes)
@@ -165,7 +167,6 @@ class PartitionedHyperGraph:
         :param filename: Path to write figure to, defaults to ""
         :type filename: str, optional
         """
-
         # TODO: Add some options (visualization) for plotting the graph more nicely
         hnx.draw(graph)
 
@@ -191,14 +192,14 @@ class HyperGraph:
         self.node_idx = defaultdict(int)   
 
     def add_hyperedge(self, root: int, targets: list) -> None:
-        if not root in self.node_idx:
+        if root not in self.node_idx:
             node_idx = self._hg.add_node(str(root))
             self.node_idx[root] = node_idx
 
         # Add edges to all target nodes
         for t in targets:
             # Add target node if it does not exists yet
-            if not t in self.node_idx:
+            if t not in self.node_idx:
                 node_idx = self._hg.add_node(str(t))
                 self.node_idx[t] = node_idx
 
@@ -226,8 +227,7 @@ class HypergraphCircuit(AnalysisPass):
     """
     
     def __init__(self):
-        """Hypergraph initializer """
-
+        """Hypergraph initializer"""
         super().__init__()
 
     def run(self, dag: DAGCircuit) -> None:
@@ -245,7 +245,7 @@ class HypergraphCircuit(AnalysisPass):
 
 
     def _qc_to_hypergraph(self, dag: DAGCircuit) -> None:
-        """ Create hypergraph given circuit as DAG.
+        """Create hypergraph given circuit as DAG.
 
         It is possible to e.g. group gates together (these will then become hyperedges). For now, do not consider such
         grouping mechanism.
@@ -271,13 +271,13 @@ class HypergraphCircuit(AnalysisPass):
         for control, targets in control_map.items():
             hgc.add_hyperedge(control, targets)
 
-        self.property_set['hyper_dag'] = hgc
+        self.property_set["hyper_dag"] = hgc
 
         # TODO: modify the drawing
         self.draw_hg("data/circuits/surface_memory_hg.png")
 
     def hg_to_kahypar(self):
-        """ Translate hypergraph to kahypar format
+        """Translate hypergraph to kahypar format
 
         The hypergraph is converted into  a format that is similar to the CSR (Compressed Sparse Row) format. The 
         edge_vector list defines all vertices of a hyperedge. The idx_vector marks where each hyperedge starts in the
@@ -289,8 +289,7 @@ class HypergraphCircuit(AnalysisPass):
         :return: _description_
         :rtype: _type_
         """
-        
-        hgc = self.property_set['hyper_dag']
+        hgc = self.property_set["hyper_dag"]
 
         # Construct edge_vector and index_vector
         
@@ -314,7 +313,7 @@ class HypergraphCircuit(AnalysisPass):
             #print(f"{root_node}: {out_edges_target}")
 
         # Set property for later usage
-        self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
+        self.property_set["hyper_dag_kahypar"] = (idx_vector, edge_vector)
 
         # TODO: Remove the return statement and only use the property set from above
         return idx_vector, edge_vector
@@ -352,7 +351,7 @@ class HypergraphCircuit(AnalysisPass):
             #else:
                 #print(i)
 
-        self.property_set['hyper_dag_kahypar'] = (idx_vector, edge_vector)
+        self.property_set["hyper_dag_kahypar"] = (idx_vector, edge_vector)
 
         #print(idx_vector)
         #print(edge_vector)
@@ -360,7 +359,7 @@ class HypergraphCircuit(AnalysisPass):
     def multigraph_to_singular(self):
         # Remove all duplicate edges added due to multigraph setting
 
-        hgc = self.property_set['hyper_dag']
+        hgc = self.property_set["hyper_dag"]
 
         simple_g = rx.PyGraph(multigraph=False)
 
@@ -389,11 +388,11 @@ class HypergraphCircuit(AnalysisPass):
         pass
 
     def get_num_edges(self):
-        hgc = self.property_set['hyper_dag']
+        hgc = self.property_set["hyper_dag"]
         return hgc.get_num_edges()
 
     def get_num_vertices(self):
-        hgc = self.property_set['hyper_dag']
+        hgc = self.property_set["hyper_dag"]
         return hgc.get_num_vertices()
 
     def draw_hg(self, filename=""):
@@ -417,5 +416,5 @@ class HypergraphCircuit(AnalysisPass):
             }
             return attr_dict
         
-        hgc = self.property_set['hyper_dag']
+        hgc = self.property_set["hyper_dag"]
         graphviz_draw(hgc._hg, filename=filename, node_attr_fn=node_attr_fn)

@@ -43,7 +43,7 @@ class QPUBlock:
         return False
 
     def _overlaps_forbidden(self, x, y, w, h):
-        """ Check if any forbidden (fx, fy) lies inside the placement rectangle.
+        """Check if any forbidden (fx, fy) lies inside the placement rectangle.
 
         :param x: _description_
         :type x: _type_
@@ -56,7 +56,6 @@ class QPUBlock:
         :return: _description_
         :rtype: _type_
         """
-
         for fx, fy in self.no_placement_zones:
             if x <= fx < x + w and y <= fy < y + h:
                 return True
@@ -143,8 +142,8 @@ class QPUBlock:
         # Brute-force search over the whole block
         print(f"Standard placement failed for {partition_id}, performing grid search...")
 
-        for y in range(0, self.height - ph + 1):
-            for x in range(0, self.width - pw + 1):
+        for y in range(self.height - ph + 1):
+            for x in range(self.width - pw + 1):
 
                 # Check for overlaps
                 if self._overlaps(x, y, pw, ph):
@@ -246,7 +245,6 @@ def plot_block_counts(width: int,
     :param filename: _description_
     :type filename: str
     """
-
     fig, ax = plt.subplots(figsize=(width, height))
 
     # Loop through each grid block and get number of partitions per QPU
@@ -254,7 +252,7 @@ def plot_block_counts(width: int,
         for x in range(width):
             count = len(block_assignments.get((x, y), []).placed_partitions)
             ax.text(x + 0.5, height - y - 0.5, str(count),
-                    ha='center', va='center', fontsize=12)
+                    ha="center", va="center", fontsize=12)
 
     # Draw grid lines
     ax.set_xticks(np.arange(0, width + 1, 1))
@@ -262,12 +260,12 @@ def plot_block_counts(width: int,
     ax.grid(True)
     ax.set_xlim(0, width)
     ax.set_ylim(0, height)
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
     ax.set_xticklabels([])
     ax.set_yticklabels([])
 
     # Save figure
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 

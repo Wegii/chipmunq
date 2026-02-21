@@ -2,17 +2,18 @@ import abc
 
 # Qiskit transpiler
 import qiskit
-from qiskit.transpiler import PassManager, StagedPassManager, CouplingMap
-from qiskit.transpiler.preset_passmanagers.plugin import PassManagerStagePlugin
-from qiskit.transpiler.passes import Unroll3qOrMore, ApplyLayout, TrivialLayout
-from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaAllocation
+from qiskit.transpiler import CouplingMap, PassManager, StagedPassManager
+from qiskit.transpiler.passes import ApplyLayout, Unroll3qOrMore
 from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAncilla
+from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaAllocation
+from qiskit.transpiler.preset_passmanagers.plugin import PassManagerStagePlugin
+
 # Custom passes
 from qeccm.backends import BackendChipletV2
-from qeccm.src.partitioners import KaHyParPartitioning
 from qeccm.circuit.hypergraph_circuit import HypergraphCircuit
-from qeccm.src.mapper import RandomMapper, TrivialMapper
-from qeccm.src.router import BasicSwapRouter, ParallelSwapRouter, CostRouter
+from qeccm.src.mapper import TrivialMapper
+from qeccm.src.partitioners import KaHyParPartitioning
+from qeccm.src.router import BasicSwapRouter, CostRouter, ParallelSwapRouter
 
 
 class GenericMapRoute(abc.ABC):
@@ -154,7 +155,7 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
             # Qiskit accelerate SABRE implementation
             routing_op = qiskit.transpiler.passes.SabreSwap(
                 coupling_map=CouplingMap(backend.coupling_map),
-                heuristic='decay',
+                heuristic="decay",
                 seed=42
                 )
         

@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-# Qiskit transpiler
-from qiskit.transpiler.basepasses import AnalysisPass
-
 # Hypergraph
 import kahypar
-from qeccm.circuit.hypergraph_circuit import HyperGraph, HypergraphCircuit, PartitionedHyperGraph
-import networkx as nx
-from networkx.algorithms import community
-from networkx.algorithms.community import k_clique_communities
-
-# Typing
-from qiskit.dagcircuit import DAGCircuit
-from qeccm.backends.BackendChipletV2 import BackendChipletV2
-from typing import List, Tuple
-import numpy as np
 
 # Plotting utils
 import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+
+# Typing
+from qiskit.dagcircuit import DAGCircuit
+
+# Qiskit transpiler
+from qiskit.transpiler.basepasses import AnalysisPass
+
+from qeccm.backends.BackendChipletV2 import BackendChipletV2
+from qeccm.circuit.hypergraph_circuit import HyperGraph, PartitionedHyperGraph
 
 
 class GenericHypergraphPartitioning(AnalysisPass):
@@ -31,7 +29,7 @@ class GenericHypergraphPartitioning(AnalysisPass):
 
 
 class KaHyParPartitioning(GenericHypergraphPartitioning):
-    """ Hypergraph partitioning based on multilevel hypergraph partitioning framework KaHyPar
+    """Hypergraph partitioning based on multilevel hypergraph partitioning framework KaHyPar
 
     References:
         - https://kahypar.org/
@@ -66,12 +64,11 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         :return: _description_
         :rtype: _type_
         """
-
         # Utilize pre-defined partitions
         if self.partitions != None:
             self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
                     partitioned_hgc = None,
-                    hgc = self.property_set['hyper_dag_kahypar'],
+                    hgc = self.property_set["hyper_dag_kahypar"],
                     partitions = self.partitions,
                     dag = dag)
             
@@ -80,7 +77,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         else:
 
             # Get hypergraph representation of dag
-            hgc = self.property_set['hyper_dag']
+            hgc = self.property_set["hyper_dag"]
             
             # Calculate number of partitions
             self.kp, partition_sizes = self.calculate_number_partitions(dag, hgc)
@@ -92,15 +89,15 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
                 # Hypergraph
                 self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
                     partitioned_hgc = kahypar_hg,
-                    hgc = self.property_set['hyper_dag_kahypar'])
+                    hgc = self.property_set["hyper_dag_kahypar"])
             else:
                 # Explicit Partitioning not needed 
-                (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+                (index_vector, edge_vector) = self.property_set["hyper_dag_kahypar"]
                 num_vertices = len(index_vector)
                 
                 self.property_set["partitioned_hyper_dag"] = PartitionedHyperGraph(
                     num_nodes = num_vertices,
-                    hgc = self.property_set['hyper_dag_kahypar'])
+                    hgc = self.property_set["hyper_dag_kahypar"])
                 # self.property_set["partition_to_qpu"] = partition_to_qpu
 
             # TODO: Do some visualization, so see if for lattice surgery, it is possible to lay out the partitions without
@@ -110,7 +107,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         return dag
 
-    def perform_partitioning(self, partition_sizes: List[int]) -> kahypar.Hypergraph:
+    def perform_partitioning(self, partition_sizes: list[int]) -> kahypar.Hypergraph:
         """_summary_
 
         :param partition_sizes: _description_
@@ -118,18 +115,17 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         :return: _description_
         :rtype: kahypar.Hypergraph
         """
-
         # Get vertices and edges in KaHyPar specific format
-        (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+        (index_vector, edge_vector) = self.property_set["hyper_dag_kahypar"]
         
         num_vertices = max(max(edge_vector) + 1, len(set(edge_vector))-1)
         num_hyperedges = len(index_vector) - 1
 
         # For now, all hyperedges are assumed to have the same weight
-        hyperedge_weights = [1 for i in range(0, num_hyperedges)]
+        hyperedge_weights = [1 for i in range(num_hyperedges)]
         # Qubit vertices are given weight 1
         # Potentially vertices with high connectivity should get higher weight to connect these together
-        vertex_weights = [1 for i in range(0, num_vertices)]
+        vertex_weights = [1 for i in range(num_vertices)]
 
         self.khp_context.setK(self.kp)
         self.khp_context.setCustomTargetBlockWeights(partition_sizes)
@@ -154,7 +150,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
 
         return kahypar_hg
 
-    def calculate_number_partitions(self, dag: DAGCircuit, hgc: HyperGraph) -> Tuple[int, List[int]]:
+    def calculate_number_partitions(self, dag: DAGCircuit, hgc: HyperGraph) -> tuple[int, list[int]]:
         """Calculate number of partitions
 
         This is based on:
@@ -175,7 +171,6 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         :return: _description_
         :rtype: Tuple[int, List[int]]
         """
-
         num_qubits_chiplet = self.backend.get_chip_size()
         num_qubits_circuit = dag.num_qubits()
 
@@ -188,7 +183,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
         elif self._calculate_partitions_method == "patch-aware":
             # Try to find all higly connected patches in a circuit
             
-            (index_vector, edge_vector) = self.property_set['hyper_dag_kahypar']
+            (index_vector, edge_vector) = self.property_set["hyper_dag_kahypar"]
 
             
             # Create multigraph given index and edge vectors
@@ -295,8 +290,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             k = len(bipartite_communities)
 
             # k can be of maximum size backend_num_chiplets
-            if k > self.backend.get_num_chips():
-                k = self.backend.get_num_chips()
+            k = min(k, self.backend.get_num_chips())
         else:
             pass
         

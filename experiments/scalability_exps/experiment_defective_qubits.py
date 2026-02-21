@@ -3,32 +3,22 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-import time
 
 # Custom utils
-from experiments.exp_utils.transpilation_utils import *
-from experiments.exp_utils.circuit_generator import QECMemory, QECCircuit, get_tqec_cnot_rotated
-from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
-from qeccm.src.reference_partitions import memory_d5
-from experiments.exp_utils.simulation_utils import *
-from qeccm.backends.backend_utils import plot_gate_map
-
-from experiments.exp_utils.circuit_utils import stim_to_qiskit
-from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
-from stim import Circuit as StimCircuit
-
-from glue.eccentric_bench.noise import get_noise_model
-
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
-from experiments.utils import *
 from collections import defaultdict
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from experiments.exp_utils.simulation_utils import *
+from experiments.exp_utils.transpilation_utils import *
+from experiments.utils import *
 
 
 def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left: str, filename: str = ""):
@@ -63,8 +53,8 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
         "axes.labelsize": FONTSIZE*1.5,
         "font.size": FONTSIZE*1.2,
         "legend.fontsize": (FONTSIZE - 2)*1.5,
-        "xtick.labelsize": (FONTSIZE - 1)*1.5,
-        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
@@ -78,7 +68,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
     plt.rcParams.update(tex_fonts)
 
     colors = [pastel_blue, pastel_orange]
-    hatches = ['//', 'o']  # one hatch per placement mode
+    hatches = ["//", "o"]  # one hatch per placement mode
 
     labels = placement_modes  # ["default", "size_aware"]
 
@@ -96,7 +86,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
 
     ax.set_xticks(x)
@@ -137,7 +127,7 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
 
     ax.set_xticks(x)
@@ -178,11 +168,11 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
             width,
             yerr=0.1,          
             capsize=4,      
-            error_kw={'elinewidth': 2, 'ecolor': 'black'},
+            error_kw={"elinewidth": 2, "ecolor": "black"},
             label=labels[i],
             color=colors[i],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         handles.append(handle)
 
@@ -212,10 +202,10 @@ def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left:
 
     legend_fig = plt.figure(figsize=(3, 2))
     legend = legend_fig.legend(handles = [handles[0], handles[1]],
-                               loc = 'center',
+                               loc = "center",
                                frameon = False,
                                ncols = 3)
-    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
@@ -266,8 +256,8 @@ def plot_combined_backends(custom_depth,
 
     # Colors
     colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
-    colors = [ '#A7D9ED', '#F7C6A2', "#4682B4", "#F08080"]
-    hatches = ['...', '//', 'xxx', 'ooo']  # one hatch per placement mode
+    colors = [ "#A7D9ED", "#F7C6A2", "#4682B4", "#F08080"]
+    hatches = ["...", "//", "xxx", "ooo"]  # one hatch per placement mode
    
     tex_fonts = {
         # Use LaTeX to write all text
@@ -277,8 +267,8 @@ def plot_combined_backends(custom_depth,
         "axes.labelsize": FONTSIZE*1.5,
         "font.size": FONTSIZE*1.2,
         "legend.fontsize": (FONTSIZE - 2)*1.5,
-        "xtick.labelsize": (FONTSIZE - 1)*1.5,
-        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
         "axes.titlesize": 10,
         # Hatches
         "hatch.linewidth": 0.5,
@@ -311,11 +301,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[0],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         # SABRE
         ax.bar(
@@ -324,11 +314,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[1],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         
 
@@ -342,11 +332,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[2],
             hatch=hatches[i+2],
-            edgecolor='black'
+            edgecolor="black"
         )
         # SABRE
         ax.bar(
@@ -355,11 +345,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[3],
             hatch=hatches[i+2],
-            edgecolor='black'
+            edgecolor="black"
         )
 
     ax.set_xticks(x)
@@ -404,11 +394,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[0],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         # SABRE
         ax.bar(
@@ -417,11 +407,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
             color=colors[1],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         
 
@@ -435,11 +425,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[2],
             hatch=hatches[i+2],
-            edgecolor='black'
+            edgecolor="black"
         )
         # SABRE
         ax.bar(
@@ -448,11 +438,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
             color=colors[3],
             hatch=hatches[i+2],
-            edgecolor='black'
+            edgecolor="black"
         )
 
 
@@ -500,11 +490,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label="Chipmunq, single patch, " + labels[i],
             color=colors[0],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         handles.append(h)
         # SABRE
@@ -514,11 +504,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label="LightSABRE, single patch, " + labels[i],
             color=colors[1],
             hatch=hatches[i],
-            edgecolor='black'
+            edgecolor="black"
         )
         handles.append(h)
         
@@ -533,11 +523,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_custom,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label="Chipmunq, multi patch, " + labels[i],
             color=colors[2],
             hatch=hatches[i+2],
-            edgecolor='black'
+            edgecolor="black"
         )
         handles.append(h)
 
@@ -549,11 +539,11 @@ def plot_combined_backends(custom_depth,
             width,
             yerr=values_err_sabre,          
             capsize=2,      
-            error_kw={'elinewidth': 1, 'ecolor': 'black'},
+            error_kw={"elinewidth": 1, "ecolor": "black"},
             label="LightSABRE, multi patch, " + labels[i],
             color=colors[3],
             hatch=hatches[i+2],
-            edgecolor='black'
+            edgecolor="black"
         )
         handles.append(h)
 
@@ -584,10 +574,11 @@ def plot_combined_backends(custom_depth,
 
     legend_fig = plt.figure(figsize=(3, 2))
     legend = legend_fig.legend(handles = handles,
-                               loc = 'center',
+                               loc = "center",
                                frameon = False,
-                               ncols = 4)
-    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+                               ncols = 4,
+                               columnspacing=1.5)
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
     
 
@@ -620,7 +611,7 @@ def calculate_qpu_utilization(circuit, backend):
 
     utilized_qubits = 0
     for qubit in qubits:
-        if qubit != '':
+        if qubit != "":
             utilized_chiplets.add(backend.node_to_chiplet[int(qubit)])
             utilized_qubits += 1
 
@@ -793,7 +784,7 @@ def run_exp_defective():
                             sabre_depth_combined,
                             sabre_overhead_combined,
                             sabre_utilization_combined,
-                            filename = f"experiments/evaluation/defective_qubits/combined_overhead")
+                            filename = "experiments/evaluation/defective_qubits/combined_overhead")
 
             
 if __name__ == "__main__":

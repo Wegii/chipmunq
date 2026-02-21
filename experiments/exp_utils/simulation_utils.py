@@ -1,14 +1,13 @@
-from experiments.exp_utils.circuit_utils import stim_to_qiskit
-from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
-from experiments.exp_utils.transpilation_utils import *
-
-import sinter
 import multiprocessing
 
-from tqec.utils.noise_model import NoiseModel
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import sinter
+from tqec.utils.noise_model import NoiseModel
+
+from experiments.exp_utils.transpilation_utils import *
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 
 
 def transpile_stim_circuit(circuit: StimCodeCircuit,
@@ -31,7 +30,6 @@ def transpile_stim_circuit(circuit: StimCodeCircuit,
     :return: _description_
     :rtype: tuple[StimCodeCircuit, QuantumCircuit, StimCodeCircuit, QuantumCircuit]
     """
-
     # Stim to qiskit
     stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 

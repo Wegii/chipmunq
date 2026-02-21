@@ -1,27 +1,28 @@
 import os
 import sys
+
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src/"))
 #sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
 #from qiskit_qec.utils import get_stim_circuits
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-from qiskit import QuantumCircuit
-
 # Typing
-from collections.abc import Callable, Iterable, Iterator
+
+from qiskit import QuantumCircuit
 from qiskit.providers import BackendV2
+
+# eccentric_bench
+from glue.eccentric_bench.backends import QubitTracking
 
 # Qiskit to stim translation
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 
-# eccentric_bench
-from glue.eccentric_bench.backends import QubitTracking
 #from glue.eccentric_bench.noise import get_noise_model
 #from glue.eccentric_bench.decoders import decode
 
 
-class QECCircuitStats():
+class QECCircuitStats:
     """_summary_
     """
 
@@ -79,7 +80,6 @@ class QECCircuitStats():
         :return: Number of qubits in circuit
         :rtype: _type_
         """
-
         # Number of qubits
         return self.circ.num_qubits
 
@@ -89,7 +89,6 @@ class QECCircuitStats():
         :return: _description_
         :rtype: _type_
         """
-
         # Sum of all gates
         return self.get_num_two_gates() + self.get_num_single_gates()
         
@@ -105,7 +104,6 @@ class QECCircuitStats():
         :return: Number of two-qubit gates
         :rtype: int
         """
-
         return sum(1 for instr, qargs, cargs in self.circ.data if len(qargs) == 2)
 
 
@@ -119,25 +117,14 @@ class QECCircuitStats():
         :return: Depth of circuit
         :rtype: int
         """
-
         return self.circ.depth()
     
 
 
-from multiprocessing import cpu_count
-from pathlib import Path
 
-import matplotlib.pyplot as plt
-import numpy
-import sinter
 
-from tqec.gallery.cnot import cnot
-from tqec import NoiseModel
-from tqec.simulation.plotting.inset import plot_observable_as_inset
-from tqec.simulation.simulation import start_simulation_using_sinter
-from tqec.utils.enums import Basis
 
-class SingleLatticeSurgeryStats():
+class SingleLatticeSurgeryStats:
     """Statistics of a single circuit with Lattice Surgery
     """
 
@@ -164,7 +151,6 @@ class SingleLatticeSurgeryStats():
         :return: _description_
         :rtype: float
         """
-        
         error_type = "modsi1000"
         error_prob = 5e-2
         code_name = "surface"

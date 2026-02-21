@@ -1,11 +1,11 @@
 # Typing
-from qeccm.backends.BackendChipletV2 import BackendChipletV2
+from qiskit.circuit.library.standard_gates import SwapGate
+from qiskit.dagcircuit import DAGCircuit
 
 # Qiskit
 from qiskit.transpiler.basepasses import TransformationPass
-from qiskit.dagcircuit import DAGCircuit
-from qiskit.circuit.library.standard_gates import SwapGate
-from qiskit.transpiler.layout import Layout
+
+from qeccm.backends.BackendChipletV2 import BackendChipletV2
 
 
 class GenericRouter(TransformationPass):
@@ -28,7 +28,7 @@ class GenericRouter(TransformationPass):
 
 
 class BasicSwapRouter(GenericRouter):
-    """ Wrapper around qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
+    """Wrapper around qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
 
     def __init__(self, backend):
         super().__init__(backend)
@@ -51,7 +51,6 @@ class BasicSwapRouter(GenericRouter):
         :return: _description_
         :rtype: _type_
         """
-
         current_layout = self.property_set["layout"]
         new_dag = DAGCircuit()
         for qreg in dag.qregs.values():
@@ -213,7 +212,6 @@ class CostRouter(GenericRouter):
         :return: _description_
         :rtype: DAGCircuit
         """
-
         print("Global cost routing")
 
         new_dag = DAGCircuit()
@@ -225,7 +223,7 @@ class CostRouter(GenericRouter):
         # Get all inter-chiplet connections and their respective noise from the backend
         inter_chiplet_connections = self.backend.inter_chiplet_connections
         # Keep track of utilization of inter-chiplet connection
-        inter_chiplet_utilization = {key: 0 for key in inter_chiplet_connections}
+        inter_chiplet_utilization = dict.fromkeys(inter_chiplet_connections, 0)
 
         for node in dag.topological_op_nodes():
             if len(node.qargs) == 2:
@@ -255,7 +253,7 @@ class CostRouter(GenericRouter):
 
                         # In case the connection is found, try to get the noise value from it. Flip source and target
                         # if the node could not be found
-                        if not (inter_chiplet_nodes in inter_chiplet_connections):
+                        if inter_chiplet_nodes not in inter_chiplet_connections:
                             inter_chiplet_nodes = (inter_chiplet_nodes[1], inter_chiplet_nodes[0])
 
                         current_path_cost = (len(path) +
@@ -288,10 +286,10 @@ class CostRouter(GenericRouter):
                                     cicc = int(p1[0])
                                     cicc_2 = int(p1[1])
                                     new_inter_chiplet_nodes = (cicc, cicc_2)
-                                    if not (new_inter_chiplet_nodes in inter_chiplet_connections):
+                                    if new_inter_chiplet_nodes not in inter_chiplet_connections:
                                         new_inter_chiplet_nodes = (new_inter_chiplet_nodes[1], new_inter_chiplet_nodes[0])
 
-                                    if not (new_inter_chiplet_nodes in inter_chiplet_connections):
+                                    if new_inter_chiplet_nodes not in inter_chiplet_connections:
                                         # The inter-chiplet connection does not exist
                                         continue
 
@@ -367,7 +365,7 @@ class CostRouter(GenericRouter):
 
 
 class AcceleratedBasicSwapRouter(GenericRouter):
-    """ Accelerated version of qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
+    """Accelerated version of qiskit.transpiler.passes.BasicSwap utilizing a custom layout"""
 
     def __init__(self, backend):
         super().__init__(backend)
@@ -390,7 +388,6 @@ class AcceleratedBasicSwapRouter(GenericRouter):
         :return: _description_
         :rtype: _type_
         """
-
         current_layout = self.property_set["layout"]
         
         # Accelerated implementation
@@ -405,7 +402,7 @@ class AcceleratedBasicSwapRouter(GenericRouter):
         return new_dag   
 
 class ParallelSwapRouter(GenericRouter):
-    """ Parallel implementation of BasicSwapRouter"""
+    """Parallel implementation of BasicSwapRouter"""
 
     # Parallel implementation
     from joblib import Parallel, delayed
@@ -505,7 +502,7 @@ class ParallelSwapRouter(GenericRouter):
         return local_dag_nodes, remote_dag_nodes, single_dag_nodes
 
     def _local_routing(self, dag, local_dag_nodes: list):
-        """ Perform local basic swap routing
+        """Perform local basic swap routing
 
         Note: Parallelization over all nodes
 
@@ -514,7 +511,6 @@ class ParallelSwapRouter(GenericRouter):
         :return: _description_
         :rtype: _type_
         """
-
         """
         # TODO: parallelize routing
         routed_local_dag_instr = []
@@ -606,7 +602,6 @@ class ParallelSwapRouter(GenericRouter):
         :return: _description_
         :rtype: _type_
         """
-
         # TODO: simple swap between the nodes
 
         # TODO: parallelize routing

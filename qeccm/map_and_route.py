@@ -1,15 +1,14 @@
 # Qiskit integration
-import qiskit
-from qiskit.transpiler.basepasses import TransformationPass
-from qiskit.dagcircuit import DAGCircuit
+from qecc_mapping.qeccm.circuit.hypergraph_circuit import HypergraphCircuit
 
 # Implementation
 from qecc_mapping.qeccm.src.mar import *
-from qecc_mapping.qeccm.circuit.hypergraph_circuit import HypergraphCircuit
+from qiskit.dagcircuit import DAGCircuit
+from qiskit.transpiler.basepasses import TransformationPass
 
 
 class PartitionedMapRoutePass(TransformationPass):
-    """ Map input circuit onto a backend topology via insertion of SWAPs.
+    """Map input circuit onto a backend topology via insertion of SWAPs.
 
     The `PartitionedMapRoutePass` pass acts both as a layout stage and a routing stage.
 

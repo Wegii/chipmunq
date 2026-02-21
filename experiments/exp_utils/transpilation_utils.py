@@ -1,14 +1,15 @@
 # Qiskit transpiler
 import qiskit
 from qiskit import QuantumCircuit
-from qiskit.transpiler import StagedPassManager, PassManager, StagedPassManager, CouplingMap
-from qiskit.transpiler.passes import Unroll3qOrMore, ApplyLayout, TrivialLayout
-from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaAllocation
+from qiskit.transpiler import CouplingMap, PassManager, StagedPassManager
+from qiskit.transpiler.passes import ApplyLayout, TrivialLayout, Unroll3qOrMore
 from qiskit.transpiler.passes.layout.enlarge_with_ancilla import EnlargeWithAncilla
-from qiskit.converters import circuit_to_dag, dag_to_circuit
+from qiskit.transpiler.passes.layout.full_ancilla_allocation import FullAncillaAllocation
+
+from qeccm.backends.BackendChipletV2 import BackendChipletV2
+
 # Custom implementation
 from qeccm.src.mar import PartitionedMapRoutePlugin
-from qeccm.backends.BackendChipletV2 import BackendChipletV2
 
 
 def custom_partitioned_transpilation(circuit: QuantumCircuit,
@@ -24,7 +25,6 @@ def custom_partitioned_transpilation(circuit: QuantumCircuit,
     :return: _description_
     :rtype: qiskit.QuantumCircuit
     """
-
     mar_pmsp = PartitionedMapRoutePlugin()
     # Pass to construct hypergraph from circuit
     init_pm = mar_pmsp._generate_initial_pass()
@@ -84,10 +84,9 @@ def custom_accelerated_partitioned_transpilation(circuit: QuantumCircuit,
     :return: _description_
     :rtype: qiskit.QuantumCircuit
     """
-    from qeccm.src.router import AcceleratedBasicSwapRouter
-
     # Custom implementation of basic routing 
-    from qiskit._accelerate.basic_swap import basic_routing
+
+    from qeccm.src.router import AcceleratedBasicSwapRouter
 
     mar_pmsp = PartitionedMapRoutePlugin()
     # Pass to construct hypergraph from circuit
@@ -117,7 +116,6 @@ def basicswap_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2) 
     :return: _description_
     :rtype: qiskit.QuantumCircuit
     """
-    
     init_pm = PassManager([Unroll3qOrMore()])
 
     layout_pm = PassManager([TrivialLayout(backend.coupling_map), FullAncillaAllocation(backend.coupling_map)])
@@ -139,7 +137,6 @@ def sabre_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2) -> q
     :return: _description_
     :rtype: qiskit.QuantumCircuit
     """
-    
     init_pm = PassManager([Unroll3qOrMore()])
 
     # TODO: Change this to SABRE layout
@@ -147,7 +144,7 @@ def sabre_transpilation(circuit: QuantumCircuit, backend: BackendChipletV2) -> q
 
     routing_op = qiskit.transpiler.passes.SabreSwap(
             coupling_map=CouplingMap(backend.coupling_map),
-            heuristic='decay',
+            heuristic="decay",
             seed=42
             )
     router_pm = PassManager([EnlargeWithAncilla(), ApplyLayout(), routing_op])

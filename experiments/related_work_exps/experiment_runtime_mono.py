@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-import time
 import pickle
+import time
 
 """
 # MECH
@@ -30,9 +31,10 @@ from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
 """
 
 # Plotting
-from experiments.utils import *
-from experiments.related_work_exps.utils import *
 from matplotlib.ticker import MaxNLocator
+
+from experiments.related_work_exps.utils import *
+from experiments.utils import *
 
 
 def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: str = ""):
@@ -77,35 +79,35 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
 
     ax.bar(x-width, qiskit_2q_overhead, width,
            label="LightSABRE", color="lightcoral",
-           hatch='o', edgecolor='black')
+           hatch="o", edgecolor="black")
 
     ax.bar(x, mech_2q_overhead, width,
            label="MECH", color="#A7D9ED",
-           hatch='//', edgecolor='black')
+           hatch="//", edgecolor="black")
     
     bars_qeccsynth = ax.bar(x+width, qeccsynth_2q_overhead, width,
                             label="QECC-Synth", color="#B2D8B2",
-                            hatch='/', edgecolor='black')
+                            hatch="/", edgecolor="black")
     
 
     # Adjust styling of last bar for qecc-synth to show that it timed out
     tb = [bars_qeccsynth[-1], bars_qeccsynth[-2]]
     for timeout_bar in tb:
-        timeout_bar.set_facecolor('white')      
+        timeout_bar.set_facecolor("white")      
         #timeout_bar.set_edgecolor('#B2D8B2')        
         #timeout_bar.set_facecolor('white')          
-        timeout_bar.set_edgecolor('red')        
-        timeout_bar.set_linestyle('--')        
-        timeout_bar.set_hatch('xxx')           
+        timeout_bar.set_edgecolor("red")        
+        timeout_bar.set_linestyle("--")        
+        timeout_bar.set_hatch("xxx")           
         timeout_bar.set_linewidth(2)
         timeout_bar.set_path_effects([])
-        timeout_bar.set_edgecolor('red')
-        timeout_bar.set_edgecolor('#B2D8B2')
+        timeout_bar.set_edgecolor("red")
+        timeout_bar.set_edgecolor("#B2D8B2")
 
-    ax.text(x[-1] + width, 1200, "T/O", ha='center', va='bottom', 
-        color='red', fontweight='bold', fontsize=12)
-    ax.text(x[-2] + width, 1200, "T/O", ha='center', va='bottom', 
-        color='red', fontweight='bold', fontsize=12)
+    ax.text(x[-1] + width, 1200, "T/O", ha="center", va="bottom", 
+        color="red", fontweight="bold", fontsize=12)
+    ax.text(x[-2] + width, 1200, "T/O", ha="center", va="bottom", 
+        color="red", fontweight="bold", fontsize=12)
     
     
     ax.set_xticks(x)
@@ -127,7 +129,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
         color=plot_lib_color,
     )
 
-    plt.tick_params(axis='both', labelsize=14)
+    plt.tick_params(axis="both", labelsize=14)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.xlabel("Surface code distance", fontsize=(FONTSIZE - 1)*1.5)
@@ -137,7 +139,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     plt.yscale("log")
     ax.set_ylim(0, 5e3)
 
-    plt.grid(True, which='major', linestyle='--', alpha=0.5)
+    plt.grid(True, which="major", linestyle="--", alpha=0.5)
     # ax.legend(loc='upper left')
 
     fig.subplots_adjust(left=0.175, right=0.95, top=0.83, bottom=0.2)
@@ -182,7 +184,7 @@ def run_runtime_scaling():
             # QECCsynth
             if d <= 5:
                 start_qeccsynth = time.time()
-                _ = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{m}_{m}')
+                _ = transpile_circuit_QECCSynth(d, architecture, f"square_{n}_{m}_{m}")
                 end_qeccsynth = time.time()
 
             # Qiskit
@@ -198,13 +200,13 @@ def run_runtime_scaling():
             sabre_time_storage[(b, d)] = end_sabre - start_sabre
 
     # Write results to file
-    with open(f"experiments/evaluation/related_work/timing_mech_mono.pkl", "wb") as f:
+    with open("experiments/evaluation/related_work/timing_mech_mono.pkl", "wb") as f:
         pickle.dump(mech_time_storage, f)
 
-    with open(f"experiments/evaluation/related_work/timing_qeccsynth_mono.pkl", "wb") as f:
+    with open("experiments/evaluation/related_work/timing_qeccsynth_mono.pkl", "wb") as f:
         pickle.dump(qeccsynth_time_storage, f)
 
-    with open(f"experiments/evaluation/related_work/timing_sabre_mono.pkl", "wb") as f:
+    with open("experiments/evaluation/related_work/timing_sabre_mono.pkl", "wb") as f:
         pickle.dump(sabre_time_storage, f)
     
     
@@ -213,11 +215,11 @@ if __name__ == "__main__":
     # run_runtime_scaling()
     
     # Load pre-computed results
-    with open(f"experiments/evaluation/related_work/timing_mech_mono.pkl", "rb") as f:
+    with open("experiments/evaluation/related_work/timing_mech_mono.pkl", "rb") as f:
         mech_time_storage = pickle.load(f)
-    with open(f"experiments/evaluation/related_work/timing_qeccsynth_mono.pkl", "rb") as f:
+    with open("experiments/evaluation/related_work/timing_qeccsynth_mono.pkl", "rb") as f:
         qeccsynth_time_storage = pickle.load(f)
-    with open(f"experiments/evaluation/related_work/timing_sabre_mono.pkl", "rb") as f:
+    with open("experiments/evaluation/related_work/timing_sabre_mono.pkl", "rb") as f:
         sabre_time_storage = pickle.load(f)
 
     plot_runtime(mech_time_storage,

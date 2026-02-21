@@ -1,23 +1,25 @@
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
-import pickle
-from tqdm import tqdm
 import itertools
 import logging
+import pickle
+
 import numpy as np
+from tqdm import tqdm
 
 # MECH
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
-from external.baseline.MECH.Circuit import *
-from external.baseline.MECH.Chiplet import *
-from external.baseline.MECH.HighwayOccupancy import *
-from external.baseline.MECH.Router import *
-from external.baseline.MECH.MECHBenchmarks import *
-from external.baseline.MECH.transpile_mech import transpile_circuit_MECH
 import networkx as nx
-from networkx.classes import Graph
+
+from external.baseline.MECH.Chiplet import *
+from external.baseline.MECH.Circuit import *
+from external.baseline.MECH.HighwayOccupancy import *
+from external.baseline.MECH.MECHBenchmarks import *
+from external.baseline.MECH.Router import *
+from external.baseline.MECH.transpile_mech import transpile_circuit_MECH
 
 # QECC-Synth
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/QECC_Synth/SurfStitch/MyCode/src"))
@@ -31,10 +33,10 @@ from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/"))
 sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
 from codes import get_code, get_max_d
+from qiskit.transpiler import CouplingMap
 
 # Qiskit
 from qiskit.visualization import plot_coupling_map
-from qiskit.transpiler import CouplingMap
 
 
 def generate_simple_dqc_backend(x_num: int, y_num: int, cross_link_sparsity: int) -> tuple[nx.Graph, int, int]:
@@ -51,8 +53,7 @@ def generate_simple_dqc_backend(x_num: int, y_num: int, cross_link_sparsity: int
     Returns:
         tuple[nx.Graph, int, int]: _description_
     """
-
-    structure = 'square'
+    structure = "square"
     chip_col_num = 2
     chip_row_num = 2
 
@@ -78,7 +79,6 @@ def generate_qiskit_backend_from_mech(G: nx.graph) -> CouplingMap:
     Returns:
         CouplingMap: _description_
     """
-
     qubit_idx_dict = gen_qubit_idx_dict(G)
     regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
     regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
@@ -95,7 +95,6 @@ def coupling_to_adjacency(coupling_map: list) -> np.array:
     Returns:
         np.array: Adjacency matrix
     """
-
     # Extract unique qubits and sort them
     qubits = sorted({q for pair in coupling_map for q in pair})
     qubit_index = {q: i for i, q in enumerate(qubits)}
@@ -120,7 +119,6 @@ def idx_dict_to_list(mapping_dict: dict) -> list:
     Returns:
         list: Indices
     """
-
     # Step 1: Group by row
     from collections import defaultdict
 
@@ -150,7 +148,6 @@ def generate_qecc_synth_backend_from_mech(G: nx.graph) -> tuple[np.array, list]:
     Returns:
         tuple[np.array, list]: Adjacency graph and qubit index list
     """
-
     qubit_idx_dict = gen_qubit_idx_dict(G)
     regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
     regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
@@ -168,7 +165,6 @@ def display_simple_backend(backend: nx.Graph, filename: str) -> None:
         backend (nx.Graph): _description_
         filename (str): _description_
     """
-
     qubit_idx_dict = gen_qubit_idx_dict(backend)
     regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in backend.edges)
     regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in backend.edges)
@@ -184,12 +180,11 @@ def write_to_file(object, filename: str) -> None:
         object (_type_): Object to write
         filename (str): Destination
     """
-
-    filehandler = open(f"{filename}.pkl", 'wb') 
+    filehandler = open(f"{filename}.pkl", "wb") 
     pickle.dump(object, filehandler)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Select surface code as this is supported and tested with both MECH and QECC-Synth
     code_name = "surface"
 
@@ -230,7 +225,7 @@ if __name__ == '__main__':
         # Generate backend for QECC-Synth
         architecture = generate_qecc_synth_backend_from_mech(simple_dqc_backend)
         # Perform algorithm
-        circuit_qecc_synth = transpile_circuit_QECCSynth(d, architecture, f'square_{n}_{n}_{c}')
+        circuit_qecc_synth = transpile_circuit_QECCSynth(d, architecture, f"square_{n}_{n}_{c}")
         write_to_file(circuit_qecc_synth, f"data/transpiled_circuit/{code_name}_d_square_{n}_{n}_{c}_qecc_synth")  
         # Found optimium: 6, 6, 4  
 

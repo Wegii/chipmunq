@@ -4,21 +4,23 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-import time
 
 # Custom utils
-from experiments.exp_utils.transpilation_utils import *
-from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
-from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
-from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
+from experiments.exp_utils.transpilation_utils import *
 from experiments.utils import *
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+from qeccm.backends.backend_utils import plot_circuit_layout_utilization
 
 
 def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: str = ""):
@@ -46,8 +48,8 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     x = np.arange(len(np_values))
     width = 0.35/3
 
-    colors = [ '#A7D9ED', '#F7C6A2', "#4682B4", "#F08080"]
-    hatches = ['o', 'xx',]
+    colors = [ "#A7D9ED", "#F7C6A2", "#4682B4", "#F08080"]
+    hatches = ["o", "xx",]
 
     tex_fonts = {
         # Use LaTeX to write all text
@@ -56,9 +58,9 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
         # Font sizes
         "axes.labelsize": FONTSIZE*1.5,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.5,
-        "xtick.labelsize": (FONTSIZE - 1)*1.5,
-        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "legend.fontsize": (FONTSIZE - 2)*1.3,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
         "axes.titlesize": 10,
         # Hatches
         "hatch.linewidth": 0.5,
@@ -74,12 +76,12 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     plt.rcParams.update(tex_fonts)
 
     # Pastel colors
-    pastel_blue = '#A7D9ED'
-    pastel_blue_dark = '#4682B4'
-    pastel_orange = '#F7C6A2'
-    pastel_orange_dark = '#F08080'
+    pastel_blue = "#A7D9ED"
+    pastel_blue_dark = "#5B9BD5"
+    pastel_orange = "#F7C6A2"
+    pastel_orange_dark = "#E68A5C"
     pastel_red = "#F7A2A2"
-    pastel_red_dark = "#FF5C5C"
+    pastel_red_dark = "#D65C5C"
 
     # Create depth statistics
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
@@ -89,34 +91,34 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     h = ax.bar(x - 2.5*width, low_depth_vals, width,
            label = r"Basic, $p_{inter}$ = $1e^{-4}$",
            color = pastel_blue,
-           hatch = hatches[0], edgecolor = 'black')
+           hatch = hatches[0], edgecolor = "black")
     handles.append(h)
     h = ax.bar(x + .5*width, high_depth_vals, width,
            label = r"Basic, $p_{inter}$ = $1e^{-2}$",
-           color = pastel_blue,
-           hatch = hatches[1], edgecolor = 'black')
+           color = pastel_blue_dark,
+           hatch = hatches[1], edgecolor = "black")
     handles.append(h)
     # Tradeoff
     h = ax.bar(x - 1.5*width, low_depth_vals_tradeoff, width,
            label = r"Tradeoff, $p_{inter}$ = $1e^{-4}$",
            color = pastel_orange,
-           hatch = hatches[0], edgecolor = 'black')
+           hatch = hatches[0], edgecolor = "black")
     handles.append(h)
     h = ax.bar(x + 1.5*width, high_depth_vals_tradeoff, width,
            label = r"Tradeoff, $p_{inter}$ = $1e^{-2}$",
-           color = pastel_orange,
-           hatch = hatches[1], edgecolor = 'black')
+           color = pastel_orange_dark,
+           hatch = hatches[1], edgecolor = "black")
     handles.append(h)
     # Focus
     h = ax.bar(x - .5*width, low_depth_vals_focus, width,
            label = r"Focus, $p_{inter}$ = $1e^{-4}$",
            color = pastel_red,
-           hatch = hatches[0], edgecolor = 'black')
+           hatch = hatches[0], edgecolor = "black")
     handles.append(h)
     h = ax.bar(x + 2.5*width, high_depth_vals_focus, width,
            label = r"Focus, $p_{inter}$ = $1e^{-2}$",
-           color = pastel_red,
-           hatch = hatches[1], edgecolor = 'black')
+           color = pastel_red_dark,
+           hatch = hatches[1], edgecolor = "black")
     handles.append(h)
 
     ax.set_xticks(x)
@@ -140,7 +142,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
         color=plot_lib_color,
     )
 
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
     fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
@@ -155,34 +157,34 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     h = ax.bar(x - 2.5*width, low_over_vals, width,
            label = r"Basic, $p_{inter}$ = $1e^{-4}$",
            color = pastel_blue,
-           hatch = hatches[0], edgecolor = 'black')
+           hatch = hatches[0], edgecolor = "black")
     handles.append(h)
     h = ax.bar(x + .5*width, high_over_vals, width,
            label = r"Basic, $p_{inter}$ = $1e^{-2}$",
-           color = pastel_blue,
-           hatch = hatches[1], edgecolor = 'black')
+           color = pastel_blue_dark,
+           hatch = hatches[1], edgecolor = "black")
     handles.append(h)
     # Tradeoff
     h = ax.bar(x - 1.5*width, low_over_vals_tradeoff, width,
            label = r"Tradeoff, $p_{inter}$ = $1e^{-4}$",
            color = pastel_orange,
-           hatch = hatches[0], edgecolor = 'black')
+           hatch = hatches[0], edgecolor = "black")
     handles.append(h)
     h = ax.bar(x + 1.5*width, high_over_vals_tradeoff, width,
            label = r"Tradeoff, $p_{inter}$ = $1e^{-2}$",
-           color = pastel_orange,
-           hatch = hatches[1], edgecolor = 'black')
+           color = pastel_orange_dark,
+           hatch = hatches[1], edgecolor = "black")
     handles.append(h)
     # Focus
     h = ax.bar(x - .5*width, low_over_vals_focus, width,
            label = r"Focus, $p_{inter}$ = $1e^{-4}$",
            color = pastel_red,
-           hatch = hatches[0], edgecolor = 'black')
+           hatch = hatches[0], edgecolor = "black")
     handles.append(h)
     h = ax.bar(x + 2.5*width, high_over_vals_focus, width,
            label = r"Focus, $p_{inter}$ = $1e^{-2}$",
-           color = pastel_red,
-           hatch = hatches[1], edgecolor = 'black')
+           color = pastel_red_dark,
+           hatch = hatches[1], edgecolor = "black")
     handles.append(h)
 
     ax.set_xticks(x)
@@ -215,18 +217,18 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     )
 
     #fig.tight_layout()
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
     fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
     legend = legend_fig.legend(handles = handles,
-                               loc = 'center',
+                               loc = "center",
                                frameon = False,
                                ncols = 3,
                                columnspacing=1.5)
-    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
     
@@ -256,7 +258,7 @@ def run_exp_inter_chiplet():
     for config in ["basic", "tradeoff", "focus"]:
         for ks in [3]:#[1, 2, 3, 4]
             for ni in num_inter_chiplet_connections:
-                for iter_c in range(0, n_iter):
+                for iter_c in range(n_iter):
 
                     if ni not in low_error_depth:
                         low_error_depth[ni] = {}
@@ -359,34 +361,34 @@ def run_exp_inter_chiplet():
 
             
 if __name__ == "__main__":
-    run_exp_inter_chiplet()
+    # run_exp_inter_chiplet()
 
     # Load circuit statistics for the three runs
-    with open(f"experiments/evaluation/inter_chiplet/low_error_depth_basic.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/low_error_depth_basic.pkl", "rb") as f:
         low_error_depth_basic = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_basic.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/low_error_overhead_basic.pkl", "rb") as f:
         low_error_overhead_basic = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_depth_basic.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/high_error_depth_basic.pkl", "rb") as f:
         high_error_depth_basic = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_basic.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/high_error_overhead_basic.pkl", "rb") as f:
         high_error_overhead_basic = pickle.load(f)
 
-    with open(f"experiments/evaluation/inter_chiplet/low_error_depth_tradeoff.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/low_error_depth_tradeoff.pkl", "rb") as f:
         low_error_depth_tradeoff = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_tradeoff.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/low_error_overhead_tradeoff.pkl", "rb") as f:
         low_error_overhead_tradeoff = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_depth_tradeoff.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/high_error_depth_tradeoff.pkl", "rb") as f:
         high_error_depth_tradeoff = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_tradeoff.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/high_error_overhead_tradeoff.pkl", "rb") as f:
         high_error_overhead_tradeoff = pickle.load(f)
 
-    with open(f"experiments/evaluation/inter_chiplet/low_error_depth_focus.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/low_error_depth_focus.pkl", "rb") as f:
         low_error_depth_focus = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/low_error_overhead_focus.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/low_error_overhead_focus.pkl", "rb") as f:
         low_error_overhead_focus = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_depth_focus.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/high_error_depth_focus.pkl", "rb") as f:
         high_error_depth_focus = pickle.load(f)
-    with open(f"experiments/evaluation/inter_chiplet/high_error_overhead_focus.pkl", "rb") as f:
+    with open("experiments/evaluation/inter_chiplet/high_error_overhead_focus.pkl", "rb") as f:
         high_error_overhead_focus = pickle.load(f)
 
     plot_combined([low_error_depth_basic, low_error_depth_tradeoff, low_error_depth_focus],

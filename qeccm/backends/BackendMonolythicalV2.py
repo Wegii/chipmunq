@@ -1,26 +1,16 @@
 # Wrapper around BackendV2
 
-import logging
 
 # Graph
-import rustworkx as rx
 import rustworkx.generators
-
-# Visualizations
-from rustworkx.visualization import mpl_draw, graphviz_draw
-import matplotlib.pyplot as plt
 
 # Qiskit
 from qiskit.providers import BackendV2, Options
-from qiskit.transpiler import CouplingMap
-from qiskit.transpiler import Target, InstructionProperties
-from qiskit.circuit.library import XGate, SXGate, RZGate, CZGate, ECRGate
-from qiskit.circuit import Measure, Delay, Parameter, Reset
-from qiskit import QuantumCircuit, transpile
-from qiskit.visualization import plot_gate_map
+
+# Visualizations
+from rustworkx.visualization import graphviz_draw
 
 # Numerics
-import numpy as np
 
 # Coupling maps:
 # Create different coupling maps
@@ -52,7 +42,7 @@ import numpy as np
 # TODO: add class or function for constructing different connectivity graphs (grid, ring, heavyhex) 
 
 class BackendMonolythicalV2(BackendV2):
-    """ Simple monolythical backend
+    """Simple monolythical backend
 
     Args:
         BackendV2 (_type_): _description_
@@ -65,7 +55,7 @@ class BackendMonolythicalV2(BackendV2):
 
         self.G = None
         # TODO:  Add a)Linear, (b) Ring, (c) Grid, and (d) Star.
-        self.typology = 'grid'
+        self.typology = "grid"
 
 
     def build_backend(self):

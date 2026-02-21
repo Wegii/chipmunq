@@ -1,25 +1,24 @@
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # MECH
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
-from external.baseline.MECH.Circuit import *
-from external.baseline.MECH.Chiplet import *
-from external.baseline.MECH.HighwayOccupancy import *
-from external.baseline.MECH.Router import *
-from external.baseline.MECH.MECHBenchmarks import *
-from external.baseline.MECH.transpile_mech import transpile_circuit_MECH
 import networkx as nx
-from networkx.classes import Graph
+import numpy as np
 
 # Qiskit
 import qiskit
-from qiskit.visualization import plot_coupling_map
-from qiskit.transpiler import CouplingMap
-
-import numpy as np
 import stim
+from qiskit.transpiler import CouplingMap
+from qiskit.visualization import plot_coupling_map
+
+from external.baseline.MECH.Chiplet import *
+from external.baseline.MECH.Circuit import *
+from external.baseline.MECH.HighwayOccupancy import *
+from external.baseline.MECH.MECHBenchmarks import *
+from external.baseline.MECH.Router import *
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 
@@ -36,8 +35,7 @@ def generate_simple_backend(x_num: int, y_num: int, icc_num: int = None) -> tupl
     Returns:
         tuple[nx.Graph, int, int]: _description_
     """
-
-    structure = 'square'
+    structure = "square"
     chip_col_num = 2
     chip_row_num = 2
 
@@ -66,7 +64,6 @@ def coupling_to_adjacency(coupling_map: list) -> np.array:
     Returns:
         np.array: Adjacency matrix
     """
-
     # Extract unique qubits and sort them
     qubits = sorted({q for pair in coupling_map for q in pair})
     qubit_index = {q: i for i, q in enumerate(qubits)}
@@ -91,7 +88,6 @@ def idx_dict_to_list(mapping_dict: dict) -> list:
     Returns:
         list: Indices
     """
-
     # Step 1: Group by row
     from collections import defaultdict
 
@@ -120,7 +116,6 @@ def generate_qecc_synth_backend_from_mech(G: nx.graph) -> tuple[np.array, list]:
     Returns:
         tuple[np.array, list]: Adjacency graph and qubit index list
     """
-
     qubit_idx_dict = gen_qubit_idx_dict(G)
     regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
     regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
@@ -140,7 +135,6 @@ def generate_qiskit_backend_from_mech(G: nx.graph) -> CouplingMap:
     Returns:
         CouplingMap: _description_
     """
-
     qubit_idx_dict = gen_qubit_idx_dict(G)
     regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in G.edges)
     regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in G.edges)
@@ -155,7 +149,6 @@ def display_simple_backend(backend: nx.Graph, filename: str) -> None:
         backend (nx.Graph): _description_
         filename (str): _description_
     """
-
     qubit_idx_dict = gen_qubit_idx_dict(backend)
     regular_coupling = list([qubit_idx_dict[n1], qubit_idx_dict[n2]] for n1,n2 in backend.edges)
     regular_coupling += list([qubit_idx_dict[n2], qubit_idx_dict[n1]] for n1,n2 in backend.edges)
@@ -193,13 +186,12 @@ def calc_circuit_qiskit_stats(transpiled_circuit: qiskit.circuit,
     Returns:
         dict: _description_
     """
-
     # Parameter
     cross_chip_gate_weight = 7.4
 
     # Decompose swap gates
     filter_function = lambda gate: gate.operation.num_qubits >= 2
-    swap_decomposed_circuit = transpiled_circuit.decompose('swap')
+    swap_decomposed_circuit = transpiled_circuit.decompose("swap")
 
     # Calculate depth
     swap_decomposed_depth = 0
@@ -220,13 +212,13 @@ def calc_circuit_qiskit_stats(transpiled_circuit: qiskit.circuit,
         idx_qubit_dict = gen_idx_qubit_dict(G)
         edge = (idx_qubit_dict[q1], idx_qubit_dict[q2])
 
-        if instr.name in ['cx', 'cp'] and G.edges[edge]['type'] == 'on_chip':
+        if instr.name in ["cx", "cp"] and G.edges[edge]["type"] == "on_chip":
             within_chip_cnots += 1
-        elif instr.name == 'swap' and G.edges[edge]['type'] == 'on_chip':
+        elif instr.name == "swap" and G.edges[edge]["type"] == "on_chip":
             within_chip_cnots += 3
-        elif instr.name in ['cx', 'cp'] and G.edges[edge]['type'] == 'cross_chip':
+        elif instr.name in ["cx", "cp"] and G.edges[edge]["type"] == "cross_chip":
             cross_chip_cnots += 1
-        elif instr.name == 'swap' and G.edges[edge]['type'] == 'cross_chip':
+        elif instr.name == "swap" and G.edges[edge]["type"] == "cross_chip":
             cross_chip_cnots += 3
 
     # Calculate effective number of CNOT gates (for calculation, see section 7.1 of "MECH: Multi-Entry Communication Highway for Superconducting Quantum Chiplets")
@@ -242,30 +234,30 @@ def calc_circuit_qiskit_stats(transpiled_circuit: qiskit.circuit,
 
         two_qubit_overhead = (within_chip_cnots + cross_chip_cnots) - num_2q_gates(initial_circuit)
         
-        result_qiskit = {'2q_gates_overhead': two_qubit_overhead,
-                         'depth': swap_decomposed_depth,
-                         'eff_gate_num': norm_cnots,
-                         'on-chip': within_chip_cnots,
-                         'cross-chip': cross_chip_cnots}
+        result_qiskit = {"2q_gates_overhead": two_qubit_overhead,
+                         "depth": swap_decomposed_depth,
+                         "eff_gate_num": norm_cnots,
+                         "on-chip": within_chip_cnots,
+                         "cross-chip": cross_chip_cnots}
     else:
         # Calculate gate overhead using results file. Only applicable ot QECC-Synth
 
         # If qeccsynth results are available, add 2q-gate overhead
         # Calculation of CNOT overhead taken from QECC-Synth - CodeStitch.py
         cnotNum = 0
-        for k in range(qeccsynth_result['chunkNum']):
-            for s in qeccsynth_result['Swap_layer'][k]:
+        for k in range(qeccsynth_result["chunkNum"]):
+            for s in qeccsynth_result["Swap_layer"][k]:
                 cnotNum += 3
-        for k in range(qeccsynth_result['chunkNum']):
-            for k, stab in enumerate(qeccsynth_result['Stab'][k]):
-                cnotNum += len(stab['Ancilla']) * 2 - 2
+        for k in range(qeccsynth_result["chunkNum"]):
+            for k, stab in enumerate(qeccsynth_result["Stab"][k]):
+                cnotNum += len(stab["Ancilla"]) * 2 - 2
 
         two_qubit_overhead = cnotNum
-        result_qiskit = {'2q_gates_overhead': two_qubit_overhead,
-                         'depth': swap_decomposed_depth,
-                         'eff_gate_num': norm_cnots,
-                         'on-chip': within_chip_cnots,
-                         'cross-chip': cross_chip_cnots}
+        result_qiskit = {"2q_gates_overhead": two_qubit_overhead,
+                         "depth": swap_decomposed_depth,
+                         "eff_gate_num": norm_cnots,
+                         "on-chip": within_chip_cnots,
+                         "cross-chip": cross_chip_cnots}
     
     return result_qiskit
 
@@ -279,7 +271,6 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
     Returns:
         dict: _description_
     """
-    
     # Parameter
     cross_chip_gate_weight = 7.4
     meas_weight = 2.2
@@ -290,9 +281,9 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
 
     for idx in range(router.circuit.depth):
         for line in range(len(router.circuit.circuit_lines)):
-            if router.circuit.take_role(line, idx) == 'q':
+            if router.circuit.take_role(line, idx) == "q":
                 meas_num += 1
-            if router.circuit.take_role(line, idx) in ['t', 'mt']:
+            if router.circuit.take_role(line, idx) in ["t", "mt"]:
                 node = router.circuit.take_node(line, idx)
                 #print(node.control)
                 #print(isinstance(node, Circuit.MOpNode))
@@ -309,7 +300,7 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
                     control_line = node.shared
                 control_qubit, target_qubit = router.highway_manager.idx_qubit_dict[control_line], router.highway_manager.idx_qubit_dict[line]
                 
-                if router.chip.has_edge(control_qubit, target_qubit) and router.chip.edges[(control_qubit, target_qubit)]['type'] == 'cross_chip':
+                if router.chip.has_edge(control_qubit, target_qubit) and router.chip.edges[(control_qubit, target_qubit)]["type"] == "cross_chip":
                     cross_chip_gate_num += 1
                 else:
                     on_chip_gate_num += 1
@@ -326,14 +317,14 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
     eff_gate_num = on_chip_gate_num + cross_chip_gate_num * cross_chip_gate_weight + meas_num * meas_weight
 
     # Collect statistics
-    result_mech = {'initial_2q_gates': initial_2q_gates,
-                   'depth': router.circuit.depth,
-                   '2q_gates_overhead': (on_chip_gate_num + cross_chip_gate_num) - initial_2q_gates,
-                   'eff_gate_num': eff_gate_num,
-                   'on-chip': on_chip_gate_num,
-                   'cross-chip': cross_chip_gate_num,
-                   'meas_num': meas_num,
-                   'shuttle_num': len(router.highway_manager.shuttle_stack)}
+    result_mech = {"initial_2q_gates": initial_2q_gates,
+                   "depth": router.circuit.depth,
+                   "2q_gates_overhead": (on_chip_gate_num + cross_chip_gate_num) - initial_2q_gates,
+                   "eff_gate_num": eff_gate_num,
+                   "on-chip": on_chip_gate_num,
+                   "cross-chip": cross_chip_gate_num,
+                   "meas_num": meas_num,
+                   "shuttle_num": len(router.highway_manager.shuttle_stack)}
 
 
     return result_mech

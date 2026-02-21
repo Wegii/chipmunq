@@ -1,48 +1,39 @@
 from __future__ import annotations
 
-import sys
-import os
-import logging
 import copy
-#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
-#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
-
-import qiskit
-import numpy as np
-
-from itertools import product
-
-from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-
+import logging
 
 # QECCircuit
 import random
+from itertools import product
+
+import numpy as np
 import pyzx as zx
+
+#sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/src"))
+#sys.path.append(os.path.join(os.getcwd(), "../eccentric_bench/external/qiskit_qec/"))
+import qiskit
+
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+
 zx.settings.colors = zx.rgb_colors
-
-import qiskit.qasm2 as qasm2
-from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
-
-import sinter
-from tqec import compile_block_graph, NoiseModel
-
-from tqec.utils.enums import Basis
-from tqec.computation.block_graph import BlockGraph, BlockKind, block_kind_from_str
-from tqec.computation.cube import CubeKind, Port, YHalfCube
-from tqec.computation.pipe import PipeKind
-from tqec.computation.cube import ZXCube
-from tqec.utils.position import FloatPosition3D, Position3D
-from tqec.utils.scale import round_or_fail
-from tqec.gallery import cnot, three_cnots, memory, stability, cz
-from tqec.gallery.steane_encoding import steane_encoding
-from tqec.utils.position import Direction3D, Position3D, SignedDirection3D
-from experiments.exp_utils.circuit_utils import stim_to_qiskit
-
-import stim
 
 # Plotting
 import matplotlib.pyplot as plt
+import stim
+from qiskit import QuantumCircuit, qasm2
+from tqec import NoiseModel, compile_block_graph
+from tqec.computation.block_graph import BlockGraph, block_kind_from_str
+from tqec.computation.cube import CubeKind, Port, YHalfCube, ZXCube
+from tqec.computation.pipe import PipeKind
+from tqec.gallery import cnot, memory, three_cnots
+from tqec.gallery.steane_encoding import steane_encoding
+from tqec.utils.enums import Basis
+from tqec.utils.position import FloatPosition3D, Position3D
+from tqec.utils.scale import round_or_fail
+
+from experiments.exp_utils.circuit_utils import stim_to_qiskit
 
 
 def get_tqec_cnot_rotated(distance_scale: int = 2, n1: int = 1, n2: int = 0) -> tuple[StimCodeCircuit, list]:
@@ -58,7 +49,7 @@ def get_tqec_cnot_rotated(distance_scale: int = 2, n1: int = 1, n2: int = 0) -> 
 
 
 
-class GenericCircuit():
+class GenericCircuit:
     def __init__(self, nq: int):
         self.num_qubits = nq
 
@@ -106,7 +97,7 @@ class GenericCircuit():
 
         return patched_circuit
 
-class QECMemory():
+class QECMemory:
     """QECC memory circuits
     
     Supported codes:
@@ -198,7 +189,6 @@ class QECMemory():
         :return: QECC memory circuit
         :rtype: qiskit.QuantumCircuit
         """
-
         qecc_mem = self._generate_code_from_eccentric_bench(codename, distance_scale = distance_scale)
         
 
@@ -211,9 +201,8 @@ class QECMemory():
 
 
 class QECCircuit:
-    """ Logical circuits using lattice surgery
-    
-    
+    """Logical circuits using lattice surgery
+
     Tasks
         - TODO: Needs quite a lot of improvement
         - TODO: Perform circuit verification + circuit conversion (in topologiq and pyzx) verification
@@ -228,14 +217,13 @@ class QECCircuit:
         pass
 
     def single_memory_patch(self, distance_scale: int = 1):
-        """Generate single logical memory 
+        """Generate single logical memory
 
         Code adapted from: https://tqec.github.io/tqec/gallery/memory.html
 
         :param distance_scale: Scale of surface code patch, defaults to 1
         :type distance_scale: int, optional
         """
-
         # TODO: add option for manhattan radius
 
         graph = memory(Basis.Z)
@@ -309,7 +297,6 @@ class QECCircuit:
         :return: _description_
         :rtype: _type_
         """
-        
         g = BlockGraph("HadamardExample")
 
         # Compatible cubes for Hadamard
@@ -374,7 +361,6 @@ class QECCircuit:
         :param distance_scale: Scale of surface code patch, defaults to 1
         :type distance_scale: int, optional
         """
-
         # TODO: add option for manhattan radius
 
         #graph = cz(["XI -> XZ", "IZ -> IZ"])#.rotate(Direction3D.Z, )
@@ -689,7 +675,6 @@ class QECCircuit:
                 ]
                 max_qubit = None
                 qubit_shift = max_qubit + 1
-                pass
             else:
                 pass
 
@@ -700,7 +685,7 @@ class QECCircuit:
                 # Iterate over all single partitions
                 for p in single_partitions:
                     modified_p = copy.deepcopy(p) 
-                    modified_p['indices'] = [i + nc * qubit_shift for i in modified_p['indices']]
+                    modified_p["indices"] = [i + nc * qubit_shift for i in modified_p["indices"]]
                     partitions.append(modified_p)
 
             print(partitions)
@@ -824,7 +809,7 @@ class QECCircuit:
             between_1 = True
             perform_horizontal_skip = True
 
-            for nc in range(0, num_col):
+            for nc in range(num_col):
 
                 # This has to be turned on and off every 7 columns or so
                 patch_down = False
@@ -866,7 +851,7 @@ class QECCircuit:
                             perform_horizontal_skip = not perform_horizontal_skip
 
                             skip = np.array(list(range(2*distance_scale + 2)))    
-                            vertical_skip = [skip+(i*((2*(2*distance_scale+1) + 2))) for i in range(n2)]
+                            vertical_skip = [skip+(i*(2*(2*distance_scale+1) + 2)) for i in range(n2)]
                             # Convert to simple list
                             vertical_skip = np.concatenate(vertical_skip)
                             vertical_skip = vertical_skip.tolist()
@@ -874,9 +859,8 @@ class QECCircuit:
                             if between_1:
                                 if r in vertical_skip:
                                     continue
-                            else:
-                                if r not in vertical_skip:
-                                    continue
+                            elif r not in vertical_skip:
+                                continue
                         
 
                         qubit_index += 1
@@ -896,7 +880,6 @@ class QECCircuit:
                 # ancilla width/height = 3
                 patch_width = patch_height = 4
                 ancilla_size = 3
-                pass
             if distance_scale == 2:
                 # 5
                 # width = height = 6
@@ -928,7 +911,6 @@ class QECCircuit:
         :return: _description_
         :rtype: _type_
         """
-
         graph = three_cnots(Basis.X)
         compiled_graph = compile_block_graph(graph)
         stim_circuit = compiled_graph.generate_stim_circuit(
@@ -948,7 +930,6 @@ class QECCircuit:
         :return: _description_
         :rtype: _type_
         """
-
         graph = steane_encoding(Basis.X)
         compiled_graph = compile_block_graph(graph)
         stim_circuit = compiled_graph.generate_stim_circuit(
@@ -961,11 +942,9 @@ class QECCircuit:
     def simple_circuit(self):
         from topologiq.scripts.runner import runner
         from topologiq.utils.interop_pyzx import pyzx_g_to_simple_g
-        from topologiq.utils.utils_zx_graphs import kind_to_zx_type
 
         def steane_circuit_qiskit():
-            """Function to generate the Steane code encoding circuit. """
-
+            """Function to generate the Steane code encoding circuit."""
             """
             qc = QuantumCircuit(10)
 
@@ -1014,9 +993,9 @@ class QECCircuit:
         # Optimize
         # Apply states
         num_apply_state = zx_graph.num_inputs()
-        zx_graph.apply_state('0' * num_apply_state)
+        zx_graph.apply_state("0" * num_apply_state)
         # Apply post-select only to the outputs of the ancilla qubits
-        zx_graph.apply_effect('000///////')
+        zx_graph.apply_effect("000///////")
         #zx_graph.apply_effect('///')
         #zx.draw(zx_graph, labels = True)
         zx.full_reduce(zx_graph)
@@ -1035,7 +1014,7 @@ class QECCircuit:
                 print(f"{k}: {v}")
         
         # Parameters & hyper-parameters
-        circuit_name = f"steane_from_qiskit"
+        circuit_name = "steane_from_qiskit"
         visualisation = "final"  # Calls 3D visualisation at the end. `None` to deactivate.
         animation = None  # Change to "GIF" or "MP4" for a summary animation (significant runtime costs).
 
@@ -1182,7 +1161,7 @@ class QECCircuit:
             assert len(filled_graphs) == 2
             if observable_basis == Basis.X:
                 return filled_graphs[0].graph
-            elif observable_basis == Basis.Z:
+            if observable_basis == Basis.Z:
                 return filled_graphs[1].graph
 
 

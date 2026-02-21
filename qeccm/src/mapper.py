@@ -1,32 +1,27 @@
 # Typing
-import kahypar
 
 # Numerics
-import random
 import math
-import numpy as np
-
-# Qiskit transpiler
-from qiskit.providers import BackendV2
-from qiskit.dagcircuit import DAGCircuit
-from qiskit.transpiler.basepasses import AnalysisPass
-from qiskit.transpiler.layout import Layout
-from qiskit.circuit import Qubit, QuantumRegister
-
-# Hypergraph stuff
-import networkx as nx
-from qeccm.circuit.hypergraph_circuit import PartitionedHyperGraph
+import random
 from collections import deque
 from itertools import product
 
-from qeccm.src.qpublock import QPUBlock, plot_block_counts, dimension_to_linear_index, linear_index_to_dimension
+from qiskit.circuit import QuantumRegister
 
+# Qiskit transpiler
+from qiskit.dagcircuit import DAGCircuit
+from qiskit.transpiler.basepasses import AnalysisPass
+from qiskit.transpiler.layout import Layout
+
+# Hypergraph stuff
+from qeccm.circuit.hypergraph_circuit import PartitionedHyperGraph
+from qeccm.src.qpublock import QPUBlock, dimension_to_linear_index, linear_index_to_dimension, plot_block_counts
 
 
 class GenericMapper(AnalysisPass):
 
     def __init__(self):
-        """ GenericMapper initializer """ 
+        """GenericMapper initializer""" 
         super().__init__()
 
         # Backend for mapping
@@ -54,8 +49,7 @@ class RandomMapper(GenericMapper):
     """
 
     def __init__(self, backend):
-        """ RandomMapper initializer """        
-
+        """RandomMapper initializer"""        
         super().__init__()
 
         # Coupling map to map the dag to
@@ -93,7 +87,7 @@ class RandomMapper(GenericMapper):
         layout = Layout()
         regs = dag.qubits + list(dag.qregs.values())
 
-        hgc = self.property_set['hyper_dag']
+        hgc = self.property_set["hyper_dag"]
         for reg in regs:
             if isinstance(reg, QuantumRegister):
                 layout.add_register(reg)
@@ -120,14 +114,13 @@ class TrivialMapper(GenericMapper):
     """
 
     def __init__(self, backend, patch_initialization: str = ""):
-        """ TrivialMapper initializer
+        """TrivialMapper initializer
 
         :param backend: _description_
         :type backend: _type_
         :param patch_initialization: _description_, defaults to "center"
         :type patch_initialization: str, optional
         """
-        
         super().__init__()
 
         # Coupling map to map the dag to
@@ -145,7 +138,6 @@ class TrivialMapper(GenericMapper):
         :param dag: _description_
         :type dag: DAGCircuit
         """
-
         # 0. Get partitioning from partition pass
         partitioned_hgc = self.property_set["partitioned_hyper_dag"]
 
@@ -172,7 +164,6 @@ class TrivialMapper(GenericMapper):
         :return: _description_
         :rtype: Layout
         """
-
         print("Generating Layout")
 
         layout = Layout()
@@ -182,12 +173,11 @@ class TrivialMapper(GenericMapper):
         for reg in regs:
             if isinstance(reg, QuantumRegister):
                 layout.add_register(reg)
-            else:
-                if reg._index in vq_to_pq:
-                    # Get physical qubit
-                    physical_qubit = vq_to_pq[reg._index]
-                    # Map mapping from virtual qubit to physical qubit
-                    layout.add(reg, physical_qubit)
+            elif reg._index in vq_to_pq:
+                # Get physical qubit
+                physical_qubit = vq_to_pq[reg._index]
+                # Map mapping from virtual qubit to physical qubit
+                layout.add(reg, physical_qubit)
         
 
         # Virtual to physical qubit mapping
@@ -239,22 +229,22 @@ class TrivialMapper(GenericMapper):
                     partition_id, local_x, local_y, patch_width, patch_height = p
                     # Virtual qubits for this partition
                     nodes_of_partition = partitions[partition_id]
-                    print(pre_defined_partitions[partition_id]['indices'] == nodes_of_partition)
+                    print(pre_defined_partitions[partition_id]["indices"] == nodes_of_partition)
                     print(f"Trying to place nodes {nodes_of_partition}")
 
                     # TODO: Extract the type of patch from either the partition or somewhere
                     rotated_full = False
                     code_distance = -1
                     if pre_defined_partitions != None:
-                        match pre_defined_partitions[partition_id]['type']:
+                        match pre_defined_partitions[partition_id]["type"]:
                             case "rectangle":
                                 rectangle = True
                             case "rotated_surface_code":
                                 rotated_full = True
-                                code_distance = pre_defined_partitions[partition_id]['distance']
+                                code_distance = pre_defined_partitions[partition_id]["distance"]
                             case "rotated_surface_code_ancilla":
                                 rotated_full = True
-                                code_distance = pre_defined_partitions[partition_id]['distance']
+                                code_distance = pre_defined_partitions[partition_id]["distance"]
                     else:
                         # TODO: Calculate partition type from number of nodes
                         # TODO: Calculate code distance from number of nodes
@@ -279,7 +269,6 @@ class TrivialMapper(GenericMapper):
                         elif code_distance == 9:
                             # TODO: Implement distance 9
                             print("Distance 9 not implemented!")
-                            pass
                         
                         
                         # Define starting row and column
@@ -371,7 +360,6 @@ class TrivialMapper(GenericMapper):
         :return: _description_
         :rtype: List[int]
         """
-
         placement, blocks = self.placement_aware_assignment(partitioned_hg,
                                                             dag,
                                                             width = self.backend.c2,
@@ -418,7 +406,6 @@ class TrivialMapper(GenericMapper):
         :return: _description_
         :rtype: tuple[dict, dict]
         """
-        
         partition_size = {}
         for partition_key, nodes in partitioned_hg._btn.items():
             partition_size[partition_key] = len(nodes) #math.sqrt(len(nodes))
@@ -515,8 +502,8 @@ class TrivialMapper(GenericMapper):
                 # Extract width and height of the patch from the pre-defined patches. Otherwise calculate from the
                 # number of nodes
                 if pre_defined_partitions != None:
-                    pw = pre_defined_partitions[partition_id]['width']
-                    ph = pre_defined_partitions[partition_id]['height']
+                    pw = pre_defined_partitions[partition_id]["width"]
+                    ph = pre_defined_partitions[partition_id]["height"]
                 else:
                     # TODO: Implement this
                     print("Calculating width and height of partition given the number of nodes!")

@@ -2,30 +2,28 @@
 
 # TODO: replace logging with qiskit logger
 import logging
+import random
 
 # Numerics
 import numpy as np
-import random
 
 # Graph
 import rustworkx as rx
 import rustworkx.generators
-
-# Visualizations
-from rustworkx.visualization import graphviz_draw
-import matplotlib.pyplot as plt
+from qiskit.circuit import Delay, Measure, Parameter, Reset
+from qiskit.circuit.library import CZGate, ECRGate, RZGate, SXGate, XGate
 
 # Qiskit
 from qiskit.providers import BackendV2, Options
-from qiskit.transpiler import Target, InstructionProperties
-from qiskit.circuit.library import XGate, SXGate, RZGate, CZGate, ECRGate
-from qiskit.circuit import Measure, Delay, Parameter, Reset
+from qiskit.transpiler import InstructionProperties, Target
 
-LABEL_ON_CHIP = 'on_chip_connection'
-LABEL_INTER_CHIP = 'inter_chip_connection'
+# Visualizations
+
+LABEL_ON_CHIP = "on_chip_connection"
+LABEL_INTER_CHIP = "inter_chip_connection"
 
 class BackendChipletV2(BackendV2):
-    """ Simple chiplet backend
+    """Simple chiplet backend
 
     Things to add:
      - Check out how to modify the backend with target that the qiskit compiler knows all potential constraints
@@ -55,7 +53,6 @@ class BackendChipletV2(BackendV2):
         :param n_inter: _description_
         :type n_inter: _type_
         """
-        
         super().__init__(name="GenericChiplet")
     
         # Number of chiplets, row, column
@@ -168,7 +165,6 @@ class BackendChipletV2(BackendV2):
         :return: _description_
         :rtype: rx.PyGraph
         """
-
         # For a nice layout have a look at:
         #   https://github.com/munich-quantum-toolkit/qecc/blob/ls-compilation/scripts/co3/layouts.py
         # There, the layout has fixed coordinates.
@@ -252,7 +248,7 @@ class BackendChipletV2(BackendV2):
             distance = 3
             G = rx.generators.directed_heavy_hex_graph(distance, bidirectional=False)
         elif self.topology == "line":
-            raise NotImplemented
+            raise NotImplementedError
 
         # Single-qubit gates
         # Generate instruction properties for single qubit gates and a measurement, delay,
@@ -483,7 +479,6 @@ class BackendChipletV2(BackendV2):
         :return: Chiplet the node is assigned to
         :rtype: int
         """
-        
         return self.node_to_chiplet[node]
         
     def get_edge_coordinates(self, n, m, offset=0) -> tuple:
@@ -508,7 +503,6 @@ class BackendChipletV2(BackendV2):
         :return: _description_
         :rtype: dict
         """
-
         # TODO: It should be possible to set the noise and amplification during construction of backend
         if noise == None:
             noise = 0.1
@@ -544,13 +538,11 @@ class BackendChipletV2(BackendV2):
         :return: Number of chiplets
         :rtype: int
         """
-
         if self.chiplet_topology == "line":
             return self.c1
-        elif self.chiplet_topology == "grid":
+        if self.chiplet_topology == "grid":
             return self.c1 * self.c2
-        else:
-            return -1
+        return -1
 
     def get_chip_size(self) -> int:
         """Return size of the biggest chip.

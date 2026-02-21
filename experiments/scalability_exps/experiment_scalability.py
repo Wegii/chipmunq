@@ -2,22 +2,25 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
+import pickle
 import time
+from math import *
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.ticker import MaxNLocator
+
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 
 # Custom utils
 from experiments.exp_utils.transpilation_utils import *
-from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
-from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-import pickle
-from math import *
-import numpy as np
 from experiments.utils import *
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 
 def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
@@ -58,13 +61,13 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     colors_custom = [ "#8FB7E1", "#5E97CC", "#3B6FA8"]
     colors_sabre = [ "#E38E8A", "#C85E59", "#9F3B36"]
 
-    inter_markers = ['x', 'o', 's']
+    inter_markers = ["x", "o", "s"]
 
     handles = []
     for i, ks in enumerate(ks_values):
         # SABRE
         y_sabre = [sabre_time_storage[np].get(ks, None) for np in np_values]
-        h = plt.plot(x_val, y_sabre, marker=inter_markers[i], linestyle='--', label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
+        h = plt.plot(x_val, y_sabre, marker=inter_markers[i], linestyle="--", label=f"LightSABRE, d={2*ks+1}", color=colors_sabre[i])
         # TODO: Calculate correct variance
        #y_std = np.array([2, 2, 2, 2, 2])
        # plt.fill_between(x_val, 
@@ -78,7 +81,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     #for i, ks in enumerate(ks_values):
         # Custom
         y_custom = [custom_time_storage[np].get(ks, None) for np in np_values]
-        h = plt.plot(x_val, y_custom, marker=inter_markers[i], linestyle='-', label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
+        h = plt.plot(x_val, y_custom, marker=inter_markers[i], linestyle="-", label=f"Chipmunq, d={2*ks+1}", color=colors_custom[i])
         handles.extend(h)
 
     #plt.axvline(x=3)
@@ -105,14 +108,14 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     #)
 
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.tick_params(axis='both', labelsize=14)
+    plt.tick_params(axis="both", labelsize=14)
 
     plt.xlabel("Number of patches", fontsize=FONTSIZE*1.5)
     plt.ylabel("Runtime [s]", fontsize=FONTSIZE*1.5)
     plt.yscale("log")
 
     #plt.grid(True)
-    plt.grid(True, which='major', linestyle='--', alpha=0.5)
+    plt.grid(True, which="major", linestyle="--", alpha=0.5)
     #ax.legend(loc='lower right', ncol=2)
     #plt.tight_layout()
     fig.subplots_adjust(left=0.15, right=0.95, top=0.83, bottom=0.21)
@@ -122,11 +125,11 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
 
     legend_fig = plt.figure(figsize=(3, 2))
     legend = legend_fig.legend(handles = handles,
-                               loc = 'center',
+                               loc = "center",
                                frameon = False,
                                ncols = 3,
                                columnspacing=1.5)
-    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
@@ -240,9 +243,9 @@ def run_exp_scalability():
     """
     
     # Load pre-computed results
-    with open(f"experiments/evaluation/scalability/timing_custom.pkl", "rb") as f:
+    with open("experiments/evaluation/scalability/timing_custom.pkl", "rb") as f:
         custom_time_storage = pickle.load(f)
-    with open(f"experiments/evaluation/scalability/timing_sabre.pkl", "rb") as f:
+    with open("experiments/evaluation/scalability/timing_sabre.pkl", "rb") as f:
         sabre_time_storage = pickle.load(f)
 
     print("Custom:")

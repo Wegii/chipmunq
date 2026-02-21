@@ -7,34 +7,21 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
 # Custom utils
-from experiments.exp_utils.transpilation_utils import *
-from experiments.exp_utils.circuit_generator import QECMemory, QECCircuit, get_tqec_cnot_rotated
-from qeccm.backends.backend_utils import plot_circuit_layout, plot_circuit_layout_utilization
-from qeccm.src.reference_partitions import memory_d5
-from experiments.exp_utils.simulation_utils import *
-from qeccm.backends.backend_utils import plot_gate_map
-
-from experiments.exp_utils.circuit_utils import stim_to_qiskit
-from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
-from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
-from stim import Circuit as StimCircuit
-
-from glue.eccentric_bench.noise import get_noise_model
-
-from tqec.utils.noise_model import NoiseModel
-from tqec.computation.block_graph import BlockGraph
-from tqec.utils.enums import Basis
-from tqec.utils.position import Position3D
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
 from collections import defaultdict
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from experiments.exp_utils.simulation_utils import *
+from experiments.exp_utils.transpilation_utils import *
 from experiments.utils import *
 
 
@@ -44,9 +31,9 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     d_values = set()
     for s in stats:
         ler = s.errors / (s.shots - s.discards)
-        p = s.json_metadata['p']
-        t = str(s.json_metadata['run_name'])
-        d = str(s.json_metadata['d'])
+        p = s.json_metadata["p"]
+        t = str(s.json_metadata["run_name"])
+        d = str(s.json_metadata["d"])
         
         error_rates[t][d][p].append(ler)
         physical_error_rates.add(p)
@@ -62,9 +49,9 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         # Font sizes
         "axes.labelsize": FONTSIZE*1.5,
         "font.size": FONTSIZE*1.2,
-        "legend.fontsize": (FONTSIZE - 2)*1.5,
-        "xtick.labelsize": (FONTSIZE - 1)*1.5,
-        "ytick.labelsize": (FONTSIZE - 1)*1.5,
+        "legend.fontsize": (FONTSIZE - 2)*1.3,
+        "xtick.labelsize": (FONTSIZE - 1)*1.3,
+        "ytick.labelsize": (FONTSIZE - 1)*1.3,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
@@ -80,7 +67,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.5))
     # Plot identity (x = y)
-    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.2, color="#000000B3", label=f'x=y')
+    plt.plot(physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.2, color="#000000B3", label="x=y")
 
     colors_sabre = ([ "#E38E8A", "#C85E59", "#9F3B36"])
     colors_transpiled = ([ "#5E97CC", "#3B6FA8", "#2A5687"])
@@ -89,9 +76,9 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
 
 
     # TODO: Add sabre to the plots
-    inter_markers = ['x', 'o', 's']
+    inter_markers = ["x", "o", "s"]
     handles = []
-    d_values_reduced = ['5', '7']
+    d_values_reduced = ["5", "7"]
 
     for ti, t in enumerate(["default", "compiled", "sabre"]):
         for i, d in enumerate(d_values_reduced):
@@ -115,7 +102,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
                         markerfacecolor="none",
                         linestyle= "solid", #"--" if t == "default" else "solid",
                         color = color_list[ti][i],
-                        label = f'{l}, d={d}')
+                        label = f"{l}, d={d}")
             handles.extend(h)
             
     if inter_chiplet_noise == 0.0001:
@@ -185,19 +172,19 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     #plt.ylim(-0.01, 0.9)
     plt.ylim(5e-9, 2e0)
     plt.xlim(1e-4, 1e-2)
-    plt.xscale('log')
-    plt.yscale('log')
+    plt.xscale("log")
+    plt.yscale("log")
 
 
     plt.xlabel("Physical error rate")
     plt.ylabel("Logical error rate")
     #plt.legend(loc="lower right", ncol=2)
     #plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=2)
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
     #plt.tight_layout()
     #fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
     fig.subplots_adjust(left=0.24, right=0.95, top=0.8, bottom=0.21)
-    plt.savefig(filename + ".pdf", format="pdf", bbox_inches='tight')
+    plt.savefig(filename + ".pdf", format="pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -229,7 +216,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
                     markerfacecolor = "none",
                     linestyle= "--",
                     color = colors_transpiled[i],
-                    label = f'({d})')
+                    label = f"({d})")
             
     
     ax.text(
@@ -247,14 +234,14 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     
     #plt.ylim(-0.01, 0.9)
     #plt.ylim(5e-9, 1e0)
-    plt.xscale('log')
+    plt.xscale("log")
     #plt.yscale('log')
 
 
     plt.xlabel("Physical error rate")
     plt.ylabel(r"$LER_{Compiled} / LER_{Default}$")
     #plt.legend(loc="upper right", ncol=1)
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.grid(True, which="both", linestyle="--", alpha=0.5)
 
     fig.subplots_adjust(left=0.24, right=0.95, top=0.95, bottom=0.1)
     plt.savefig(filename + "_relative.pdf", format="pdf")
@@ -262,11 +249,11 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
 
     legend_fig = plt.figure(figsize=(3, 2))
     legend = legend_fig.legend(handles = handles,
-                               loc = 'center',
+                               loc = "center",
                                frameon = False,
                                ncols = 3,
                                columnspacing = 1.5)
-    legend_fig.savefig(filename + 'legend.pdf', bbox_inches='tight', format="pdf")
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
     

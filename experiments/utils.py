@@ -1,11 +1,4 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import matplotlib.ticker as mtick
-from matplotlib.ticker import ScalarFormatter
-
 
 # Figure sizes and font
 WIDTH_FIGSIZE = 6
@@ -38,5 +31,5 @@ tex_fonts = {
 }
 
 plt.rcParams.update(tex_fonts)
-plt.rcParams['pdf.fonttype'] = 42
-plt.rcParams['ps.fonttype'] = 42
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
