@@ -156,7 +156,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
-    ax.set_xlabel("Circuit size")
+    ax.set_xlabel("Interconnection density")
     ax.set_ylabel("Depth Overhead")
     # ax.legend()
 
@@ -249,7 +249,7 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
 
     ax.set_xticks(x)
     ax.set_xticklabels(section_titles)
-    ax.set_xlabel("Circuit size")
+    ax.set_xlabel("Interconnection density")
     ax.set_ylabel("#2q gate overhead ")
     # ax.legend()
     # ax.set_ylim(0, 6100)
