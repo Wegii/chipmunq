@@ -241,13 +241,15 @@ def plot_combined_backends(
     x = np.arange(len(df_values))  # [0,1,2]
 
     # Two bars per group
-    width = 0.4 / 4  # 0.35/4#0.35/2
+    width = 0.5 / 4  # 0.35/4#0.35/2
 
     title_left = ""
 
     # Colors
-    colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
-    colors = ["#A7D9ED", "#F7C6A2", "#4682B4", "#F08080"]
+    # colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
+    colors_custom = ["#A7D9ED", "#5B9BD5", "#D9D9D9", "#7F7F7F"]
+    colors_sabre = ["#F7C6A2", "#E68A5C", "#F7A2A2", "#D65C5C"]
+
     hatches = ["...", "//", "xxx", "ooo"]  # one hatch per placement mode
 
     tex_fonts = {
@@ -286,60 +288,62 @@ def plot_combined_backends(
 
         # Custom
         ax.bar(
-            x + i * 2 * width - 3.5 * width,
+            x + i * 1 * width - 2.5 * width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
-            color=colors[0],
+            color=colors_custom[i],
             hatch=hatches[i],
             edgecolor="black",
         )
-        # SABRE
-        ax.bar(
-            x + i * 2 * width - 2.5 * width,
-            values_mean_sabre,
-            width,
-            yerr=values_err_sabre,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
-            label=labels[i],
-            color=colors[1],
-            hatch=hatches[i],
-            edgecolor="black",
-        )
+        if i < 1:
+            # SABRE
+            ax.bar(
+                x + i * 2 * width - .5 * width,
+                values_mean_sabre,
+                width,
+                yerr=values_err_sabre,
+                capsize=2,
+                error_kw={"elinewidth": 1, "ecolor": "black"},
+                label=labels[i],
+                color=colors_sabre[i],
+                #hatch=hatches[i],
+                edgecolor="black",
+            )
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_depth[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_depth[1], df_values, mode, ks)
         # Custom
         ax.bar(
-            x + (2 + i) * width * 2 - 3.5 * width,  # 1.5*width,
+            x + (2 + i) * width * 2 - 3.5 * width - i*width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
-            color=colors[2],
-            hatch=hatches[i + 2],
+            color=colors_custom[i+2],
+            hatch=hatches[i],
             edgecolor="black",
         )
-        # SABRE
-        ax.bar(
-            x + (2 + i) * width * 2 - 2.5 * width,
-            values_mean_sabre,
-            width,
-            yerr=values_err_sabre,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
-            label=labels[i] + "multi",
-            color=colors[3],
-            hatch=hatches[i + 2],
-            edgecolor="black",
-        )
+        if i < 1:
+            # SABRE
+            ax.bar(
+                x + (2 + i) * width * 2 - 1.5 * width,
+                values_mean_sabre,
+                width,
+                yerr=values_err_sabre,
+                capsize=2,
+                error_kw={"elinewidth": 1, "ecolor": "black"},
+                label=labels[i] + "multi",
+                color=colors_sabre[i + 2],
+                #hatch=hatches[i + 2],
+                edgecolor="black",
+            )
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -373,60 +377,62 @@ def plot_combined_backends(
 
         # Custom
         ax.bar(
-            x + i * 2 * width - 3.5 * width,
+            x + i * 1 * width - 2.5 * width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i],
-            color=colors[0],
+            color=colors_custom[i],
             hatch=hatches[i],
             edgecolor="black",
         )
-        # SABRE
-        ax.bar(
-            x + i * 2 * width - 2.5 * width,
-            values_mean_sabre,
-            width,
-            yerr=values_err_sabre,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
-            label=labels[i],
-            color=colors[1],
-            hatch=hatches[i],
-            edgecolor="black",
-        )
+        if i < 1:
+            # SABRE
+            ax.bar(
+                x + i * 2 * width - .5 * width,
+                values_mean_sabre,
+                width,
+                yerr=values_err_sabre,
+                capsize=2,
+                error_kw={"elinewidth": 1, "ecolor": "black"},
+                label=labels[i],
+                color=colors_sabre[i],
+                #hatch=hatches[i],
+                edgecolor="black",
+            )
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_overhead[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_overhead[1], df_values, mode, ks)
         # Custom
         ax.bar(
-            x + (2 + i) * width * 2 - 3.5 * width,  # 1.5*width,
+            x + (2 + i) * width * 2 - 3.5 * width - i*width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
-            color=colors[2],
-            hatch=hatches[i + 2],
+            color=colors_custom[i + 2],
+            hatch=hatches[i],
             edgecolor="black",
         )
-        # SABRE
-        ax.bar(
-            x + (2 + i) * width * 2 - 2.5 * width,
-            values_mean_sabre,
-            width,
-            yerr=values_err_sabre,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
-            label=labels[i] + "multi",
-            color=colors[3],
-            hatch=hatches[i + 2],
-            edgecolor="black",
-        )
+        if i < 1:
+            # SABRE
+            ax.bar(
+                x + (2 + i) * width * 2 - 1.5 * width,
+                values_mean_sabre,
+                width,
+                yerr=values_err_sabre,
+                capsize=2,
+                error_kw={"elinewidth": 1, "ecolor": "black"},
+                label=labels[i] + "multi",
+                color=colors_sabre[i + 2],
+                #hatch=hatches[i + 2],
+                edgecolor="black",
+            )
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -462,65 +468,67 @@ def plot_combined_backends(
 
         # Custom
         h = ax.bar(
-            x + i * 2 * width - 3.5 * width,
+            x + i * 1 * width - 2.5 * width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label="Chipmunq, single patch, " + labels[i],
-            color=colors[0],
+            color=colors_custom[i],
             hatch=hatches[i],
             edgecolor="black",
         )
         handles.append(h)
-        # SABRE
-        h = ax.bar(
-            x + i * 2 * width - 2.5 * width,
-            values_mean_sabre,
-            width,
-            yerr=values_err_sabre,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
-            label="LightSABRE, single patch, " + labels[i],
-            color=colors[1],
-            hatch=hatches[i],
-            edgecolor="black",
-        )
-        handles.append(h)
+        if i < 1:
+            # SABRE
+            h = ax.bar(
+                x + i * 2 * width - .5 * width,
+                values_mean_sabre,
+                width,
+                yerr=values_err_sabre,
+                capsize=2,
+                error_kw={"elinewidth": 1, "ecolor": "black"},
+                label="LightSABRE, single patch",
+                color=colors_sabre[i],
+                #hatch=hatches[i],
+                edgecolor="black",
+            )
+            handles.append(h)
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_utilization[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[1], df_values, mode, ks)
         # Custom
         h = ax.bar(
-            x + (2 + i) * width * 2 - 3.5 * width,  # 1.5*width,
+            x + (2 + i) * width * 2 - 3.5 * width - i*width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label="Chipmunq, multi patch, " + labels[i],
-            color=colors[2],
-            hatch=hatches[i + 2],
+            color=colors_custom[i + 2],
+            hatch=hatches[i],
             edgecolor="black",
         )
         handles.append(h)
 
-        # SABRE
-        h = ax.bar(
-            x + (2 + i) * width * 2 - 2.5 * width,
-            values_mean_sabre,
-            width,
-            yerr=values_err_sabre,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
-            label="LightSABRE, multi patch, " + labels[i],
-            color=colors[3],
-            hatch=hatches[i + 2],
-            edgecolor="black",
-        )
-        handles.append(h)
+        if i < 1:
+            # SABRE
+            h = ax.bar(
+                x + (2 + i) * width * 2 - 1.5 * width,
+                values_mean_sabre,
+                width,
+                yerr=values_err_sabre,
+                capsize=2,
+                error_kw={"elinewidth": 1, "ecolor": "black"},
+                label="LightSABRE, multi patch",
+                color=colors_sabre[i + 2],
+                #hatch=hatches[i + 2],
+                edgecolor="black",
+            )
+            handles.append(h)
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -545,8 +553,13 @@ def plot_combined_backends(
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=4, columnspacing=1.5)
-    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
+    legend = legend_fig.legend(handles=[handles[0], handles[4], handles[2], handles[5]], loc="center", frameon=False, ncols=4, columnspacing=1.5)
+    legend_fig.savefig(filename + "legend_custom.pdf", bbox_inches="tight", format="pdf")
+    plt.close(legend_fig)
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles=[handles[1], handles[3]], loc="center", frameon=False, ncols=4, columnspacing=1.5)
+    legend_fig.savefig(filename + "legend_sabre.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
