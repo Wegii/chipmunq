@@ -282,6 +282,7 @@ class QECCircuit:
         :return: _description_
         :rtype: _type_
         """
+
         g = BlockGraph("HadamardExample")
 
         # Compatible cubes for Hadamard
@@ -408,6 +409,58 @@ class QECCircuit:
         stim_circuit = compiled_graph.generate_stim_circuit(k=distance_scale, manhattan_radius=2)
 
         return stim_to_qiskit(stim_circuit), stim_circuit
+
+    def single_cnot_full_memory_extended(self, distance_scale: int = 1,):
+        g = BlockGraph("Logical CNOT with extended syndrom measurement rounds")
+
+        cnot_counter = 0
+
+        nodes = [
+            (Position3D(0, 0, 0), "P", f"In_Control_{cnot_counter}"),
+            (Position3D(0, 0, 1), "ZXX", ""),
+            (Position3D(0, 0, 2), "ZXZ", ""),
+            (Position3D(0, 0, 3), "ZXZ", ""), # Additional rounds
+            # ADD (Position3D(0, 0, Correct Z), "ZXZ", "") for even more rounds on control
+            (Position3D(0, 0, 4), "P", f"Out_Control_{cnot_counter}"), # Adjust Z here if you add another pipe
+
+            (Position3D(0, 1, 1), "ZXX", ""),
+            (Position3D(0, 1, 2), "ZXZ", ""),
+
+            (Position3D(1, 1, 0), "P", f"In_Target_{cnot_counter}"),
+            (Position3D(1, 1, 1), "ZXZ", ""),
+            (Position3D(1, 1, 2), "ZXZ", ""),
+            (Position3D(1, 1, 3), "ZXZ", ""), # Additional cycle
+            # ADD (Position3D(1, 1, Correct Z), "ZXZ", "") for even more rounds on target
+            (Position3D(1, 1, 4), "P", f"Out_Target_{cnot_counter}"), # Adjust Z here if you add another pipe
+        ]
+        for pos, kind, label in nodes:
+            g.add_cube(pos, kind, label)
+
+        # add pipes as tuples (source, target) and adjust indices!
+        pipes = [
+            (0, 1),
+            (1, 2),
+            (2, 3),  # Control
+            (3, 4),
+            (1, 5),
+            (5, 6),  # Ancilla
+            (6, 9),  # Merge
+            (7, 8),
+            (8, 9),
+            (9, 10),
+            (10, 11),  # Target
+        ]
+
+        for p0, p1 in pipes:
+            g.add_pipe(nodes[p0][0], nodes[p1][0])
+
+        g.fill_ports(ZXCube.from_str("ZXZ"))
+
+        # Compile the block graph and construct stim circuit
+        compiled_graph = compile_block_graph(g)
+        stim_circuit = compiled_graph.generate_stim_circuit(k=distance_scale, manhattan_radius=2)
+
+        return stim_circuit
 
     def single_cnot_full_memory(self, distance_scale: int = 1, n1: int = 1, n2: int = 0):
 
@@ -1184,15 +1237,50 @@ class QECCircuit:
                 max_qubit = 352
                 qubit_shift = max_qubit + 1
 
-            elif distance_scale == 4:
+            elif distance_scale == 7:
                 single_partitions = [
-                    {"indices": [], "width": None, "height": None, "distance": 9, "type": "rotated_surface_code"},
-                    {"indices": [], "width": None, "height": None, "distance": 9, "type": "rotated_surface_code"},
-                    {"indices": [], "width": None, "height": None, "distance": 9, "type": "rotated_surface_code"},
-                    {"indices": [], "width": None, "height": 1, "distance": 9, "type": "rotated_surface_code"},
-                    {"indices": [], "width": 1, "height": None, "distance": 9, "type": "rotated_surface_code"},
+                    # Control Patch (Patch 1)
+                    {
+                        "indices": [x for x in range(977) if x % 63 < 16 or 32 <= x % 63 < 47],
+                        "width": 16,
+                        "height": 31,
+                        "distance": 15,
+                        "type": "rotated_surface_code",
+                    },
+                    # Ancilla Patch (Patch 2)
+                    {
+                        "indices": [x for x in range(977) if 16 <= x % 63 < 32 or 48 <= x % 63 < 63],
+                        "width": 16,
+                        "height": 31,
+                        "distance": 15,
+                        "type": "rotated_surface_code",
+                    },
+                    # Target Patch (Patch 3)
+                    {
+                        "indices": list(range(992, 1473)),
+                        "width": 16,
+                        "height": 31,
+                        "distance": 15,
+                        "type": "rotated_surface_code",
+                    },
+                    # CA_Patch (Patch 4)
+                    {
+                        "indices": [47, 110, 173, 236, 299, 362, 425, 488, 551, 614, 677, 740, 803, 866, 929],
+                        "width": 16,
+                        "height": 1,
+                        "distance": 15,
+                        "type": "rotated_surface_code",
+                    },
+                    # AT_Patch (Patch 5)
+                    {
+                        "indices": [977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991],
+                        "width": 1,
+                        "height": 16,
+                        "distance": 15,
+                        "type": "rotated_surface_code",
+                    },
                 ]
-                max_qubit = None
+                max_qubit = 1472
                 qubit_shift = max_qubit + 1
             else:
                 pass

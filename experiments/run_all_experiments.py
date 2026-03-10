@@ -1,7 +1,7 @@
 from qec_exps.experiment_distributed_lattice_surgery import *
 from qec_exps.experiment_limited_inter_chiplet_connectivity import *
 from qec_exps.experiment_noise_aware_routing import *
-from related_work_exps.experiment_runtime_scaling import *
+from related_work_exps.experiment_runtime_mono import *
 from related_work_exps.experiment_statistics import *
 from scalability_exps.experiment_defective_qubits import *
 from scalability_exps.experiment_inter_chiplet import *
@@ -33,7 +33,7 @@ run_exp_defective()
 
 
 # How long does lattice surgery (with and without mapping+routing) take for different surgery libraries
-perform_surgery_comparison()
+run_surgery_comparison()
 
 
 # How does the logical error rate of lattice surgery operations change when distributed to multiple chiplets?
@@ -45,4 +45,4 @@ run_exp_distributed_inter_chiplet()
 
 
 # How is the logical error rate influenced by focusing on different metrics during routing
-perform_noise_aware_routing()
+run_noise_aware_routing()

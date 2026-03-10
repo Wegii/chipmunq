@@ -253,12 +253,20 @@ class TrivialMapper(GenericMapper):
                             start_row = local_y + 10
                             column_length = 12
                         elif code_distance == 7:
-                            # TODO: Implement distance 7
                             start_row = local_y + 14
                             column_length = 16
                         elif code_distance == 9:
-                            # TODO: Implement distance 9
-                            print("Distance 9 not implemented!")
+                            start_row = local_y + 18
+                            column_length = 20
+                        elif code_distance == 9:
+                            start_row = local_y + 22
+                            column_length = 24
+                        elif code_distance == 9:
+                            start_row = local_y + 26
+                            column_length = 28
+                        elif code_distance == 15:
+                            start_row = local_y + 30
+                            column_length = 32
 
                         # Define starting row and column
                         # TODO: Fix this mess
