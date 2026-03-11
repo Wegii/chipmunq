@@ -1,0 +1,4 @@
+#!/bin/bash
+delay=2
+wl=$(($STAREXEC_WALLCLOCK_LIMIT-$delay))
+timeout -s 15 $wl ./nuwls-c_static $1 

@@ -1,0 +1,303 @@
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/Options.h:30,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:55,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h: 在函数‘double Glucose::parseDouble(B&)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:99:5: 警告：this ‘while’ clause does not guard... [-Wmisleading-indentation]
+     while (*in >= '0' && *in <= '9')
+     ^~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:103:2: 附注：...this statement, but the latter is misleadingly indented as if it were guarded by the ‘while’
+  if (*in != 'e') printf("PARSE ERROR! Unexpected char: %c\n", *in),exit(3);
+  ^~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h: 在成员函数‘void Glucose::Solver::RandomizePolarities()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:554:75: 警告：comparison of integer expressions of different signedness: ‘unsigned int’ and ‘int’ [-Wsign-compare]
+ inline void     Solver::RandomizePolarities   () { for (unsigned i = 0; i < polarity.size(); ++i) polarity[i] = (bool)(rand() % 2); }
+                                                                         ~~^~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h: 在构造函数‘Torc::Torc()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:162:9: 警告：‘Torc::skipFillingSolverPolarity’ will be initialized after [-Wreorder]
+    bool skipFillingSolverPolarity;
+         ^~~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:157:8: 警告：  ‘int Torc::printEveryModel’ [-Wreorder]
+    int printEveryModel;
+        ^~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:104:4: 警告：在此处初始化后被初始化 [-Wreorder]
+    Torc() : timeStart(std::chrono::high_resolution_clock::now()), polIsConservative(true), conservativeUseAllVars(true), polIsOptimistic(true), varTargetsBumpVal(113), bumpRelWeights(false), varTargetsBumpMaxRandVal(0),
+    ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:32:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::build_instance(int, int, long long unsigned int, lit**, int*, long long int*)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:461:34: 警告：comparison of integer expressions of different signedness: ‘long long int’ and ‘long long unsigned int’ [-Wsign-compare]
+         if (org_clause_weight[i] != top_clause_weight)
+             ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:418:10: 警告：unused variable ‘tempstr1’ [-Wunused-variable]
+     char tempstr1[10];
+          ^~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:419:10: 警告：unused variable ‘tempstr2’ [-Wunused-variable]
+     char tempstr2[10];
+          ^~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:432:12: 警告：unused variable ‘c’ [-Wunused-variable]
+     int v, c;
+            ^
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:441:9: 警告：unused variable ‘cur_lit’ [-Wunused-variable]
+     int cur_lit;
+         ^~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:451:10: 警告：unused variable ‘clause_reduent’ [-Wunused-variable]
+     bool clause_reduent = false;
+          ^~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::init(std::vector<int>&)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:530:34: 警告：comparison of integer expressions of different signedness: ‘long long int’ and ‘long long unsigned int’ [-Wsign-compare]
+         if (org_clause_weight[c] == top_clause_weight)
+             ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::update_goodvarstack2(int)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:911:10: 警告：unused variable ‘clause_c’ [-Wunused-variable]
+     lit *clause_c;
+          ^~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:912:9: 警告：unused variable ‘c’ [-Wunused-variable]
+     int c;
+         ^
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::flip(int)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:945:9: 警告：unused variable ‘index’ [-Wunused-variable]
+     int index;
+         ^~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::flip2(int)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:1008:9: 警告：unused variable ‘index’ [-Wunused-variable]
+     int index;
+         ^~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘bool Satlike::verify_sol()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:1113:38: 警告：comparison of integer expressions of different signedness: ‘long long int’ and ‘long long unsigned int’ [-Wsign-compare]
+             if (org_clause_weight[c] == top_clause_weight) //verify hard clauses
+                 ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:1139:29: 警告：comparison of integer expressions of different signedness: ‘long long int’ and ‘long long unsigned int’ [-Wsign-compare]
+     if (verify_unsat_weight == opt_unsat_weight)
+         ~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::unsat(int)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:1195:35: 警告：comparison of integer expressions of different signedness: ‘long long int’ and ‘long long unsigned int’ [-Wsign-compare]
+     if (org_clause_weight[clause] == top_clause_weight)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h: 在成员函数‘void Satlike::sat(int)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/algorithms/Alg_SATLike.h:1213:35: 警告：comparison of integer expressions of different signedness: ‘long long int’ and ‘long long unsigned int’ [-Wsign-compare]
+     if (org_clause_weight[clause] == top_clause_weight)
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc: 在成员函数‘Glucose::lbool openwbo::MaxSAT::polosat(Glucose::Solver*, Glucose::vec<Glucose::Lit>&, Glucose::vec<Glucose::Lit>&, std::function<bool()>)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:426:21: 警告：comparison of integer expressions of different signedness: ‘int’ and ‘std::vector<Glucose::Lit>::size_type’ {aka ‘long unsigned int’} [-Wsign-compare]
+   for (int i = 0; i < observables.size(); ++i)
+                   ~~^~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:440:64: 警告：格式 ‘%u’ expects argument of type ‘unsigned int’, but argument 4 has type ‘std::vector<Glucose::Lit>::size_type’ {aka ‘long unsigned int’} [-Wformat=]
+     if (verbosity > 2 || (verbosity > 1 && iEpoch > 0)) printf("c Polosat: epoch %d < %d starting with %u remaining literals\n", iEpoch, Torc::Instance()->GetMsMaxEpochs(), remainingRelLits.size());
+                                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                              ~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:456:32: 警告：格式 ‘%u’ expects argument of type ‘unsigned int’, but argument 3 has type ‘std::vector<Glucose::Lit>::size_type’ {aka ‘long unsigned int’} [-Wformat=]
+      if (verbosity > 2) printf("c Calling SAT for %d time with %u relaxation variables remaining and %d assumptions\n", satInvocationsPerEpoch, remainingRelLits.size(), assumptions.size());
+                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                          ~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:502:34: 警告：格式 ‘%u’ expects argument of type ‘unsigned int’, but argument 3 has type ‘std::vector<Glucose::Lit>::size_type’ {aka ‘long unsigned int’} [-Wformat=]
+        if (verbosity > 2) printf("c OBV strategy calling SAT for %d time with %u relaxation variables remaining and %d assumptions\n", satInvocationsPerEpoch, remainingRelLits.size(), assumptions.size());
+                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                          ~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc: 在成员函数‘Glucose::lbool openwbo::MaxSAT::searchSATSolver(Glucose::Solver*, Glucose::vec<Glucose::Lit>&, bool)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:730:55: 警告：格式 ‘%d’ expects argument of type ‘int’, but argument 2 has type ‘Glucose::Lit’ [-Wformat=]
+   for (int i = 0; i < assumptions.size(); ++i) printf(" %d", assumptions[i]);
+                                                       ^~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Heap.h:24,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:53,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h: In instantiation of ‘void Glucose::vec<T>::capacity(int) [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:75:57:   required from ‘void Glucose::vec<T>::push() [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:81:9:   required from ‘void Glucose::Map<K, D, H, E>::_insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:140:76:   required from ‘void Glucose::Map<K, D, H, E>::insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverStats.h:73:31:   required from here
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:122:54: 警告：‘void* realloc(void*, size_t)’ moving an object of non-trivially copyable type ‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’; use ‘new’ and ‘delete’ instead [-Wclass-memaccess]
+     if (add > INT_MAX - cap || ((data = (T*)::realloc(data, (cap += add) * sizeof(T))) == NULL) && errno == ENOMEM)
+                                             ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverTypes.h:61,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:56,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:62:12: 附注：‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’ declared here
+     struct Pair { K key; D data; };
+            ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/Options.h:30,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:55,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.h:31,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h: 在函数‘double Glucose::parseDouble(B&)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:99:5: 警告：this ‘while’ clause does not guard... [-Wmisleading-indentation]
+     while (*in >= '0' && *in <= '9')
+     ^~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:103:2: 附注：...this statement, but the latter is misleadingly indented as if it were guarded by the ‘while’
+  if (*in != 'e') printf("PARSE ERROR! Unexpected char: %c\n", *in),exit(3);
+  ^~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.h:31,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h: 在成员函数‘void Glucose::Solver::RandomizePolarities()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:554:75: 警告：comparison of integer expressions of different signedness: ‘unsigned int’ and ‘int’ [-Wsign-compare]
+ inline void     Solver::RandomizePolarities   () { for (unsigned i = 0; i < polarity.size(); ++i) polarity[i] = (bool)(rand() % 2); }
+                                                                         ~~^~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.h:31,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h: 在构造函数‘Torc::Torc()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:162:9: 警告：‘Torc::skipFillingSolverPolarity’ will be initialized after [-Wreorder]
+    bool skipFillingSolverPolarity;
+         ^~~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:157:8: 警告：  ‘int Torc::printEveryModel’ [-Wreorder]
+    int printEveryModel;
+        ^~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.h:31,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:104:4: 警告：在此处初始化后被初始化 [-Wreorder]
+    Torc() : timeStart(std::chrono::high_resolution_clock::now()), polIsConservative(true), conservativeUseAllVars(true), polIsOptimistic(true), varTargetsBumpVal(113), bumpRelWeights(false), varTargetsBumpMaxRandVal(0),
+    ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Alg.h:24,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverTypes.h:59,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:28:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h: In instantiation of ‘void Glucose::vec<T>::capacity(int) [with T = openwbo::Partition]’:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:138:5:   required from ‘void Glucose::vec<T>::growTo(int) [with T = openwbo::Partition]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:118:34:   required from here
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:122:54: 警告：‘void* realloc(void*, size_t)’ moving an object of non-trivially copyable type ‘struct openwbo::Partition’; use ‘new’ and ‘delete’ instead [-Wclass-memaccess]
+     if (add > INT_MAX - cap || ((data = (T*)::realloc(data, (cap += add) * sizeof(T))) == NULL) && errno == ENOMEM)
+                                             ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:30:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.h:44:16: 附注：‘struct openwbo::Partition’ declared here
+ typedef struct {
+                ^
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Alg.h:24,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverTypes.h:59,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:28:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h: In instantiation of ‘void Glucose::vec<T>::capacity(int) [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:75:57:   required from ‘void Glucose::vec<T>::push() [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:81:9:   required from ‘void Glucose::Map<K, D, H, E>::_insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:140:76:   required from ‘void Glucose::Map<K, D, H, E>::insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverStats.h:73:31:   required from here
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:122:54: 警告：‘void* realloc(void*, size_t)’ moving an object of non-trivially copyable type ‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’; use ‘new’ and ‘delete’ instead [-Wclass-memaccess]
+     if (add > INT_MAX - cap || ((data = (T*)::realloc(data, (cap += add) * sizeof(T))) == NULL) && errno == ENOMEM)
+                                             ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverTypes.h:61,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.cc:28:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:62:12: 附注：‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’ declared here
+     struct Pair { K key; D data; };
+            ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/Options.h:30,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:55,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.cc:4:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h: 在函数‘double Glucose::parseDouble(B&)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:99:5: 警告：this ‘while’ clause does not guard... [-Wmisleading-indentation]
+     while (*in >= '0' && *in <= '9')
+     ^~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:103:2: 附注：...this statement, but the latter is misleadingly indented as if it were guarded by the ‘while’
+  if (*in != 'e') printf("PARSE ERROR! Unexpected char: %c\n", *in),exit(3);
+  ^~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.cc:4:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h: 在成员函数‘void Glucose::Solver::RandomizePolarities()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:554:75: 警告：comparison of integer expressions of different signedness: ‘unsigned int’ and ‘int’ [-Wsign-compare]
+ inline void     Solver::RandomizePolarities   () { for (unsigned i = 0; i < polarity.size(); ++i) polarity[i] = (bool)(rand() % 2); }
+                                                                         ~~^~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.cc:4:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h: 在构造函数‘Torc::Torc()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:162:9: 警告：‘Torc::skipFillingSolverPolarity’ will be initialized after [-Wreorder]
+    bool skipFillingSolverPolarity;
+         ^~~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:157:8: 警告：  ‘int Torc::printEveryModel’ [-Wreorder]
+    int printEveryModel;
+        ^~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.cc:4:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:104:4: 警告：在此处初始化后被初始化 [-Wreorder]
+    Torc() : timeStart(std::chrono::high_resolution_clock::now()), polIsConservative(true), conservativeUseAllVars(true), polIsOptimistic(true), varTargetsBumpVal(113), bumpRelWeights(false), varTargetsBumpMaxRandVal(0),
+    ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Heap.h:24,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:53,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.cc:4:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h: In instantiation of ‘void Glucose::vec<T>::capacity(int) [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:75:57:   required from ‘void Glucose::vec<T>::push() [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:81:9:   required from ‘void Glucose::Map<K, D, H, E>::_insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:140:76:   required from ‘void Glucose::Map<K, D, H, E>::insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverStats.h:73:31:   required from here
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:122:54: 警告：‘void* realloc(void*, size_t)’ moving an object of non-trivially copyable type ‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’; use ‘new’ and ‘delete’ instead [-Wclass-memaccess]
+     if (add > INT_MAX - cap || ((data = (T*)::realloc(data, (cap += add) * sizeof(T))) == NULL) && errno == ENOMEM)
+                                             ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverTypes.h:61,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:56,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:37,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.cc:4:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:62:12: 附注：‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’ declared here
+     struct Pair { K key; D data; };
+            ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/Options.h:30,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:32:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h: 在函数‘double Glucose::parseDouble(B&)’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:99:5: 警告：this ‘while’ clause does not guard... [-Wmisleading-indentation]
+     while (*in >= '0' && *in <= '9')
+     ^~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/ParseUtils.h:103:2: 附注：...this statement, but the latter is misleadingly indented as if it were guarded by the ‘while’
+  if (*in != 'e') printf("PARSE ERROR! Unexpected char: %c\n", *in),exit(3);
+  ^~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:49:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h: 在成员函数‘void Glucose::Solver::RandomizePolarities()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:554:75: 警告：comparison of integer expressions of different signedness: ‘unsigned int’ and ‘int’ [-Wsign-compare]
+ inline void     Solver::RandomizePolarities   () { for (unsigned i = 0; i < polarity.size(); ++i) polarity[i] = (bool)(rand() % 2); }
+                                                                         ~~^~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:52:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h: 在构造函数‘Torc::Torc()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:162:9: 警告：‘Torc::skipFillingSolverPolarity’ will be initialized after [-Wreorder]
+    bool skipFillingSolverPolarity;
+         ^~~~~~~~~~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:157:8: 警告：  ‘int Torc::printEveryModel’ [-Wreorder]
+    int printEveryModel;
+        ^~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.h:51,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:52:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.h:104:4: 警告：在此处初始化后被初始化 [-Wreorder]
+    Torc() : timeStart(std::chrono::high_resolution_clock::now()), polIsConservative(true), conservativeUseAllVars(true), polIsOptimistic(true), varTargetsBumpVal(113), bumpRelWeights(false), varTargetsBumpMaxRandVal(0),
+    ^~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:95:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h: 在函数‘void test_encoding_join()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h:218:19: 警告：comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+    for (int i=0; i<num_unit_clauses; i++) {
+                  ~^~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h:242:19: 警告：comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+    for (int i=0; i<num_unit_clauses; i++) {
+                  ~^~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h: 在函数‘void test_encoding()’中:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h:373:18: 警告：comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+  for (int k=0; k < num_inc; k++) {
+                ~~^~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h:394:20: 警告：comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+     for (int i=0; i<num_unit_clauses; i++) {
+                   ~^~~~~~~~~~~~~~~~~
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/Test.h:413:20: 警告：comparison of integer expressions of different signedness: ‘int’ and ‘unsigned int’ [-Wsign-compare]
+     for (int i=0; i<num_unit_clauses; i++) {
+                   ~^~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/utils/Options.h:29,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:32:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h: In instantiation of ‘void Glucose::vec<T>::capacity(int) [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:75:57:   required from ‘void Glucose::vec<T>::push() [with T = Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:81:9:   required from ‘void Glucose::Map<K, D, H, E>::_insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:140:76:   required from ‘void Glucose::Map<K, D, H, E>::insert(const K&, const D&) [with K = std::__cxx11::basic_string<char>; D = long unsigned int; H = Glucose::Hash<std::__cxx11::basic_string<char> >; E = Glucose::Equal<std::__cxx11::basic_string<char> >]’
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverStats.h:73:31:   required from here
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Vec.h:122:54: 警告：‘void* realloc(void*, size_t)’ moving an object of non-trivially copyable type ‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’; use ‘new’ and ‘delete’ instead [-Wclass-memaccess]
+     if (add > INT_MAX - cap || ((data = (T*)::realloc(data, (cap += add) * sizeof(T))) == NULL) && errno == ENOMEM)
+                                             ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/SolverTypes.h:61,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/core/Solver.h:56,
+                 from /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.cc:49:
+/pub/data/chuyi/PMS/solver/2021/satlike-c/code/solvers/glucose4.1/mtl/Map.h:62:12: 附注：‘struct Glucose::Map<std::__cxx11::basic_string<char>, long unsigned int>::Pair’ declared here
+     struct Pair { K key; D data; };
+            ^~~~
+Making dependencies
+Compiling: /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.o
+Compiling: /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.o
+Compiling: /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.o
+Compiling: /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.o
+Linking: ../bin/satlike-c ( /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSATFormulaExtended.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Encoder.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSAT_Partition.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/ParserPB.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Torc.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/MaxSATFormula.o /pub/data/chuyi/PMS/solver/2021/satlike-c/code/Main.o utils/System.o utils/Options.o core/Solver.o ../../encodings/Enc_Adder.o ../../encodings/Enc_Totalizer.o ../../encodings/Enc_GTEIncremental.o ../../encodings/Enc_GTECluster.o ../../encodings/Enc_MTotalizer.o ../../encodings/Enc_Ladder.o ../../encodings/Enc_GTE.o ../../encodings/Enc_CNetworks.o ../../encodings/Enc_SWC.o ../../encodings/Encodings.o ../../algorithms/Alg_PartMSU3.o ../../algorithms/Alg_WBO.o ../../algorithms/Alg_OLL.o ../../algorithms/Alg_LinearSU.o ../../algorithms/Alg_OBV.o ../../algorithms/Alg_MSU3.o ../../algorithms/Alg_LinearSU_Mod.o ../../algorithms/Alg_OLL_Mod.o ../../algorithms/Alg_LinearSU_Clustering.o ../../algorithms/Alg_BLS.o ../../graph/Graph.o ../../graph/Graph_Algorithms.o ../../graph/Graph_Communities.o ../../clusterings/Cluster.o ../../clusterings/Cluster_DivisiveMaxSeparate.o ../../clusterings/SequenceStatistic.o )

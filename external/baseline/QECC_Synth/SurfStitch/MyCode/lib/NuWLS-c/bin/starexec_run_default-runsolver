@@ -1,0 +1,11 @@
+#!/bin/bash
+wl=300
+mem=32768
+
+echo "c [MSE2022] -- begin -- [MSE2022]"
+./run --timestamp -d 15 -o output.out -v output.var -w output.wat -C $wl -W $wl -M $mem ./nuwls-c_static $1
+cat output.out
+rm -f output.out
+rm -f output.var
+rm -f output.wat
+echo "c [MSE2022] -- end -- [MSE2022]"
