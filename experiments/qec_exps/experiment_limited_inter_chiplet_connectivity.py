@@ -4,20 +4,22 @@ from __future__ import annotations
 
 import os
 import sys
-
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-# Custom utils
-import pickle
-from collections import defaultdict
-
-import matplotlib.pyplot as plt
-import numpy as np
-
+from stim import Circuit as StimCircuit
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
 from experiments.utils import *
+from qeccm.backends.backend_utils import plot_circuit_layout_utilization, plot_circuit_layout
+from experiments.exp_utils.circuit_noise import get_noise_model
+
+# Plotting
+import pickle
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
 
 
 def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
@@ -136,8 +138,13 @@ def plot_evaluation(stats, filename, inter_chiplet_noise, num_inter):
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=5, columnspacing=1.5)
-    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
+    legend = legend_fig.legend(handles=handles[0:3], loc="center", frameon=False, ncols=5, columnspacing=1.5)
+    legend_fig.savefig(filename + "legend1.pdf", bbox_inches="tight", format="pdf")
+    plt.close(legend_fig)
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend = legend_fig.legend(handles=handles[3:], loc="center", frameon=False, ncols=5, columnspacing=1.5)
+    legend_fig.savefig(filename + "legend2.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
@@ -270,117 +277,128 @@ def plot_difference(stats, filename, inter_chiplet_noise):
     plt.close(fig)
 
 
-def run_exp_distributed_inter_chiplet() -> None:
+def run_exp_distributed_inter_chiplet(reproduce: bool = False) -> None:
 
     # Number of inter_chiplet_connections
     num_inter_chiplet_connections = [8, 6, 4, 2, 1]
 
-    # Noise level
-    ps = list(np.logspace(-4, -1, 10))  # list(np.logspace(-4, -1, 10))
+    # Physical noise level
+    ps = list(np.logspace(-4, -1, 10))
 
     # Inter-chiplet noise level
-    inter_chiplet_noise = [1e-4, 1e-3, 1e-2]
+    inter_chiplet_noise = [1e-3] # [1e-4, 1e-3, 1e-2]
+
+    # Transpilation
+    ts = [str(i) for i in num_inter_chiplet_connections]
+
+    # Code size of surface code
+    ks = [2, 3]
+
+    # Routing methods
+    routing_types = ["default"]  # ["cost", "default"]
 
     for ps_inter in inter_chiplet_noise:
-        # Transpilation
-        ts = [str(i) for i in num_inter_chiplet_connections]
-        ks = [2, 3]
-        routing_types = ["default"]  # ["cost", "default"]
-
-        transpiled_circuits = {}
-        """
-        def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str, k: int = 1) -> StimCircuit:
-            if (n_icc, p_icc, amp_icc, routing_type, k) in transpiled_circuits:
-                # Circuit does not need to be transpiled again
-                print("Found")
-                return transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type, k)]
-            else:
-                circuit, partitions = get_tqec_cnot_rotated(distance_scale = k,
-                                        n1 = 1,
-                                        n2 = 0)
-                
-                backend = get_backend(n_icc = n_icc,
-                                        p_icc = p_icc,
-                                        amp_icc = amp_icc,
-                                        k = k)
-
-                # Transpile circuit to backend
-                _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
-                                                                backend,
-                                                                pre_defined_partitions = partitions,
-                                                                routing_type = routing_type,#"cost",
-                                                                routing_alpha = 1.0,
-                                                                routing_beta = 1.0)
-                # Convert circuit to stim
-                custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
-                # Add circuit to dictionary, in order to not transpile this circuit configuration again
-                transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type, k)] = custom_circuit_stim
-
-                plot_circuit_layout(custom_circuit,
-                                    backend,
-                                    filename=f"experiments/evaluation/inter_chiplet/backend_mapping/layout_{n_icc}_{k}.png")
-                
-                plot_circuit_layout_utilization(custom_circuit,
-                                                backend,
-                                                filename=f"experiments/evaluation/inter_chiplet/backend_mapping/mapping_{n_icc}_{k}.png")
-
-
-                return custom_circuit_stim
-
-        def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "", k: int = 1) -> BackendChipletV2:
-            if t == "default":
-                return None
-            else:
-                if k == 1:
-                    chiplet_size = (6, 6, 11, 6)
-                elif k == 2:
-                    chiplet_size = (6, 6, 15, 8)
-                elif k == 3:
-                    chiplet_size = (6, 6, 19, 10)
-            
-                return BackendChipletV2(size = chiplet_size,#(2, 2, 15, 8),
-                                        n_inter = n_icc,
-                                        connectivity = "nn",
-                                        topology = "rotated_grid",
-                                        inter_chiplet_noise = p_icc,
-                                        inter_chiplet_amplification = amp_icc,
-                                        inter_chiplet_noise_type = "constant"
-                                        )
-
-        def _get_sinter_task():
-            # Construct sinter task for multiple code distances and noise levels
-            yield from (
-                sinter.Task(
-                    circuit=circuit,
-                    json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t, "p_inter": p_icc},
-                )
-                for circuit, k, p, t, rt, p_icc in (
-                    (get_noise_model("modsi1000",
-                                    None,
-                                    p,
-                                    None, 
-                                    remote = (None if t == "default" else
-                                            get_backend(int(t), ps_inter, 1, t, k).inter_chiplet_connections)
-                                    ).noisy_circuit(
-                                        get_circuit(-1 if t == "default" else int(t), ps_inter, 1, t, routing_type=rt, k = k)
-                                        ), k, p, t, rt, ps_inter)
-                    
-                    for t in ts
-                    for rt in routing_types
-                    for k in ks
-                    for p in ps
-                )
-            )
-
-        stats = run_sinter_simulation(_get_sinter_task, ks, ps)
-
-        with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "wb") as f:
-            pickle.dump(stats, f)
         
-        """
+        if reproduce:
+            transpiled_circuits = {}
+            
+            def get_circuit(n_icc, p_icc, amp_icc, t: str , routing_type: str, k: int = 1) -> StimCircuit:
+                if (n_icc, p_icc, amp_icc, routing_type, k) in transpiled_circuits:
+                    # Circuit does not need to be transpiled again
+                    print("Utilizing existing backend")
+                    return transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type, k)]
+                else:
+                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = k,
+                                            n1 = 1,
+                                            n2 = 0)
+                    
+                    backend = get_backend(n_icc = n_icc,
+                                            p_icc = p_icc,
+                                            amp_icc = amp_icc,
+                                            k = k)
+
+                    # Transpile circuit to backend
+                    _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
+                                                                    backend,
+                                                                    pre_defined_partitions = partitions,
+                                                                    routing_type = routing_type,#"cost",
+                                                                    routing_alpha = 1.0,
+                                                                    routing_beta = 1.0)
+                    # Convert circuit to stim
+                    custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
+                    # Add circuit to dictionary, in order to not transpile this circuit configuration again
+                    transpiled_circuits[(n_icc, p_icc, amp_icc, routing_type, k)] = custom_circuit_stim
+
+                    plot_circuit_layout(custom_circuit,
+                                        backend,
+                                        filename=f"experiments/evaluation/inter_chiplet/backend_mapping/layout_{n_icc}_{k}.png")
+                    
+                    plot_circuit_layout_utilization(custom_circuit,
+                                                    backend,
+                                                    filename=f"experiments/evaluation/inter_chiplet/backend_mapping/mapping_{n_icc}_{k}.png")
+
+
+                    return custom_circuit_stim
+
+            def get_backend(n_icc: int, p_icc: float, amp_icc: float, t: str = "", k: int = 1) -> BackendChipletV2:
+                if t == "default":
+                    return None
+                else:
+                    if k == 1:
+                        chiplet_size = (6, 6, 11, 6)
+                    elif k == 2:
+                        chiplet_size = (6, 6, 15, 8)
+                    elif k == 3:
+                        chiplet_size = (6, 6, 19, 10)
+                
+                    return BackendChipletV2(size = chiplet_size,#(2, 2, 15, 8),
+                                            n_inter = n_icc,
+                                            connectivity = "nn",
+                                            topology = "rotated_grid",
+                                            inter_chiplet_noise = p_icc,
+                                            inter_chiplet_amplification = amp_icc,
+                                            inter_chiplet_noise_type = "constant"
+                                            )
+
+            def _get_sinter_task():
+                # Construct sinter task for multiple code distances and noise levels
+                yield from (
+                    sinter.Task(
+                        circuit=circuit,
+                        json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t, "p_inter": p_icc},
+                    )
+                    for circuit, k, p, t, rt, p_icc in (
+                        (get_noise_model("modsi1000",
+                                        None,
+                                        p,
+                                        None, 
+                                        remote = (None if t == "default" else
+                                                get_backend(int(t), ps_inter, 1, t, k).inter_chiplet_connections)
+                                        ).noisy_circuit(
+                                            get_circuit(-1 if t == "default" else int(t), ps_inter, 1, t, routing_type=rt, k = k)
+                                            ), k, p, t, rt, ps_inter)
+                        
+                        for t in ts
+                        for rt in routing_types
+                        for k in ks
+                        for p in ps
+                    )
+                )
+
+            # Run simulation
+            stats = run_sinter_simulation(_get_sinter_task, ks, ps)
+            
+            # Save simulation results
+            output_dir = Path("experiments/evaluation/inter_chiplet")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            with open(output_dir / f"inter_chiplet_{ps_inter}_sweep.pkl", "wb") as f:
+                pickle.dump(stats, f)
+        
+        # Load simulation results
         with open(f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_sweep.pkl", "rb") as f:
             stats = pickle.load(f)
 
+        # Plot statistics
         plot_evaluation(
             stats,
             filename=f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}.pdf",
@@ -388,14 +406,12 @@ def run_exp_distributed_inter_chiplet() -> None:
             num_inter=num_inter_chiplet_connections,
         )
 
+        # Plot difference to full inter-chiplet connections
         plot_difference(
             stats,
             filename=f"experiments/evaluation/inter_chiplet/inter_chiplet_{ps_inter}_difference.pdf",
             inter_chiplet_noise=ps_inter,
         )
-
-    # plot_interconnect_sweep(stats,
-    #                        filename = f"experiments/evaluation/chiplet_evaluation/single_cnot_rotated_inter_chiplet_sweep.png")
 
 
 if __name__ == "__main__":

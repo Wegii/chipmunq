@@ -305,6 +305,8 @@ def collect_circuit_layers(circ: StimCircuit) -> list[StimCircuit]:
             circ.pop(gate_idx - n_deleted)
 
     return layers
+
+
 def collect_circuit_layers_with_ticks(circ: StimCircuit) -> list[StimCircuit]:
     """Split a Stim circuit into parallel-executable layers between ticks
 

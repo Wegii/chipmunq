@@ -41,7 +41,33 @@ def test_logical_circuit_generation():
     #circ.draw(output="mpl", filename="data/circuits/QECCircuit/test.png")
 
 
+def _output_to_file(content: str, filename: str = "") -> None:
+    """Write a string to a file.
+
+    If file exists, it will be overwritten.
+
+    :param content: Content to write to file
+    :type content: str
+    :param filename: File to write to, defaults to ""
+    :type filename: str, optional
+    """
+
+    if filename != "":
+        with open(filename, "w") as f:
+            print(content, file=f)
+
+
+def test_extended_cnot():
+    ks = 1
+    circuit_generator = QECCircuit()
+    circuit = circuit_generator.single_cnot_full_memory_extended(distance_scale=ks)
+    
+    _output_to_file(circuit, "tests/data/circuits/extended_cnot.stim")
+
+
 if __name__ == "__main__":
     #test_surface_memory_circuit_generation()
 
-    test_logical_circuit_generation()
+    #test_logical_circuit_generation()
+
+    test_extended_cnot()

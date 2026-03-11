@@ -1,7 +1,6 @@
 import sys
 import os
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
 # Backend
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
@@ -13,12 +12,11 @@ from qiskit.transpiler import StagedPassManager
 # Custom transpiler plugin
 from qeccm.src.mar import PartitionedMapRoutePlugin
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
+from experiments.exp_utils.circuit_noise import get_noise_model
 
 import stim
 # TQEC noise model
 from tqec.utils.noise_model import NoiseModel
-# Eccentric bench noise model
-from glue.eccentric_bench.noise import get_noise_model
 
 
 def check_tqec_noise_model():

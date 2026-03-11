@@ -1,4 +1,4 @@
-# 3. How do defective qubits affect the resulting circuit?
+# TODO: 3. How do defective qubits affect the resulting circuit?
 
 
 from __future__ import annotations
@@ -7,196 +7,19 @@ import os
 import sys
 
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-# Custom utils
-import pickle
-from collections import defaultdict
-
-import matplotlib.pyplot as plt
-import numpy as np
-
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
 from experiments.utils import *
 
-
-def plot_combined(custom_depth, custom_overhead, custom_utilization, title_left: str, filename: str = ""):
-
-    # placement modes (outer keys)
-    placement_modes = list(custom_depth.keys())  # ["default", "size_aware"]
-
-    # defective qubit counts (inner keys)
-    df_values = sorted(custom_depth[placement_modes[0]].keys())  # [1,2,3]
-
-    ks = list(custom_depth[placement_modes[0]][df_values[0]].keys())[0]
-
-    # X-axis (one position per defective-qubit count)
-    x = np.arange(len(df_values))  # [0,1,2]
-
-    # Two bars per group
-    width = 0.35
-
-    # Colors
-    pastel_blue = "#A7D9ED"  #'#A7D9ED'
-    pastel_orange = "lightcoral"  # '#6476AD' # '#F7C6A2'
-    if title_left == "Single patch configuration":
-        tl_label = ["a) ", "b) ", "c) "]
-    else:
-        tl_label = ["d) ", "e) ", "f) "]
-
-    tex_fonts = {
-        # Use LaTeX to write all text
-        # "text.usetex": True,
-        "font.family": "serif",
-        # Font sizes
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.5,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
-        "axes.titlesize": 10,
-        # Line and marker styles
-        "lines.linewidth": 2,
-        "lines.markersize": 3,
-        "lines.markeredgewidth": 1.5,
-        "lines.markeredgecolor": "black",
-        # Error bar cap size
-        "errorbar.capsize": 3,
-    }
-
-    plt.rcParams.update(tex_fonts)
-
-    colors = [pastel_blue, pastel_orange]
-    hatches = ["//", "o"]  # one hatch per placement mode
-
-    labels = placement_modes  # ["default", "size_aware"]
-
-    # ----------- Depth Overhead -------------
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.5, WIDTH_FIGSIZE*0.92))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-
-    for i, mode in enumerate(placement_modes):
-        vals = [custom_depth[mode][df][ks] for df in df_values]
-        ax.bar(
-            x + i * width - width / 2,
-            vals,
-            width,
-            label=labels[i],
-            color=colors[i],
-            hatch=hatches[i],
-            edgecolor="black",
-        )
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("Depth overhead")
-    # ax.legend(loc='upper left')
-    ax.set_ylim(0, 1250)
-
-    ax.text(0.1, 1.02, tl_label[0] + title_left, transform=ax.transAxes, fontweight="bold")
-
-    ax.text(
-        0.27,
-        1.15,
-        "Lower is better ↓",
-        transform=ax.transAxes,
-        fontweight="bold",
-        color=plot_lib_color,
-    )
-
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
-    # fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
-    fig.savefig(f"{filename}_depth.pdf", format="pdf")
-    plt.close(fig)
-
-    # ----------- 2Q Gate Overhead -------------
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-
-    for i, mode in enumerate(placement_modes):
-        vals = [custom_overhead[mode][df][ks] for df in df_values]
-        ax.bar(
-            x + i * width - width / 2,
-            vals,
-            width,
-            label=labels[i],
-            color=colors[i],
-            hatch=hatches[i],
-            edgecolor="black",
-        )
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("#2q gate overhead")
-    # ax.legend(loc='upper left')
-    ax.set_ylim(0, 5500)
-
-    ax.text(0.1, 1.02, tl_label[1] + title_left, transform=ax.transAxes, fontweight="bold")
-
-    ax.text(
-        0.27,
-        1.15,
-        "Lower is better ↓",
-        transform=ax.transAxes,
-        fontweight="bold",
-        color=plot_lib_color,
-    )
-
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
-    fig.savefig(f"{filename}_overhead.pdf", format="pdf")
-    plt.close(fig)
-
-    # ----------- Backend Utilization -------------
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-
-    handles = []
-    for i, mode in enumerate(placement_modes):
-        vals = [custom_utilization[mode][df][ks] for df in df_values]
-        handle = ax.bar(
-            x + i * width - width / 2,
-            vals,
-            width,
-            yerr=0.1,
-            capsize=4,
-            error_kw={"elinewidth": 2, "ecolor": "black"},
-            label=labels[i],
-            color=colors[i],
-            hatch=hatches[i],
-            edgecolor="black",
-        )
-        handles.append(handle)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([str(df) for df in df_values])
-    ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("Utilization")
-    # ax.legend(loc='upper left')
-    ax.set_ylim(0, 1)
-
-    ax.text(0.1, 1.02, tl_label[2] + title_left, transform=ax.transAxes, fontweight="bold")
-
-    ax.text(
-        0.27,
-        1.15,
-        "Higher is better ↑",
-        transform=ax.transAxes,
-        fontweight="bold",
-        color=plot_lib_color,
-    )
-
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.2)
-    fig.savefig(f"{filename}_utilization.pdf", format="pdf")
-    plt.close(fig)
-
-    legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=[handles[0], handles[1]], loc="center", frameon=False, ncols=3)
-    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
-    plt.close(legend_fig)
+# Plotting
+import pickle
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
 
 
 def ci95_bootstrap(values, df_values, mode, ks):
@@ -233,7 +56,7 @@ def plot_combined_backends(
     placement_modes = list(custom_depth[0].keys())  # ["default", "size_aware"]
 
     # defective qubit counts (inner keys)
-    df_values = sorted(custom_depth[0][placement_modes[0]].keys())  # [1,2,3]
+    df_values = sorted(custom_depth[0][placement_modes[0]].keys())
 
     ks = list(custom_depth[0][placement_modes[0]][df_values[0]].keys())[0]
 
@@ -278,7 +101,7 @@ def plot_combined_backends(
 
     labels = ["center", "size-aware"]
 
-    # ----------- Depth Overhead -------------
+    # Depth Overhead
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):
@@ -367,7 +190,7 @@ def plot_combined_backends(
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
-    # ----------- 2Q Gate Overhead -------------
+    # 2Q Gate Overhead
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):
@@ -456,7 +279,7 @@ def plot_combined_backends(
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
-    # ----------- Backend Utilization -------------
+    # Backend Utilization
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
@@ -528,7 +351,7 @@ def plot_combined_backends(
                 #hatch=hatches[i + 2],
                 edgecolor="black",
             )
-            handles.append(h)
+            handles.append(h) 
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -601,11 +424,11 @@ def calculate_qpu_utilization(circuit, backend):
     return utilized_qubits / (len(utilized_chiplets) * num_qubits_per_chiplet)
 
 
-def recursive_dict():
+def recursive_dict() -> defaultdict:
     return defaultdict(recursive_dict)
 
 
-def run_exp_defective():
+def run_exp_defective(reproduce: bool = False) -> None:
 
     # Backend configuration
     num_inter_chiplet_connections = 8
@@ -618,122 +441,113 @@ def run_exp_defective():
     patch_placement = ["center", "size_aware"]
 
     # Run for two backend configuration:
-    # - Backend fits single patch
+    # - Backend fits a single patch
     # - Backend fits multiple patches
     backend_config = ["single_patch", "multi_patch"]
 
-    """
-    for comp in compilation:
-        for bc in backend_config:
+    # Number of defective qubits
+    defective_qubits = [0, 1, 2, 3]
 
-            custom_depth = {}
-            custom_overhead = {}
+    # Number of iterations per configuration
+    num_iterations = 10
+    
+    # Backend size
+    num_dupl = 1
 
-            custom_depth = recursive_dict()
-            custom_overhead = recursive_dict()
-            custom_utilization = recursive_dict()
+    # Size of surface code
+    code_size = [2]
 
-            defective_qubits = [0, 1, 2, 3]
-            num_iterations = 10
-            num_dupl = 1
+    if reproduce:
+        for comp in compilation:
+            for bc in backend_config:
 
-            if bc == "single_patch":
-                nx, nm = 15, 8
-            elif bc == "multi_patch":
-                nx, nm = 23, 14
+                custom_depth = {}
+                custom_overhead = {}
 
-            # Compile a circuit to the defect free backend during the first iteration
-            defect_free_compilation = True
-            
-            # Iterate over placement methods
-            for pp in patch_placement:
-                # Iterate over code size
-                for ks in [2]:#[1, 2, 3, 4]
-                    # Generate circuit
-                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                                n1 = 1,
-                                                                n2 = 0)
-                    # Stim to qiskit
-                    stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
-                    
-                    # Iterate over number of defective qubits
-                    for df in defective_qubits:
-                        # Perform multiple iterations, since defective qubits are selected randomly
-                        for run in range(0, num_iterations):
-                            ic = 0
-                            while True:
-                                try:
-                                    backend = BackendChipletV2(size = (num_dupl*6, num_dupl*6, nx, nm),
-                                                        n_inter = num_inter_chiplet_connections,
-                                                        connectivity = "nn",
-                                                        topology = "rotated_grid",
-                                                        inter_chiplet_noise = ps_inter,
-                                                        inter_chiplet_amplification = 1,
-                                                        inter_chiplet_noise_type = "constant",
-                                                        num_defective_qubits=df,
-                                                        rng_seed = run + 42 + ic,
-                                                        sabre_defective = comp == "sabre"
-                                                    )
+                custom_depth = recursive_dict()
+                custom_overhead = recursive_dict()
+                custom_utilization = recursive_dict()
 
-                                    # Custom transpilation
-                                    if comp == "sabre":
-                                        # In order to tackle defects into account, it is necessary to 
-                                        defective_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
-                                    else:
-                                        defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                                                      backend,
-                                                                                      pre_defined_partitions = partitions,
-                                                                                      patch_initialization = pp)
-                                    break                                
-                                except Exception as e:
-                                    ic += 1
-                                    print("Unable to place patches given location of defective qubits!")
-                                    print("Retrying...")
-                            
+                if bc == "single_patch":
+                    nx, nm = 15, 8
+                elif bc == "multi_patch":
+                    nx, nm = 23, 14
+                
+                # Iterate over placement methods
+                for pp in patch_placement:
+                    # Iterate over code size
+                    for ks in code_size:
+                        # Generate circuit
+                        circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
+                                                                    n1 = 1,
+                                                                    n2 = 0)
+                        # Stim to qiskit
+                        stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                        
+                        # Iterate over number of defective qubits
+                        for df in defective_qubits:
+                            # Perform multiple iterations, since defective qubits are selected randomly
+                            for run in range(0, num_iterations):
+                                ic = 0
+                                while True:
+                                    try:
+                                        backend = BackendChipletV2(size = (num_dupl*6, num_dupl*6, nx, nm),
+                                                            n_inter = num_inter_chiplet_connections,
+                                                            connectivity = "nn",
+                                                            topology = "rotated_grid",
+                                                            inter_chiplet_noise = ps_inter,
+                                                            inter_chiplet_amplification = 1,
+                                                            inter_chiplet_noise_type = "constant",
+                                                            num_defective_qubits=df,
+                                                            rng_seed = run + 42 + ic,
+                                                            sabre_defective = comp == "sabre"
+                                                        )
 
-                            def num_2q_gates(circuit):
-                                ops = circuit.count_ops()
-                                two_qubit_gate_names = ["cx", "cz", "swap"]
-                                return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+                                        # Custom transpilation
+                                        if comp == "sabre":
+                                            # In order to tackle defects into account, it is necessary to 
+                                            defective_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+                                        else:
+                                            defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
+                                                                                        backend,
+                                                                                        pre_defined_partitions = partitions,
+                                                                                        patch_initialization = pp)
+                                        # Compilation succeeded
+                                        break                                
+                                    except Exception as e:
+                                        # Compilation failed resulting in a retry using a new seed for the RNG
+                                        ic += 1
+                                        print("Unable to place patches given location of defective qubits!")
+                                        print("Retrying...")
+                                
+                                def num_2q_gates(circuit):
+                                    ops = circuit.count_ops()
+                                    two_qubit_gate_names = ["cx", "cz", "swap"]
+                                    return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
-                            # Calculate qpu utilization
-                            custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(defective_circuit, backend)
+                                # Calculate qpu utilization
+                                custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(defective_circuit, backend)
 
-                            custom_depth[pp][df][ks][run] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
-                            custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
+                                custom_depth[pp][df][ks][run] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
+                                custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-        
-            with open(f"experiments/evaluation/defective_qubits/{comp}_depth_{bc}.pkl", "wb") as f:
-                pickle.dump(custom_depth, f)
-            with open(f"experiments/evaluation/defective_qubits/{comp}_overhead_{bc}.pkl", "wb") as f:
-                pickle.dump(custom_overhead, f)
-            with open(f"experiments/evaluation/defective_qubits/{comp}_utilization_{bc}.pkl", "wb") as f:
-                pickle.dump(custom_utilization, f)
-    """
-
-    """
-        with open(f"experiments/evaluation/defective_qubits/custom_depth_{bc}.pkl", "rb") as f:
-            custom_depth = pickle.load(f)
-        with open(f"experiments/evaluation/defective_qubits/custom_overhead_{bc}.pkl", "rb") as f:
-            custom_overhead = pickle.load(f)
-        with open(f"experiments/evaluation/defective_qubits/custom_utilization_{bc}.pkl", "rb") as f:
-            custom_utilization = pickle.load(f)
-
-        plot_combined(custom_depth,
-                      custom_overhead,
-                      custom_utilization,
-                      title_left = ("Multi patch configuration" if bc == "multi_patch"
-                                    else "Single patch configuration"),
-                      filename = f"experiments/evaluation/defective_qubits/{bc}_overhead")
-    """
-
-    backend_config = ["single_patch", "multi_patch"]
+                output_dir = Path("experiments/evaluation/defective_qubits")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                with open(output_dir / f"{comp}_depth_{bc}.pkl", "wb") as f:
+                    pickle.dump(custom_depth, f)
+                with open(output_dir / f"{comp}_overhead_{bc}.pkl", "wb") as f:
+                    pickle.dump(custom_overhead, f)
+                with open(output_dir / f"{comp}_utilization_{bc}.pkl", "wb") as f:
+                    pickle.dump(custom_utilization, f)
+   
+    # Generate plots
     custom_depth_combined = []
     custom_overhead_combined = []
     custom_utilization_combined = []
     sabre_depth_combined = []
     sabre_overhead_combined = []
     sabre_utilization_combined = []
+
     for bc in backend_config:
         # SABRE
         with open(f"experiments/evaluation/defective_qubits/sabre_depth_{bc}.pkl", "rb") as f:

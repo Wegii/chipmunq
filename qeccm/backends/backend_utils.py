@@ -1,12 +1,12 @@
 import math
-
 import matplotlib.pyplot as plt
 import numpy as np
+from qeccm.backends import BackendChipletV2
+from pathlib import Path
+
 import qiskit
 from qiskit.visualization import plot_gate_map
 from qiskit.visualization.exceptions import VisualizationError
-
-from qeccm.backends import BackendChipletV2
 
 
 def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_color: bool = False):
@@ -97,6 +97,9 @@ def plot_gate_map(backend: BackendChipletV2, filename: str = "", show_bb_node_co
         plt.axis("off")
         plt.gca().set_aspect("equal")
         plt.tight_layout()
+        
+        # Generate file and directory
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(filename)
 
 
@@ -155,6 +158,9 @@ def plot_circuit_layout(circuit: qiskit.QuantumCircuit, backend: BackendChipletV
     for idx, edge in enumerate(cmap):
         if edge[0] in qubits and edge[1] in qubits:
             lcolors[idx] = "black"
+    
+    # Generate file and directory
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
     qiskit.visualization.plot_gate_map(
         backend,
@@ -206,6 +212,9 @@ def plot_circuit_layout_utilization(circuit: qiskit.QuantumCircuit, backend: Bac
     # Generate coordinates and line color (chiplet connections)
     qubit_coordinates = generate_coordinates(backend)
     line_colors, _ = generate_formatting(backend, qubit_coordinates)
+
+    # Generate file and directory
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
     qiskit.visualization.plot_gate_map(
         backend,

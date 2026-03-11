@@ -4,23 +4,21 @@ from __future__ import annotations
 
 import os
 import sys
-
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
-import pickle
-import time
-from math import *
-
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.ticker import MaxNLocator
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
-
-# Custom utils
 from experiments.exp_utils.transpilation_utils import *
 from experiments.utils import *
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+
+# Plotting
+import pickle
+import time
+from math import *
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.ticker import MaxNLocator
+from pathlib import Path
 
 
 def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
@@ -134,7 +132,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     plt.close(legend_fig)
 
 
-def calculate_speedup(custom_time_storage, sabre_time_storage, filename: str = ""):
+def calculate_speedup(custom_time_storage, sabre_time_storage):
     # Extract sorted x values
     np_values = sorted(custom_time_storage.keys())
 
@@ -169,10 +167,14 @@ def run_exp_scalability(reproduce: bool = False) -> None:
     custom_time_storage = {}
     sabre_time_storage = {}
 
-    n_patches = [1, 2, 4, 6, 8]  # range(1, 8, 2)#10, 2)
+    # Number of logical CNOTs constructed using lattice surgery
+    n_patches = [1, 2, 4, 6, 8]
+
+    # Code distance of surface code
+    code_distance = [1, 2, 3, 7]
     
     if reproduce:
-        for ks in [1, 2, 3, 7]:#, 2, 3]:
+        for ks in code_distance:
             for num_p in n_patches:
 
                 if num_p not in custom_time_storage:
@@ -256,10 +258,12 @@ def run_exp_scalability(reproduce: bool = False) -> None:
                 sabre_time_storage[num_p][ks] = t_dur_sabre
 
         # Write results to file
-        with open(f"experiments/evaluation/scalability/timing_custom.pkl", "wb") as f:
+        output_dir = Path("experiments/evaluation/scalability")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with open(output_dir / "timing_custom.pkl", "wb") as f:
             pickle.dump(custom_time_storage, f)
 
-        with open(f"experiments/evaluation/scalability/timing_sabre.pkl", "wb") as f:
+        with open(output_dir / "timing_sabre.pkl", "wb") as f:
             pickle.dump(sabre_time_storage, f)
 
     # Load pre-computed results

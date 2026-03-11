@@ -1,12 +1,9 @@
 import sys
 import os
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
 import stim
-# Eccentric noise module
-from glue.eccentric_bench.backends import QubitTracking
-from glue.eccentric_bench.noise import get_noise_model
+from experiments.exp_utils.circuit_noise import get_noise_model
 # TQEC noise model
 from tqec.utils.noise_model import NoiseModel
 
@@ -96,20 +93,20 @@ def test_stim_conversion():
     _output_to_file(surface_code_distance_3_transpiled_stim, "tests/data/circuits/surface_code_distance_3_transpiled")
 
 
-    # Noise model: Eccentric
+    # Noise model: custom
     p = 1e-4
     noise_model = get_noise_model("constant", None, p, None)
 
     # Add noise to non-transpiled version of the stim code
-    surface_code_distance_3_circuit_eccentric_noisy = noise_model.noisy_circuit(surface_code_distance_3_circuit)
-    _output_to_file(surface_code_distance_3_circuit_eccentric_noisy,
-                    "tests/data/circuits/surface_code_distance_3_eccentric_noisy")
+    surface_code_distance_3_circuit_custom_noisy = noise_model.noisy_circuit(surface_code_distance_3_circuit)
+    _output_to_file(surface_code_distance_3_circuit_custom_noisy,
+                    "tests/data/circuits/surface_code_distance_3_custom_noisy")
 
     # Add noise to transpiled version of stim code
-    surface_code_distance_3_circuit_eccentric_noisy_transpiled = noise_model.noisy_circuit(
+    surface_code_distance_3_circuit_custom_noisy_transpiled = noise_model.noisy_circuit(
         surface_code_distance_3_transpiled_stim)
-    _output_to_file(surface_code_distance_3_circuit_eccentric_noisy_transpiled,
-                    "tests/data/circuits/surface_code_distance_3_eccentric_noisy_transpiled")
+    _output_to_file(surface_code_distance_3_circuit_custom_noisy_transpiled,
+                    "tests/data/circuits/surface_code_distance_3_custom_noisy_transpiled")
 
     # Noise model: TQEC
     tqec_noise_model = NoiseModel.uniform_depolarizing
@@ -124,24 +121,6 @@ def test_stim_conversion():
         surface_code_distance_3_transpiled_stim)
     _output_to_file(surface_code_distance_3_circuit_tqec_noisy_transpiled,
                     "tests/data/circuits/surface_code_distance_3_tqec_noisy_transpiled")
-
-
-
-def test_tqec_conversion() -> None:
-    """Test conversion of a lattice surgery circuit
-    """  
-
-    # TODO: Generate stim cnot circuit
-
-
-    # TODO: Transpile
-
-
-    # TODO: Add noise
-    # TODO: Do we even add noise for swap gates?
-
-
-    pass
 
 
 if __name__ == "__main__":

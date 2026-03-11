@@ -1,20 +1,20 @@
 from __future__ import annotations
-
 import os
 import sys
 
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-# Custom utils
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
+from experiments.exp_utils.transpilation_utils import *
+from experiments.utils import *
+from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+
+# Plotting
 import pickle
-
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import gridspec
-
-from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from pathlib import Path
 
 
 def plot_combined_split(
@@ -369,11 +369,12 @@ def plot_combined_split(
     plt.close(legend_fig)
 
 
-def run_exp_statistics():
+def run_exp_statistics(reproduce: bool = False) -> None:
 
     # Backend configuration
     num_inter_chiplet_connections = 8
     ps_inter = 1e-4
+    n_patches = [1, 3, 6]
 
     custom_depth = {}
     custom_overhead = {}
@@ -381,80 +382,80 @@ def run_exp_statistics():
     sabre_overhead = {}
     depth_overall = {}
     gate_overall = {}
+    
+    if reproduce:
+        for ks in [2]:#[1, 2, 3, 4]
+            for np in n_patches:
 
-    n_patches = [1, 3, 6]
-    """
-    for ks in [2]:#[1, 2, 3, 4]
-        for np in n_patches:
+                if np not in custom_depth:
+                    custom_depth[np] = {}
+                    custom_overhead[np] = {}
+                    sabre_depth[np] = {}
+                    sabre_overhead[np] = {}
 
-            if np not in custom_depth:
-                custom_depth[np] = {}
-                custom_overhead[np] = {}
-                sabre_depth[np] = {}
-                sabre_overhead[np] = {}
+                    depth_overall[np] = {}
+                    gate_overall[np] = {}
+                    
+                # TODO: Calculate necessary backend given number of patches
 
-                depth_overall[np] = {}
-                gate_overall[np] = {}
-                
-            # TODO: Calculate necessary backend given number of patches
+                # Generate circuit
+                circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
+                                                            n1 = np,
+                                                            n2 = 0)
 
-            # Generate circuit
-            circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                        n1 = np,
-                                                        n2 = 0)
+                backend = BackendChipletV2(size = (np*2, np*2, 15, 8),
+                                n_inter = num_inter_chiplet_connections,
+                                connectivity = "nn",
+                                topology = "rotated_grid",
+                                inter_chiplet_noise = ps_inter,
+                                inter_chiplet_amplification = 1,
+                                inter_chiplet_noise_type = "constant",
+                                num_defective_qubits=0,
+                            )
 
-            backend = BackendChipletV2(size = (np*2, np*2, 15, 8),
-                            n_inter = num_inter_chiplet_connections,
-                            connectivity = "nn",
-                            topology = "rotated_grid",
-                            inter_chiplet_noise = ps_inter,
-                            inter_chiplet_amplification = 1,
-                            inter_chiplet_noise_type = "constant",
-                            num_defective_qubits=0,
-                        )
+                # Stim to qiskit
+                stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
 
-            # Stim to qiskit
-            stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                # Custom transpilation
+                print("Custom")
+                custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
+                                                        backend,
+                                                        pre_defined_partitions=partitions)
 
-            # Custom transpilation
-            print("Custom")
-            custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
-                                                       backend,
-                                                       pre_defined_partitions=partitions)
+                # Sabre transpilation
+                print("Sabre")
+                sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
 
-            # Sabre transpilation
-            print("Sabre")
-            sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+                def num_2q_gates(circuit):
+                    ops = circuit.count_ops()
+                    two_qubit_gate_names = ["cx", "cz", "swap"]
+                    return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
-            def num_2q_gates(circuit):
-                ops = circuit.count_ops()
-                two_qubit_gate_names = ["cx", "cz", "swap"]
-                return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+                custom_depth[np][ks] = custom_circuit.depth() - (stim_code_circuit.qc).depth()
+                custom_overhead[np][ks] = num_2q_gates(custom_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-            custom_depth[np][ks] = custom_circuit.depth() - (stim_code_circuit.qc).depth()
-            custom_overhead[np][ks] = num_2q_gates(custom_circuit) - num_2q_gates(stim_code_circuit.qc)
+                sabre_depth[np][ks] = sabre_circuit.depth() - (stim_code_circuit.qc).depth()
+                sabre_overhead[np][ks] = num_2q_gates(sabre_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-            sabre_depth[np][ks] = sabre_circuit.depth() - (stim_code_circuit.qc).depth()
-            sabre_overhead[np][ks] = num_2q_gates(sabre_circuit) - num_2q_gates(stim_code_circuit.qc)
-
-            depth_overall[np][ks] = (stim_code_circuit.qc).depth()
-            gate_overall[np][ks] = num_2q_gates(stim_code_circuit.qc)
+                depth_overall[np][ks] = (stim_code_circuit.qc).depth()
+                gate_overall[np][ks] = num_2q_gates(stim_code_circuit.qc)
             
-
-    # Save data
-    with open(f"experiments/evaluation/scalability/custom_depth.pkl", "wb") as f:
-        pickle.dump(custom_depth, f)
-    with open(f"experiments/evaluation/scalability/custom_overhead.pkl", "wb") as f:
-        pickle.dump(custom_overhead, f)
-    with open(f"experiments/evaluation/scalability/sabre_depth.pkl", "wb") as f:
-        pickle.dump(sabre_depth, f)
-    with open(f"experiments/evaluation/scalability/sabre_overhead.pkl", "wb") as f:
-        pickle.dump(sabre_overhead, f)
-    with open(f"experiments/evaluation/scalability/depth_overall.pkl", "wb") as f:
-        pickle.dump(depth_overall, f)
-    with open(f"experiments/evaluation/scalability/gate_overall.pkl", "wb") as f:
-        pickle.dump(gate_overall, f)
-    """
+        # Save data
+        output_dir = Path("experiments/evaluation/scalability")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with open(output_dir / "custom_depth.pkl", "wb") as f:
+            pickle.dump(custom_depth, f)
+        with open(output_dir / "custom_overhead.pkl", "wb") as f:
+            pickle.dump(custom_overhead, f)
+        with open(output_dir / "sabre_depth.pkl", "wb") as f:
+            pickle.dump(sabre_depth, f)
+        with open(output_dir / "sabre_overhead.pkl", "wb") as f:
+            pickle.dump(sabre_overhead, f)
+        with open(output_dir / "depth_overall.pkl", "wb") as f:
+            pickle.dump(depth_overall, f)
+        with open(output_dir / "gate_overall.pkl", "wb") as f:
+            pickle.dump(gate_overall, f)
+    
 
     # Load files
     with open("experiments/evaluation/scalability/custom_depth.pkl", "rb") as f:
@@ -469,14 +470,6 @@ def run_exp_statistics():
         depth_overall = pickle.load(f)
     with open("experiments/evaluation/scalability/gate_overall.pkl", "rb") as f:
         gate_overall = pickle.load(f)
-
-    # plot_combined(custom_depth,
-    #              custom_overhead,
-    #              sabre_depth,
-    #              sabre_overhead,
-    #              depth_overall,
-    #              gate_overall,
-    #              "experiments/evaluation/scalability/cnot_scaling_overhead")
 
     plot_combined_split(
         custom_depth,

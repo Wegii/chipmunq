@@ -2,14 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
-
 sys.path.append(os.path.join(os.getcwd(), "."))
-sys.path.append(os.path.join(os.getcwd(), "glue/eccentric_bench/"))
 
-import pickle
-import time
-
-"""
 # MECH
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
 from external.baseline.MECH.Circuit import *
@@ -18,8 +12,7 @@ from external.baseline.MECH.HighwayOccupancy import *
 from external.baseline.MECH.Router import *
 from external.baseline.MECH.MECHBenchmarks import *
 from external.baseline.MECH.transpile_mech import transpile_circuit_MECH
-import networkx as nx
-from networkx.classes import Graph
+
 
 # QECC-Synth
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/QECC_Synth/SurfStitch/MyCode/src"))
@@ -28,17 +21,18 @@ from external.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth impo
 # SABRE
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/SABRE"))
 from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
-"""
 
 # Plotting
 from matplotlib.ticker import MaxNLocator
-
 from experiments.related_work_exps.utils import *
 from experiments.utils import *
+import pickle
+import time
+from pathlib import Path
 
 
-def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: str = ""):
-
+def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: str = "") -> None:
+    # Code distance of surface code
     distances = [2, 3, 4, 5, 6, 7]
 
     # Timeout-value for qecc-synth
@@ -70,7 +64,7 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     plt.rcParams.update(tex_fonts)
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
-    x_val = [2 * x + 1 for x in distances]  # + [2*x+1 for x in distances]
+    x_val = [2 * x + 1 for x in distances]
 
     section_titles = x_val
 
@@ -106,7 +100,6 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     ax.set_xticklabels(section_titles)
 
     # Add annotation
-
     title = "a) Effect of distance on compilation time"
     ax.text(-0.06, 1.02, title, transform=ax.transAxes, fontweight="bold")
 
@@ -135,75 +128,75 @@ def plot_runtime(mech_overhead, qeccsynth_overhead, qiskit_overhead, filename: s
     # ax.legend(loc='upper left')
 
     fig.subplots_adjust(left=0.175, right=0.95, top=0.83, bottom=0.2)
+
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
 
-def run_runtime_scaling():
-    code_distances = [2, 3, 4, 5, 6, 7]  # [2, 3, 4, 5]
+def run_runtime_scaling(reproduce: bool = False) -> None:
+    # Code distance of surface code
+    code_distances = [2, 3, 4, 5, 6, 7]
+    # Configuration of chiplet backend. 'mono' creates monolythic chip
     backend = ["mono"]
 
-    qeccsynth_time_storage = {}
-    mech_time_storage = {}
-    sabre_time_storage = {}
+    if reproduce:
+        qeccsynth_time_storage = {}
+        mech_time_storage = {}
+        sabre_time_storage = {}
 
-    for b in backend:
-        for d in code_distances:
-            cycles = d
-            code = get_surface_code_stim(d, cycles)
+        for b in backend:
+            for d in code_distances:
+                cycles = d
+                code = get_surface_code_stim(d, cycles)
 
-            # TODO: calculate chiplet size based on distance
-            n = m = int(d * 1.5)
-            if b == "chiplet":
-                n_icc = 1
-            else:
-                n_icc = None
+                # TODO: calculate chiplet size based on distance
+                n = m = int(d * 1.5)
+                if b == "chiplet":
+                    n_icc = 1
+                else:
+                    n_icc = None
 
-            monolithic_backend, _, _ = generate_simple_backend(n, m, n_icc)
-            architecture = generate_qecc_synth_backend_from_mech(monolithic_backend)
-            cm = generate_qiskit_backend_from_mech(monolithic_backend)
+                monolithic_backend, _, _ = generate_simple_backend(n, m, n_icc)
+                architecture = generate_qecc_synth_backend_from_mech(monolithic_backend)
+                cm = generate_qiskit_backend_from_mech(monolithic_backend)
 
-            # Print backend to file
-            display_simple_backend(
-                monolithic_backend, f"experiments/evaluation/related_work/backends/{b}_{n}_{m}_{n_icc}.png"
-            )
+                # Print backend to file
+                display_simple_backend(
+                    monolithic_backend, f"experiments/evaluation/related_work/backends/{b}_{n}_{m}_{n_icc}.png"
+                )
 
-            # MECH
-            start_mech = time.time()
-            _ = transpile_circuit_MECH(code.qc, monolithic_backend)
-            end_mech = time.time()
+                # MECH
+                start_mech = time.time()
+                _ = transpile_circuit_MECH(code.qc, monolithic_backend)
+                end_mech = time.time()
 
-            # QECCsynth
-            if d <= 5:
-                start_qeccsynth = time.time()
-                _ = transpile_circuit_QECCSynth(d, architecture, f"square_{n}_{m}_{m}")
-                end_qeccsynth = time.time()
+                # QECCsynth
+                if d <= 5:
+                    start_qeccsynth = time.time()
+                    _ = transpile_circuit_QECCSynth(d, architecture, f"square_{n}_{m}_{m}")
+                    end_qeccsynth = time.time()
 
-            # Qiskit
-            start_sabre = time.time()
-            _ = transpile_circuit_SABRE(circuit=code.qc, coupling_map=cm)
-            end_sabre = time.time()
+                # Qiskit
+                start_sabre = time.time()
+                _ = transpile_circuit_SABRE(circuit=code.qc, coupling_map=cm)
+                end_sabre = time.time()
 
-            if d <= 5:
-                qeccsynth_time_storage[(b, d)] = end_qeccsynth - start_qeccsynth
-            else:
-                qeccsynth_time_storage[(b, d)] = 1e3
-            mech_time_storage[(b, d)] = end_mech - start_mech
-            sabre_time_storage[(b, d)] = end_sabre - start_sabre
+                if d <= 5:
+                    qeccsynth_time_storage[(b, d)] = end_qeccsynth - start_qeccsynth
+                else:
+                    qeccsynth_time_storage[(b, d)] = 1e3
+                mech_time_storage[(b, d)] = end_mech - start_mech
+                sabre_time_storage[(b, d)] = end_sabre - start_sabre
 
-    # Write results to file
-    with open("experiments/evaluation/related_work/timing_mech_mono.pkl", "wb") as f:
-        pickle.dump(mech_time_storage, f)
-
-    with open("experiments/evaluation/related_work/timing_qeccsynth_mono.pkl", "wb") as f:
-        pickle.dump(qeccsynth_time_storage, f)
-
-    with open("experiments/evaluation/related_work/timing_sabre_mono.pkl", "wb") as f:
-        pickle.dump(sabre_time_storage, f)
-
-
-if __name__ == "__main__":
-    # run_runtime_scaling()
+        # Save results to file
+        output_dir = Path("experiments/evaluation/related_work")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with open(output_dir / "timing_mech_mono.pkl", "wb") as f:
+            pickle.dump(mech_time_storage, f)
+        with open(output_dir / "timing_qeccsynth_mono.pkl", "wb") as f:
+            pickle.dump(qeccsynth_time_storage, f)
+        with open(output_dir / "timing_sabre_mono.pkl", "wb") as f:
+            pickle.dump(sabre_time_storage, f)
 
     # Load pre-computed results
     with open("experiments/evaluation/related_work/timing_mech_mono.pkl", "rb") as f:
@@ -213,9 +206,14 @@ if __name__ == "__main__":
     with open("experiments/evaluation/related_work/timing_sabre_mono.pkl", "rb") as f:
         sabre_time_storage = pickle.load(f)
 
+    # Plot runtime scaling for various code distances
     plot_runtime(
         mech_time_storage,
         qeccsynth_time_storage,
         sabre_time_storage,
         "experiments/evaluation/related_work/memory_scaling_mono.pdf",
     )
+
+
+if __name__ == "__main__":
+    run_runtime_scaling()
