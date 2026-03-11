@@ -30,7 +30,7 @@ mkShell rec {
 
     # Activate virtualenv if it exists
     #if [ -d ".venv" ]; then
-    source ../venv/qeccm/bin/activate
+    #source ../venv/qeccm_new/bin/activate
     #else
     #  echo "No virtual environment found, create it using python -m venv .venv"
     #fi
