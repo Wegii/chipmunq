@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 # MECH
@@ -123,7 +124,7 @@ def plot_gate_overhead(mech_overhead, qeccsynth_overhead, qiskit_overhead, type:
     # ax.legend(loc='upper left')
 
     fig.subplots_adjust(left=0.175, right=0.95, top=0.83, bottom=0.18)
-    
+
     plt.savefig(filename + ".pdf", format="pdf")
     plt.close(fig)
 

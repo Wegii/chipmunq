@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from stim import Circuit as StimCircuit
@@ -684,17 +685,17 @@ def perform_noise_aware_routing_sweep(reproduce: bool = False) -> None:
 
             # Perform simulations with reduced number of shots
             stats = run_sinter_simulation(_get_sinter_task, [k], ps, num_shots=1_000_000, num_t=10 * 2)
-            
+
             # Save results
             output_dir = Path("experiments/evaluation/qec_routing/sweep")
             output_dir.mkdir(parents=True, exist_ok=True)
-            with open(output_dir / f"routing_{ra}_{rb}_{inter_chiplet_noise}_sweep.pkl", "wb"
-            ) as f:
+            with open(output_dir / f"routing_{ra}_{rb}_{inter_chiplet_noise}_sweep.pkl", "wb") as f:
                 pickle.dump(stats, f)
 
     # Plot hyperparameter sweep
-    plot_hyperparameter_search('experiments/evaluation/qec_routing/sweep/',
-                               "experiments/evaluation/qec_routing/routing_sweep.pdf")
+    plot_hyperparameter_search(
+        "experiments/evaluation/qec_routing/sweep/", "experiments/evaluation/qec_routing/routing_sweep.pdf"
+    )
 
 
 def run_noise_aware_routing(reproduce: bool = False) -> None:
@@ -729,7 +730,9 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
             for ps_inter in inter_chiplet_noise:
                 transpiled_circuits = {}
 
-                def get_circuit(routing_type: str, inter_noise_factor: int, distance_scale: int, seed: int) -> StimCircuit:
+                def get_circuit(
+                    routing_type: str, inter_noise_factor: int, distance_scale: int, seed: int
+                ) -> StimCircuit:
 
                     if (routing_type, inter_noise_factor, seed) in transpiled_circuits:
                         # Circuit does not need to be transpiled again
@@ -819,7 +822,9 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
                                         ].inter_chiplet_connections
                                     ),
                                 ).noisy_circuit(
-                                    get_circuit(routing_type=rt, inter_noise_factor=icnm, distance_scale=k, seed=iter_seed)
+                                    get_circuit(
+                                        routing_type=rt, inter_noise_factor=icnm, distance_scale=k, seed=iter_seed
+                                    )
                                 ),
                                 k,
                                 p,

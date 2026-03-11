@@ -10,6 +10,7 @@ import numpy as np
 import pyzx as zx
 import qiskit
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
+
 zx.settings.colors = zx.rgb_colors
 
 # Plotting
@@ -122,7 +123,7 @@ class QECMemory:
         :return: QECC memory circuit
         :rtype: qiskit.QuantumCircuit
         """
-        
+
         d = 2 * distance_scale + 1
 
         if d < 3:
@@ -380,7 +381,10 @@ class QECCircuit:
 
         return stim_to_qiskit(stim_circuit), stim_circuit
 
-    def single_cnot_full_memory_extended(self, distance_scale: int = 1,):
+    def single_cnot_full_memory_extended(
+        self,
+        distance_scale: int = 1,
+    ):
         g = BlockGraph("Logical CNOT with extended syndrom measurement rounds")
 
         cnot_counter = 0
@@ -389,19 +393,17 @@ class QECCircuit:
             (Position3D(0, 0, 0), "P", f"In_Control_{cnot_counter}"),
             (Position3D(0, 0, 1), "ZXX", ""),
             (Position3D(0, 0, 2), "ZXZ", ""),
-            (Position3D(0, 0, 3), "ZXZ", ""), # Additional rounds
+            (Position3D(0, 0, 3), "ZXZ", ""),  # Additional rounds
             # ADD (Position3D(0, 0, Correct Z), "ZXZ", "") for even more rounds on control
-            (Position3D(0, 0, 4), "P", f"Out_Control_{cnot_counter}"), # Adjust Z here if you add another pipe
-
+            (Position3D(0, 0, 4), "P", f"Out_Control_{cnot_counter}"),  # Adjust Z here if you add another pipe
             (Position3D(0, 1, 1), "ZXX", ""),
             (Position3D(0, 1, 2), "ZXZ", ""),
-
             (Position3D(1, 1, 0), "P", f"In_Target_{cnot_counter}"),
             (Position3D(1, 1, 1), "ZXZ", ""),
             (Position3D(1, 1, 2), "ZXZ", ""),
-            (Position3D(1, 1, 3), "ZXZ", ""), # Additional cycle
+            (Position3D(1, 1, 3), "ZXZ", ""),  # Additional cycle
             # ADD (Position3D(1, 1, Correct Z), "ZXZ", "") for even more rounds on target
-            (Position3D(1, 1, 4), "P", f"Out_Target_{cnot_counter}"), # Adjust Z here if you add another pipe
+            (Position3D(1, 1, 4), "P", f"Out_Target_{cnot_counter}"),  # Adjust Z here if you add another pipe
         ]
         for pos, kind, label in nodes:
             g.add_cube(pos, kind, label)

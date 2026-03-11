@@ -122,7 +122,7 @@ def plot_combined_backends(
         if i < 1:
             # SABRE
             ax.bar(
-                x + i * 2 * width - .5 * width,
+                x + i * 2 * width - 0.5 * width,
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
@@ -130,7 +130,7 @@ def plot_combined_backends(
                 error_kw={"elinewidth": 1, "ecolor": "black"},
                 label=labels[i],
                 color=colors_sabre[i],
-                #hatch=hatches[i],
+                # hatch=hatches[i],
                 edgecolor="black",
             )
 
@@ -139,14 +139,14 @@ def plot_combined_backends(
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_depth[1], df_values, mode, ks)
         # Custom
         ax.bar(
-            x + (2 + i) * width * 2 - 3.5 * width - i*width,
+            x + (2 + i) * width * 2 - 3.5 * width - i * width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
             capsize=2,
             error_kw={"elinewidth": 1, "ecolor": "black"},
             label=labels[i] + "multi",
-            color=colors_custom[i+2],
+            color=colors_custom[i + 2],
             hatch=hatches[i],
             edgecolor="black",
         )
@@ -161,7 +161,7 @@ def plot_combined_backends(
                 error_kw={"elinewidth": 1, "ecolor": "black"},
                 label=labels[i] + "multi",
                 color=colors_sabre[i + 2],
-                #hatch=hatches[i + 2],
+                # hatch=hatches[i + 2],
                 edgecolor="black",
             )
 
@@ -211,7 +211,7 @@ def plot_combined_backends(
         if i < 1:
             # SABRE
             ax.bar(
-                x + i * 2 * width - .5 * width,
+                x + i * 2 * width - 0.5 * width,
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
@@ -219,7 +219,7 @@ def plot_combined_backends(
                 error_kw={"elinewidth": 1, "ecolor": "black"},
                 label=labels[i],
                 color=colors_sabre[i],
-                #hatch=hatches[i],
+                # hatch=hatches[i],
                 edgecolor="black",
             )
 
@@ -228,7 +228,7 @@ def plot_combined_backends(
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_overhead[1], df_values, mode, ks)
         # Custom
         ax.bar(
-            x + (2 + i) * width * 2 - 3.5 * width - i*width,
+            x + (2 + i) * width * 2 - 3.5 * width - i * width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
@@ -250,7 +250,7 @@ def plot_combined_backends(
                 error_kw={"elinewidth": 1, "ecolor": "black"},
                 label=labels[i] + "multi",
                 color=colors_sabre[i + 2],
-                #hatch=hatches[i + 2],
+                # hatch=hatches[i + 2],
                 edgecolor="black",
             )
 
@@ -303,7 +303,7 @@ def plot_combined_backends(
         if i < 1:
             # SABRE
             h = ax.bar(
-                x + i * 2 * width - .5 * width,
+                x + i * 2 * width - 0.5 * width,
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
@@ -311,7 +311,7 @@ def plot_combined_backends(
                 error_kw={"elinewidth": 1, "ecolor": "black"},
                 label="LightSABRE, single patch",
                 color=colors_sabre[i],
-                #hatch=hatches[i],
+                # hatch=hatches[i],
                 edgecolor="black",
             )
             handles.append(h)
@@ -321,7 +321,7 @@ def plot_combined_backends(
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[1], df_values, mode, ks)
         # Custom
         h = ax.bar(
-            x + (2 + i) * width * 2 - 3.5 * width - i*width,
+            x + (2 + i) * width * 2 - 3.5 * width - i * width,
             values_mean_custom,
             width,
             yerr=values_err_custom,
@@ -345,10 +345,10 @@ def plot_combined_backends(
                 error_kw={"elinewidth": 1, "ecolor": "black"},
                 label="LightSABRE, multi patch",
                 color=colors_sabre[i + 2],
-                #hatch=hatches[i + 2],
+                # hatch=hatches[i + 2],
                 edgecolor="black",
             )
-            handles.append(h) 
+            handles.append(h)
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -373,12 +373,20 @@ def plot_combined_backends(
     plt.close(fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=[handles[0], handles[4], handles[2], handles[5]], loc="center", frameon=False, ncols=4, columnspacing=1.5)
+    legend = legend_fig.legend(
+        handles=[handles[0], handles[4], handles[2], handles[5]],
+        loc="center",
+        frameon=False,
+        ncols=4,
+        columnspacing=1.5,
+    )
     legend_fig.savefig(filename + "legend_custom.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
     legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=[handles[1], handles[3]], loc="center", frameon=False, ncols=4, columnspacing=1.5)
+    legend = legend_fig.legend(
+        handles=[handles[1], handles[3]], loc="center", frameon=False, ncols=4, columnspacing=1.5
+    )
     legend_fig.savefig(filename + "legend_sabre.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
@@ -447,7 +455,7 @@ def run_exp_defective(reproduce: bool = False) -> None:
 
     # Number of iterations per configuration
     num_iterations = 10
-    
+
     # Backend size
     num_dupl = 1
 
@@ -457,7 +465,6 @@ def run_exp_defective(reproduce: bool = False) -> None:
     if reproduce:
         for comp in compilation:
             for bc in backend_config:
-
                 custom_depth = {}
                 custom_overhead = {}
 
@@ -469,18 +476,16 @@ def run_exp_defective(reproduce: bool = False) -> None:
                     nx, nm = 15, 8
                 elif bc == "multi_patch":
                     nx, nm = 23, 14
-                
+
                 # Iterate over placement methods
                 for pp in patch_placement:
                     # Iterate over code size
                     for ks in code_size:
                         # Generate circuit
-                        circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                                    n1 = 1,
-                                                                    n2 = 0)
+                        circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=1, n2=0)
                         # Stim to qiskit
-                        stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
-                        
+                        stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
+
                         # Iterate over number of defective qubits
                         for df in defective_qubits:
                             # Perform multiple iterations, since defective qubits are selected randomly
@@ -488,45 +493,54 @@ def run_exp_defective(reproduce: bool = False) -> None:
                                 ic = 0
                                 while True:
                                     try:
-                                        backend = BackendChipletV2(size = (num_dupl*6, num_dupl*6, nx, nm),
-                                                            n_inter = num_inter_chiplet_connections,
-                                                            connectivity = "nn",
-                                                            topology = "rotated_grid",
-                                                            inter_chiplet_noise = ps_inter,
-                                                            inter_chiplet_amplification = 1,
-                                                            inter_chiplet_noise_type = "constant",
-                                                            num_defective_qubits=df,
-                                                            rng_seed = run + 42 + ic,
-                                                            sabre_defective = comp == "sabre"
-                                                        )
+                                        backend = BackendChipletV2(
+                                            size=(num_dupl * 6, num_dupl * 6, nx, nm),
+                                            n_inter=num_inter_chiplet_connections,
+                                            connectivity="nn",
+                                            topology="rotated_grid",
+                                            inter_chiplet_noise=ps_inter,
+                                            inter_chiplet_amplification=1,
+                                            inter_chiplet_noise_type="constant",
+                                            num_defective_qubits=df,
+                                            rng_seed=run + 42 + ic,
+                                            sabre_defective=comp == "sabre",
+                                        )
 
                                         # Custom transpilation
                                         if comp == "sabre":
-                                            # In order to tackle defects into account, it is necessary to 
+                                            # In order to tackle defects into account, it is necessary to
                                             defective_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
                                         else:
-                                            defective_circuit = custom_cost_transpilation(stim_code_circuit.qc,
-                                                                                        backend,
-                                                                                        pre_defined_partitions = partitions,
-                                                                                        patch_initialization = pp)
+                                            defective_circuit = custom_cost_transpilation(
+                                                stim_code_circuit.qc,
+                                                backend,
+                                                pre_defined_partitions=partitions,
+                                                patch_initialization=pp,
+                                            )
                                         # Compilation succeeded
-                                        break                                
+                                        break
                                     except Exception as e:
                                         # Compilation failed resulting in a retry using a new seed for the RNG
                                         ic += 1
                                         print("Unable to place patches given location of defective qubits!")
                                         print("Retrying...")
-                                
+
                                 def num_2q_gates(circuit):
                                     ops = circuit.count_ops()
                                     two_qubit_gate_names = ["cx", "cz", "swap"]
                                     return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
                                 # Calculate qpu utilization
-                                custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(defective_circuit, backend)
+                                custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(
+                                    defective_circuit, backend
+                                )
 
-                                custom_depth[pp][df][ks][run] = defective_circuit.depth() - (stim_code_circuit.qc).depth()
-                                custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(stim_code_circuit.qc)
+                                custom_depth[pp][df][ks][run] = (
+                                    defective_circuit.depth() - (stim_code_circuit.qc).depth()
+                                )
+                                custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(
+                                    stim_code_circuit.qc
+                                )
 
                 output_dir = Path("experiments/evaluation/defective_qubits")
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -536,7 +550,7 @@ def run_exp_defective(reproduce: bool = False) -> None:
                     pickle.dump(custom_overhead, f)
                 with open(output_dir / f"{comp}_utilization_{bc}.pkl", "wb") as f:
                     pickle.dump(custom_utilization, f)
-   
+
     # Generate plots
     custom_depth_combined = []
     custom_overhead_combined = []

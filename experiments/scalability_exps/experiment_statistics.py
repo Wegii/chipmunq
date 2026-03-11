@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
@@ -382,11 +383,10 @@ def run_exp_statistics(reproduce: bool = False) -> None:
     sabre_overhead = {}
     depth_overall = {}
     gate_overall = {}
-    
-    if reproduce:
-        for ks in [2]:#[1, 2, 3, 4]
-            for np in n_patches:
 
+    if reproduce:
+        for ks in [2]:  # [1, 2, 3, 4]
+            for np in n_patches:
                 if np not in custom_depth:
                     custom_depth[np] = {}
                     custom_overhead[np] = {}
@@ -395,32 +395,29 @@ def run_exp_statistics(reproduce: bool = False) -> None:
 
                     depth_overall[np] = {}
                     gate_overall[np] = {}
-                    
-                # TODO: Calculate necessary backend given number of patches
 
                 # Generate circuit
-                circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                            n1 = np,
-                                                            n2 = 0)
+                circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=np, n2=0)
 
-                backend = BackendChipletV2(size = (np*2, np*2, 15, 8),
-                                n_inter = num_inter_chiplet_connections,
-                                connectivity = "nn",
-                                topology = "rotated_grid",
-                                inter_chiplet_noise = ps_inter,
-                                inter_chiplet_amplification = 1,
-                                inter_chiplet_noise_type = "constant",
-                                num_defective_qubits=0,
-                            )
+                backend = BackendChipletV2(
+                    size=(np * 2, np * 2, 15, 8),
+                    n_inter=num_inter_chiplet_connections,
+                    connectivity="nn",
+                    topology="rotated_grid",
+                    inter_chiplet_noise=ps_inter,
+                    inter_chiplet_amplification=1,
+                    inter_chiplet_noise_type="constant",
+                    num_defective_qubits=0,
+                )
 
                 # Stim to qiskit
-                stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
 
                 # Custom transpilation
                 print("Custom")
-                custom_circuit = custom_partitioned_transpilation(stim_code_circuit.qc,
-                                                        backend,
-                                                        pre_defined_partitions=partitions)
+                custom_circuit = custom_partitioned_transpilation(
+                    stim_code_circuit.qc, backend, pre_defined_partitions=partitions
+                )
 
                 # Sabre transpilation
                 print("Sabre")
@@ -439,7 +436,7 @@ def run_exp_statistics(reproduce: bool = False) -> None:
 
                 depth_overall[np][ks] = (stim_code_circuit.qc).depth()
                 gate_overall[np][ks] = num_2q_gates(stim_code_circuit.qc)
-            
+
         # Save data
         output_dir = Path("experiments/evaluation/scalability")
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -455,7 +452,6 @@ def run_exp_statistics(reproduce: bool = False) -> None:
             pickle.dump(depth_overall, f)
         with open(output_dir / "gate_overall.pkl", "wb") as f:
             pickle.dump(gate_overall, f)
-    
 
     # Load files
     with open("experiments/evaluation/scalability/custom_depth.pkl", "rb") as f:

@@ -10,11 +10,13 @@ from scalability_exps.experiment_statistics import *
 
 import time
 
+
 def format_duration(seconds):
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
     return f"{hours:02}:{minutes:02}:{secs:02}"
+
 
 reproduce_results = True
 

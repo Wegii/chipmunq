@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
@@ -391,10 +392,14 @@ def run_exp_inter_chiplet(reproduce: bool = False) -> None:
                         print((stim_code_circuit.qc).depth())
 
                         low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
-                        low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(stim_code_circuit.qc)
+                        low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(
+                            stim_code_circuit.qc
+                        )
 
                         high_error_depth[ni][ks] = high_error_circuit.depth() - (stim_code_circuit.qc).depth()
-                        high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(stim_code_circuit.qc)
+                        high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(
+                            stim_code_circuit.qc
+                        )
 
             # Store values for evaluation
             output_dir = Path("experiments/evaluation/inter_chiplet")
@@ -450,5 +455,3 @@ def run_exp_inter_chiplet(reproduce: bool = False) -> None:
 
 if __name__ == "__main__":
     run_exp_inter_chiplet()
-
-    

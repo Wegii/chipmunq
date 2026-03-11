@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from stim import Circuit as StimCircuit
@@ -199,71 +200,70 @@ def run_exp_distributed_lattice_surgery(reproduce: bool = False) -> None:
     ps = list(np.logspace(-4, -1, 10))
 
     # Inter-chiplet noise levels
-    inter_chiplet_noise = [1e-3] # [1e-4, 1e-3, 1e-2]
-    
+    inter_chiplet_noise = [1e-3]  # [1e-4, 1e-3, 1e-2]
+
     # Compilation methods
     # - default: No compilation
     # - compiled: Our method
     # - sabre: LightSABRE method
-    ts = ["default", "compiled", "sabre"] 
+    ts = ["default", "compiled", "sabre"]
 
     # Code size of surface code
     ks = [1, 2, 3]
-    
-    for ps_inter in inter_chiplet_noise:
 
+    for ps_inter in inter_chiplet_noise:
         if reproduce:
             transpiled_circuits = {}
-            
+
             def get_circuit(distance_scale: int, p_icc, amp_icc, t: str) -> StimCircuit:
-                
+
                 if t == "default":
                     # Reference circuit
-                    circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
-                                                                n1 = 1,
-                                                                n2 = 0)
+                    circuit, partitions = get_tqec_cnot_rotated(distance_scale=distance_scale, n1=1, n2=0)
                     normal_circuit_stim = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
                     return normal_circuit_stim
                 else:
-                    n_icc, backend = get_backend(p_icc = p_icc,
-                                        amp_icc = amp_icc, 
-                                        d = distance_scale)
+                    n_icc, backend = get_backend(p_icc=p_icc, amp_icc=amp_icc, d=distance_scale)
 
                     if (distance_scale, n_icc, p_icc, amp_icc, t) in transpiled_circuits:
                         # Circuit does not need to be transpiled again
                         print("Utilizing existing backend")
                         return transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, t)]
                     else:
-                        circuit, partitions = get_tqec_cnot_rotated(distance_scale = distance_scale,
-                                                                n1 = 1,
-                                                                n2 = 0)
-                        
+                        circuit, partitions = get_tqec_cnot_rotated(distance_scale=distance_scale, n1=1, n2=0)
+
                         # Transpile circuit to backend
                         if t == "compiled":
                             # Custom compilation
-                            _, custom_circuit, _, _ = transpile_stim_circuit(circuit,
-                                                                            backend,
-                                                                            pre_defined_partitions = partitions,
-                                                                            routing_type = "cost",
-                                                                            routing_alpha = 0,
-                                                                            routing_beta = 0)
+                            _, custom_circuit, _, _ = transpile_stim_circuit(
+                                circuit,
+                                backend,
+                                pre_defined_partitions=partitions,
+                                routing_type="cost",
+                                routing_alpha=0,
+                                routing_beta=0,
+                            )
                         elif t == "sabre":
                             # Compilation using SABRRE
-                            stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                            stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
                             custom_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
-                            
+
                         # Convert circuit to stim
                         custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
                         # Add circuit to dictionary, in order to not transpile this circuit configuration again
                         transpiled_circuits[(distance_scale, n_icc, p_icc, amp_icc, t)] = custom_circuit_stim
 
-                        plot_circuit_layout(custom_circuit,
-                                            backend,
-                                            filename=f"experiments/evaluation/qec_evaluation/backend_mapping/layout_{t}_{distance_scale}.png")
-                        
-                        plot_circuit_layout_utilization(custom_circuit,
-                                                        backend,
-                                                        filename=f"experiments/evaluation/qec_evaluation/backend_mapping/mapping_{t}_{distance_scale}.png")
+                        plot_circuit_layout(
+                            custom_circuit,
+                            backend,
+                            filename=f"experiments/evaluation/qec_evaluation/backend_mapping/layout_{t}_{distance_scale}.png",
+                        )
+
+                        plot_circuit_layout_utilization(
+                            custom_circuit,
+                            backend,
+                            filename=f"experiments/evaluation/qec_evaluation/backend_mapping/mapping_{t}_{distance_scale}.png",
+                        )
 
                         return custom_circuit_stim
 
@@ -286,16 +286,17 @@ def run_exp_distributed_lattice_surgery(reproduce: bool = False) -> None:
                         chiplet_size = (6, 6, 23, 12)
                         nic = 11
 
-                    backend = BackendChipletV2(size=chiplet_size,#size = (6, 6, 15, 8),
-                                                n_inter = nic,
-                                                connectivity = "nn",
-                                                topology = "rotated_grid",
-                                                inter_chiplet_noise = p_icc,
-                                                inter_chiplet_amplification = amp_icc,
-                                                inter_chiplet_noise_type = "constant",#"constant"
-                                                num_defective_qubits=0,
-                                                )
-                    
+                    backend = BackendChipletV2(
+                        size=chiplet_size,  # size = (6, 6, 15, 8),
+                        n_inter=nic,
+                        connectivity="nn",
+                        topology="rotated_grid",
+                        inter_chiplet_noise=p_icc,
+                        inter_chiplet_amplification=amp_icc,
+                        inter_chiplet_noise_type="constant",  # "constant"
+                        num_defective_qubits=0,
+                    )
+
                     return nic, backend
 
             def _get_sinter_task():
@@ -303,25 +304,30 @@ def run_exp_distributed_lattice_surgery(reproduce: bool = False) -> None:
                 yield from (
                     sinter.Task(
                         circuit=circuit,
-                        json_metadata={"d": 2 * k + 1, "r": 2 * k + 1, "p": p, "run_name": t,},
+                        json_metadata={
+                            "d": 2 * k + 1,
+                            "r": 2 * k + 1,
+                            "p": p,
+                            "run_name": t,
+                        },
                     )
                     for circuit, k, p, t in (
-                        (get_noise_model("modsi1000",
-                                        None,
-                                        p,
-                                        None, 
-                                        remote = (None if t == "default" else
-                                                get_backend(d = k,
-                                                            p_icc = ps_inter,
-                                                            amp_icc = 1,
-                                                            t = t)[1].inter_chiplet_connections)
-                                        ).noisy_circuit(
-                                            get_circuit(distance_scale = k,
-                                                        p_icc = ps_inter,
-                                                        amp_icc = 1,
-                                                        t = t)
-                                            ), k, p, t)
-                        
+                        (
+                            get_noise_model(
+                                "modsi1000",
+                                None,
+                                p,
+                                None,
+                                remote=(
+                                    None
+                                    if t == "default"
+                                    else get_backend(d=k, p_icc=ps_inter, amp_icc=1, t=t)[1].inter_chiplet_connections
+                                ),
+                            ).noisy_circuit(get_circuit(distance_scale=k, p_icc=ps_inter, amp_icc=1, t=t)),
+                            k,
+                            p,
+                            t,
+                        )
                         for t in ts
                         for k in ks
                         for p in ps

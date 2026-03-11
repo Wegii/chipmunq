@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
@@ -65,7 +66,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
         # Values above 1e3 are removed due to timeout
         y_sabre = [y for y in y_sabre if y < 1e3]
         h = plt.plot(
-            x_val[:len(y_sabre)],
+            x_val[: len(y_sabre)],
             y_sabre,
             marker=inter_markers[i],
             linestyle="--",
@@ -145,12 +146,12 @@ def calculate_speedup(custom_time_storage, sabre_time_storage):
 
         # Only account runtime values below the runtime threshold of 1e3
         sabre_clean = np.array([y for y in sabre_values if y < 1e3])
-        custom_reduced = np.array(custom_values[0:len(sabre_clean)])
+        custom_reduced = np.array(custom_values[0 : len(sabre_clean)])
 
-        speedup = sabre_clean/custom_reduced
+        speedup = sabre_clean / custom_reduced
         all_speedup.extend(speedup)
 
-        print(f"d={2*ks + 1}: {np.mean(speedup)}")
+        print(f"d={2 * ks + 1}: {np.mean(speedup)}")
         # print(np.std(speedup))
 
     print(f"All speedups: {all_speedup}")
@@ -170,26 +171,23 @@ def run_exp_scalability(reproduce: bool = False) -> None:
 
     # Code distance of surface code
     code_distance = [1, 2, 3, 7]
-    
+
     if reproduce:
         for ks in code_distance:
             for num_p in n_patches:
-
                 if num_p not in custom_time_storage:
                     custom_time_storage[num_p] = {}
                     sabre_time_storage[num_p] = {}
 
                 # Generate circuit
                 print("Generating circuit")
-                circuit, partitions = get_tqec_cnot_rotated(distance_scale = ks,
-                                                            n1 = num_p,
-                                                            n2 = 0)
-                
+                circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=num_p, n2=0)
+
                 # Calculate required number of chiplets given the number of patches that we want to place
                 bx = num_p
                 by = num_p
-                
-                bx, by = 2*(num_p+1), 2*(num_p+1)
+
+                bx, by = 2 * (num_p + 1), 2 * (num_p + 1)
 
                 if ks == 1:
                     chiplet_size = (bx, by, 11, 6)
@@ -212,27 +210,26 @@ def run_exp_scalability(reproduce: bool = False) -> None:
                 elif ks == 7:
                     chiplet_size = (bx, by, 35, 18)
                     nic = 17
-                    
+
                 print("Generating backend")
-                backend = BackendChipletV2(size = chiplet_size,
-                                n_inter = nic,
-                                connectivity = "nn",
-                                topology = "rotated_grid",
-                                inter_chiplet_noise = ps_inter,
-                                inter_chiplet_amplification = 1,
-                                inter_chiplet_noise_type = "constant",
-                                num_defective_qubits=0,
-                            )
+                backend = BackendChipletV2(
+                    size=chiplet_size,
+                    n_inter=nic,
+                    connectivity="nn",
+                    topology="rotated_grid",
+                    inter_chiplet_noise=ps_inter,
+                    inter_chiplet_amplification=1,
+                    inter_chiplet_noise_type="constant",
+                    num_defective_qubits=0,
+                )
 
                 # Stim to qiskit
-                stim_code_circuit = StimCodeCircuit(stim_circuit = circuit)
+                stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
 
                 # Custom transpilation
                 print("Custom")
                 start_custom = time.time()
-                _ = custom_partitioned_transpilation(stim_code_circuit.qc,
-                                                        backend,
-                                                        pre_defined_partitions=partitions)
+                _ = custom_partitioned_transpilation(stim_code_circuit.qc, backend, pre_defined_partitions=partitions)
                 end_custom = time.time()
                 print("Custom done")
 
@@ -355,6 +352,6 @@ def run_single_run():
 
 
 if __name__ == "__main__":
-    run_exp_scalability(reproduce = False)
+    run_exp_scalability(reproduce=False)
 
     # run_single_run()

@@ -1,0 +1,12 @@
+# To install pre-commit hooks:
+#   pip install pre-commit
+#   pre-commit install
+
+repos:
+  # Formatting using ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.4
+    hooks:
+      # This hook only handles formatting (like Black)
+      - id: ruff-format
+        priority: 1
