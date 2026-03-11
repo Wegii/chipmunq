@@ -21,6 +21,8 @@ from external.baseline.MECH.MECHBenchmarks import *
 from external.baseline.MECH.Router import *
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
+from pathlib import Path
+
 
 def generate_simple_backend(x_num: int, y_num: int, icc_num: int = None) -> tuple[nx.Graph, int, int]:
     """Generate simple backend using MECH library.
@@ -158,8 +160,7 @@ def display_simple_backend(backend: nx.Graph, filename: str) -> None:
 
     cm = CouplingMap(couplinglist=regular_coupling)
 
-    print(cm)
-
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
     plot_coupling_map(cm.size(), None, cm.get_edges(), filename=filename)
 
 

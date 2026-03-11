@@ -8,9 +8,10 @@ from scalability_exps.experiment_inter_chiplet import *
 from scalability_exps.experiment_scalability import *
 from scalability_exps.experiment_statistics import *
 
+
 # Set to True if the results should be reproduced. False for utilizing pre-computed results and 
 # generate plots only
-reproduce_results = False
+reproduce_results = True
 
 # Experiments for evaluating runtime of qecc-synth and MECH
 run_runtime_scaling(reproduce = reproduce_results)
