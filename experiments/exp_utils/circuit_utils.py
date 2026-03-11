@@ -17,16 +17,3 @@ def stim_to_qiskit(stim_circuit) -> QuantumCircuit:
     stim_code = StimCodeCircuit(stim_circuit=stim_circuit)
 
     return stim_code
-
-
-def get_partitions_stim_tqec(stim_circuit, code_distance):
-
-    # Iterate over cirucit
-
-    # Extract all Qubit_coords
-
-    # Parse QUBIT_COORDS(y, x) idx
-
-    # Start at min y and min x
-
-    pass

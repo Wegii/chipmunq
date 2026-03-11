@@ -1,7 +1,3 @@
-# How does the number of inter-chiplet connections influence circuit routing?
-# How does the error of inter-chiplet connections influence circuit routing?
-
-
 from __future__ import annotations
 
 import os
@@ -10,7 +6,7 @@ sys.path.append(os.path.join(os.getcwd(), "."))
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from qeccm.backends.backend_utils import plot_circuit_layout_utilization
 

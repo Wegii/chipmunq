@@ -1,12 +1,12 @@
 from __future__ import annotations
+
 import os
 import sys
-
 sys.path.append(os.path.join(os.getcwd(), "."))
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
 # Plotting

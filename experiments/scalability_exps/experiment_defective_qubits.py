@@ -1,6 +1,3 @@
-# TODO: 3. How do defective qubits affect the resulting circuit?
-
-
 from __future__ import annotations
 
 import os
@@ -12,7 +9,7 @@ from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 
 # Plotting
 import pickle

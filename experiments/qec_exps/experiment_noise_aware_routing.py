@@ -8,7 +8,7 @@ from stim import Circuit as StimCircuit
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 from experiments.exp_utils.circuit_noise import get_noise_model
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 from qeccm.backends.backend_utils import plot_circuit_layout_utilization

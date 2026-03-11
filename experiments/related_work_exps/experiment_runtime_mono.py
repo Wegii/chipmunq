@@ -13,7 +13,6 @@ from external.baseline.MECH.Router import *
 from external.baseline.MECH.MECHBenchmarks import *
 from external.baseline.MECH.transpile_mech import transpile_circuit_MECH
 
-
 # QECC-Synth
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/QECC_Synth/SurfStitch/MyCode/src"))
 from external.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth import transpile_circuit_QECCSynth
@@ -25,7 +24,7 @@ from external.baseline.SABRE.transpile_sabre import transpile_circuit_SABRE
 # Plotting
 from matplotlib.ticker import MaxNLocator
 from experiments.related_work_exps.utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 import pickle
 import time
 from pathlib import Path

@@ -1,10 +1,3 @@
-# How does the logical error rate of lattice surgery operations change when distributed to multiple chiplets?
-
-# TODO: Show with simple routing, and with improved routing
-
-
-# How is the logical error rate influenced by a limited number of inter-chiplet connections?
-
 from __future__ import annotations
 
 import os
@@ -16,7 +9,7 @@ from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 from qeccm.backends.backend_utils import plot_circuit_layout_utilization, plot_circuit_layout
 from experiments.exp_utils.circuit_noise import get_noise_model
 

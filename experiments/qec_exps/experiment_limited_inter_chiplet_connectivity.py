@@ -1,5 +1,3 @@
-# How is the logical error rate influenced by a limited number of inter-chiplet connections?
-
 from __future__ import annotations
 
 import os
@@ -10,7 +8,7 @@ from stim import Circuit as StimCircuit
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
-from experiments.utils import *
+from experiments.exp_utils.utils import *
 from qeccm.backends.backend_utils import plot_circuit_layout_utilization, plot_circuit_layout
 from experiments.exp_utils.circuit_noise import get_noise_model
 
