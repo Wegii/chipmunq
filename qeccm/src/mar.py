@@ -35,12 +35,9 @@ class BasicMapRoute(GenericMapRoute):
         pass
 
     def perform_mapping(self, circuit: qiskit.QuantumCircuit) -> None:
-        # Random mapping
-
         pass
 
     def perform_routing(self):
-        # SABRE
         pass
 
 
@@ -50,8 +47,6 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
     # Each partitioning this needs to have enough qubits that can be connected to other partitions
 
     def pass_manager(self, backend: BackendChipletV2, optimization_level: int | None = None) -> StagedPassManager:
-        # TODO: generate stagedpassmanager with all stages
-
         init_pass = self._generate_initial_pass()
         layout_pass = self._generate_layout_pass(backend)
         routing_pass = self._generate_routing_pass(backend)
@@ -88,12 +83,9 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         partition_op = KaHyParPartitioning(backend, partitions)
 
         # Mapping pass
-        # mapping_op = RandomMapper(backend)
         mapping_op = TrivialMapper(backend, patch_initialization=patch_initialization)
-        # mapping_op = TrivialLayout(pass_manager_config.coupling_map)
 
         # Extend the dag with ancillas and idling qubits
-        # extension_op = [FullAncillaAllocation(pass_manager_config.coupling_map), EnlargeWithAncilla()]
         extension_op = [
             FullAncillaAllocation(backend.coupling_map),
         ]
@@ -102,12 +94,6 @@ class PartitionedMapRoutePlugin(PassManagerStagePlugin):
         apply_mapping_op = ApplyLayout()
 
         # Combine partitioning and mapping into a single pass
-
-        # layout_pm = PassManager([partition_op, mapping_op ] + extension_op +
-        #                        [apply_mapping_op] + [mapping_op, apply_mapping_op])
-        # layout_pm = PassManager([partition_op, mapping_op ] + extension_op +
-        #                        [apply_mapping_op] )
-
         layout_pm = PassManager([partition_op, mapping_op] + extension_op)
 
         return layout_pm

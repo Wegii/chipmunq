@@ -1,6 +1,7 @@
 # Visualization
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Optional, Tuple
 
 
 class QPUBlock:
@@ -19,13 +20,12 @@ class QPUBlock:
         self.height = height
         self.coord = block_coord
 
-        # print(f"block has width {width} and height {height}")
-
         # List of (x, y) points that cannot be used
         self.no_placement_zones = no_placement_zones if no_placement_zones is not None else []
 
         # free rectangles inside block
         self.free_rects = [(0, 0, width, height)]
+
         # list of (partition_id, x, y, w, h)
         self.placed_partitions = []
 
@@ -37,25 +37,40 @@ class QPUBlock:
         else:
             self.patch_initialization = patch_initialization
 
-    def _overlaps_partitions(self, x, y, w, h):
+    def _overlaps_partitions(self, x: int, y: int, w: int, h: int) -> bool:
+        """Check if partitions overlap
+
+        :param self: QPUBlock
+        :param x: x location
+        :type x: int
+        :param y: y location
+        :type y: int
+        :param w: width of partition
+        :type w: int
+        :param h: height of partition
+        :type h: int
+        :return: Whether partition overlaps or not
+        :rtype: bool
+        """
+
         for pid, px, py, pw, ph in self.placed_partitions:
             if not (x + w <= px or px + pw <= x or y + h <= py or py + ph <= y):
                 return True
         return False
 
-    def _overlaps_forbidden(self, x, y, w, h):
+    def _overlaps_forbidden(self, x: int, y: int, w: int, h: int) -> bool:
         """Check if any forbidden (fx, fy) lies inside the placement rectangle.
 
-        :param x: _description_
-        :type x: _type_
-        :param y: _description_
-        :type y: _type_
-        :param w: _description_
-        :type w: _type_
-        :param h: _description_
-        :type h: _type_
-        :return: _description_
-        :rtype: _type_
+        :param x: x location
+        :type x: int
+        :param y: y location
+        :type y: int
+        :param w: width
+        :type w: int
+        :param h: height
+        :type h: int
+        :return: Check overlap with no placement zone
+        :rtype: bool
         """
         for fx, fy in self.no_placement_zones:
             if x <= fx < x + w and y <= fy < y + h:
@@ -64,16 +79,71 @@ class QPUBlock:
         print("not allowed")
         return False
 
-    def _overlaps(self, x, y, w, h):
+    def _overlaps(self, x: int, y: int, w: int, h: int) -> bool:
+        """Check if partition overlaps other partitions or no placement zones
+
+        :param x: x location
+        :type x: int
+        :param y: y location
+        :type y: int
+        :param w: width
+        :type w: int
+        :param h: height
+        :type h: int
+        :return: Check overlap
+        :rtype: bool
+        """
+
         return self._overlaps_partitions(x, y, w, h) or self._overlaps_forbidden(x, y, w, h)
 
-    def _find_covering_free_rect(self, x, y, w, h):
+    def _find_covering_free_rect(
+        self, x: int, y: int, w: int, h: int
+    ) -> Optional[Tuple[int, Tuple[int, int, int, int]]]:
+        """Find existing free rectangle that completely contains the target area.
+
+        :param self: Description
+        :param x: x location
+        :type x: int
+        :param y: y location
+        :type y: int
+        :param w: width of partition
+        :type w: int
+        :param h: height of partition
+        :type h: int
+        :return: A tuple containing the index and the geometry (x, y, w, h) of the covering rectangle, or (None, None)
+          if no valid container is found.
+        :rtype: Tuple[int, Tuple[int, int, int, int]] | None
+        """
+
         for i, (fx, fy, fw, fh) in enumerate(self.free_rects):
             if x >= fx and y >= fy and x + w <= fx + fw and y + h <= fy + fh:
                 return i, (fx, fy, fw, fh)
         return None, None
 
-    def _split_free_rect(self, index, fx, fy, fw, fh, x, y, w, h):
+    def _split_free_rect(self, index: int, fx: int, fy: int, fw: int, fh: int, x: int, y: int, w: int, h: int) -> None:
+        """Splits a free rectangle into smaller sub-rectangles after a partition is placed.
+
+        :param self: Description
+        :param index: The index of the free rectangle to be split.
+        :type index: int
+        :param fx: The x-coordinate of the existing free rectangle.
+        :type fx: int
+        :param fy: The y-coordinate of the existing free rectangle.
+        :type fy: int
+        :param fw: The width of the existing free rectangle.
+        :type fw: int
+        :param fh: The height of the existing free rectangle.
+        :type fh: int
+        :param x: x location
+        :type x: int
+        :param y: y location
+        :type y: int
+        :param w: width of partition
+        :type w: int
+        :param h: height of partition
+        :type h: int
+        """
+
         del self.free_rects[index]
 
         # left side
@@ -92,7 +162,19 @@ class QPUBlock:
         if y + h < fy + fh:
             self.free_rects.append((x, y + h, w, (fy + fh) - (y + h)))
 
-    def place_partition(self, partition_id, pw, ph):
+    def place_partition(self, partition_id: int, pw: int, ph: int) -> Optional[Tuple[int, int]]:
+        """Attempt to place a partition within the available free space
+
+        :param self: Description
+        :param partition_id: id of partition
+        :type partition_id: int
+        :param pw: width of partition
+        :type pw: int
+        :param ph: height of partition
+        :type ph: int
+        :return: The absolute (x, y) coordinates of the placed partition if successful, otherwise None.
+        :rtype: Tuple[int, int] | None
+        """
 
         if self.patch_initialization == "center":
             # Preferred center-based placement
@@ -159,7 +241,29 @@ class QPUBlock:
         print(f"Placement for {partition_id} failed: no free slot available.")
         return None
 
-    def place_relative(self, partition_id, pw, ph, anchor_id, direction, max_shift=5):
+    def place_relative(
+        self, partition_id: int, pw: int, ph: int, anchor_id: str, direction: str, max_shift: int = 5
+    ) -> Optional[Tuple[int, int]]:
+        """Place a partition relative to an existing anchor
+
+        :param self: Description
+        :param partition_id: partition oid
+        :type partition_id: int
+        :param pw: partition width
+        :type pw: int
+        :param ph: partition height
+        :type ph: int
+        :param anchor_id: id of partition to place relative to
+        :type anchor_id: str
+        :param direction: direction of placement
+        :type direction: str
+        :param max_shift: maximum offset to test for placement on the same QPUBlock
+        :type max_shift: int
+        :return: The absolute (x, y) coordinates of the newly placed partition if successful, or None if no valid space
+          is found within the shift constraints.
+        :rtype: Tuple[int, int] | None
+        """
+
         anchor = next((p for p in self.placed_partitions if p[0] == anchor_id), None)
         if anchor is None:
             raise ValueError(f"Anchor partition {anchor_id} not found.")
@@ -235,6 +339,7 @@ def plot_block_counts(width: int, height: int, block_assignments: dict, filename
     :param filename: _description_
     :type filename: str
     """
+
     fig, ax = plt.subplots(figsize=(width, height))
 
     # Loop through each grid block and get number of partitions per QPU

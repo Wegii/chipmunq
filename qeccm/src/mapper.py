@@ -107,10 +107,7 @@ class RandomMapper(GenericMapper):
 
 
 class TrivialMapper(GenericMapper):
-    """Map to chiplet backend
-
-    TODO: Description
-    """
+    """Map to chiplet backend"""
 
     def __init__(self, backend, patch_initialization: str = ""):
         """TrivialMapper initializer
@@ -135,6 +132,7 @@ class TrivialMapper(GenericMapper):
         :param dag: _description_
         :type dag: DAGCircuit
         """
+
         # 0. Get partitioning from partition pass
         partitioned_hgc = self.property_set["partitioned_hyper_dag"]
 
@@ -397,6 +395,7 @@ class TrivialMapper(GenericMapper):
         :return: _description_
         :rtype: tuple[dict, dict]
         """
+
         partition_size = {}
         for partition_key, nodes in partitioned_hg._btn.items():
             partition_size[partition_key] = len(nodes)  # math.sqrt(len(nodes))

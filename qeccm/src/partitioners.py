@@ -235,10 +235,6 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             #       - If more patches than chiplets, try to have as many as possible good patches, and some bad ones.
             #         TODO: Find out a better way how to handle this
 
-            # Rustworkx to NetworkX
-            # TODO: This method is not working!!
-            # TODO: hgc is no longer set, as the hypergraph_circuit pass no longer calculates this, but rather
-            #       calculates a direct kahypar version
             G_rx = hgc._hg
             G_nx = nx.Graph()
 
@@ -288,7 +284,7 @@ class KaHyParPartitioning(GenericHypergraphPartitioning):
             pass
 
         # k = 1#5#3 # 3
-        print("!!!Warning: Using hardcoded value!!!")
+
         print(f"Optimal k found: {k}")
         # Set size of each partition as number of qubits on a chiplet
         partition_sizes = [num_qubits_chiplet for c in range(k)]
