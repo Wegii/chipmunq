@@ -596,4 +596,4 @@ def run_exp_defective(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_exp_defective()
+    run_exp_defective(reproduce=True)

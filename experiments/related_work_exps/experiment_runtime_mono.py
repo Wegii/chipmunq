@@ -216,4 +216,4 @@ def run_runtime_scaling(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_runtime_scaling()
+    run_runtime_scaling(reproduce=True)

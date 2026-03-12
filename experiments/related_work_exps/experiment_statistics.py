@@ -213,4 +213,4 @@ def run_statistics(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_statistics()
+    run_statistics(reproduce=True)

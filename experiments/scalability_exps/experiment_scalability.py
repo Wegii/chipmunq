@@ -274,9 +274,7 @@ def run_exp_scalability(reproduce: bool = False) -> None:
 
     plot_combined(custom_time_storage, sabre_time_storage, "experiments/evaluation/scalability/cnot_scaling.pdf")
 
-    calculate_speedup(
-        custom_time_storage, sabre_time_storage, "experiments/evaluation/scalability/cnot_scaling_speedup.pdf"
-    )
+    calculate_speedup(custom_time_storage, sabre_time_storage)
 
 
 def run_single_run():
@@ -352,6 +350,6 @@ def run_single_run():
 
 
 if __name__ == "__main__":
-    run_exp_scalability(reproduce=False)
+    run_exp_scalability(reproduce=True)
 
     # run_single_run()

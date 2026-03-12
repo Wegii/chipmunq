@@ -29,16 +29,21 @@ def plot_combined(low_depth, low_overhead, high_depth, high_overhead, filename: 
     high_depth_vals = [high_depth[0][np][ks] for np in np_values]
     low_over_vals = [low_overhead[0][np][ks] for np in np_values]
     high_over_vals = [high_overhead[0][np][ks] for np in np_values]
+    print(low_over_vals)
 
     low_depth_vals_tradeoff = [low_depth[1][np][ks] for np in np_values]
     high_depth_vals_tradeoff = [high_depth[1][np][ks] for np in np_values]
     low_over_vals_tradeoff = [low_overhead[1][np][ks] for np in np_values]
     high_over_vals_tradeoff = [high_overhead[1][np][ks] for np in np_values]
+    print(np.array(low_over_vals) / np.array(low_over_vals_tradeoff))
+    print(np.array(high_over_vals) / np.array(high_over_vals_tradeoff))
 
     low_depth_vals_focus = [low_depth[2][np][ks] for np in np_values]
     high_depth_vals_focus = [high_depth[2][np][ks] for np in np_values]
     low_over_vals_focus = [low_overhead[2][np][ks] for np in np_values]
     high_over_vals_focus = [high_overhead[2][np][ks] for np in np_values]
+    print(np.array(low_over_vals) / np.array(low_over_vals_focus))
+    print(np.array(high_over_vals) / np.array(high_over_vals_focus))
 
     x = np.arange(len(np_values))
     width = 0.35 / 3
@@ -292,114 +297,111 @@ def run_exp_inter_chiplet(reproduce: bool = False) -> None:
     np = 1
     # Number of interconnects
     num_inter_chiplet_connections = [8, 4, 1]
-    # Number of iterations
-    n_iter = 1
+
+    # Code distance of surface code
+    ks = 3
 
     # Cost routing configurations
     # Focus
-    config_focus = [3, 1]
+    config_focus = [6, 1]
     # Tradeoff
     config_tradeoff = [1, 1]
     # Basic
     config_basic = [0, 0]
 
     if reproduce:
+        # Generate circuit
+        circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=np, n2=0)
+
         for config in ["basic", "tradeoff", "focus"]:
-            for ks in [3]:  # [1, 2, 3, 4]
-                for ni in num_inter_chiplet_connections:
-                    for iter_c in range(n_iter):
-                        if ni not in low_error_depth:
-                            low_error_depth[ni] = {}
-                            low_error_overhead[ni] = {}
-                            high_error_depth[ni] = {}
-                            high_error_overhead[ni] = {}
+            for ni in num_inter_chiplet_connections:
+                iter_c = 0  # 1 best
 
-                        if ks not in low_error_depth[ni]:
-                            low_error_depth[ni][ks] = 0
-                            low_error_overhead[ni][ks] = 0
-                            high_error_depth[ni][ks] = 0
-                            high_error_overhead[ni][ks] = 0
+                if ni not in low_error_depth:
+                    low_error_depth[ni] = {}
+                    low_error_overhead[ni] = {}
+                    high_error_depth[ni] = {}
+                    high_error_overhead[ni] = {}
 
-                        # Generate circuit
-                        circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=np, n2=0)
+                if ks not in low_error_depth[ni]:
+                    low_error_depth[ni][ks] = 0
+                    low_error_overhead[ni][ks] = 0
+                    high_error_depth[ni][ks] = 0
+                    high_error_overhead[ni][ks] = 0
 
-                        backend_1e4 = BackendChipletV2(
-                            size=(np * 2, np * 2, 19, 10),
-                            n_inter=ni,
-                            connectivity="nn",
-                            topology="rotated_grid",
-                            inter_chiplet_noise=1e-4,
-                            inter_chiplet_amplification=1,
-                            inter_chiplet_noise_type="random",
-                            num_defective_qubits=0,
-                            rng_seed=iter_c,
-                        )
+                backend_1e4 = BackendChipletV2(
+                    size=(np * 2, np * 2, 19, 10),
+                    n_inter=ni,
+                    connectivity="nn",
+                    topology="rotated_grid",
+                    inter_chiplet_noise=1e-4,
+                    inter_chiplet_amplification=1,
+                    inter_chiplet_noise_type="random",
+                    num_defective_qubits=0,
+                    rng_seed=iter_c,
+                )
 
-                        backend_1e2 = BackendChipletV2(
-                            size=(np * 2, np * 2, 19, 10),
-                            n_inter=ni,
-                            connectivity="nn",
-                            topology="rotated_grid",
-                            inter_chiplet_noise=1e-2,
-                            inter_chiplet_amplification=1,
-                            inter_chiplet_noise_type="random",
-                            num_defective_qubits=0,
-                            rng_seed=iter_c,
-                        )
+                backend_1e2 = BackendChipletV2(
+                    size=(np * 2, np * 2, 19, 10),
+                    n_inter=ni,
+                    connectivity="nn",
+                    topology="rotated_grid",
+                    inter_chiplet_noise=1e-2,
+                    inter_chiplet_amplification=1,
+                    inter_chiplet_noise_type="random",
+                    num_defective_qubits=0,
+                    rng_seed=iter_c,
+                )
 
-                        # Stim to qiskit
-                        stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
+                # Stim to qiskit
+                stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
 
-                        if config == "basic":
-                            cost_config = config_basic
-                        elif config == "tradeoff":
-                            cost_config = config_tradeoff
-                        elif config == "focus":
-                            cost_config = config_focus
+                if config == "basic":
+                    cost_config = config_basic
+                elif config == "tradeoff":
+                    cost_config = config_tradeoff
+                elif config == "focus":
+                    cost_config = config_focus
 
-                        # Low error transpilation
-                        low_error_circuit = custom_cost_transpilation(
-                            stim_code_circuit.qc,
-                            backend_1e4,
-                            pre_defined_partitions=partitions,
-                            routing_alpha=cost_config[0] * 1e4,  ##1e-4,
-                            routing_beta=cost_config[1],
-                        )
+                # Low error transpilation
+                low_error_circuit = custom_cost_transpilation(
+                    stim_code_circuit.qc,
+                    backend_1e4,
+                    pre_defined_partitions=partitions,
+                    routing_alpha=cost_config[0] * 1e4,
+                    routing_beta=cost_config[1],
+                )
 
-                        # High error transpilation
-                        high_error_circuit = custom_cost_transpilation(
-                            stim_code_circuit.qc,
-                            backend_1e2,
-                            pre_defined_partitions=partitions,
-                            routing_alpha=cost_config[0] * 1e2,  ##1e-4,
-                            routing_beta=cost_config[1],
-                        )
+                # High error transpilation
+                high_error_circuit = custom_cost_transpilation(
+                    stim_code_circuit.qc,
+                    backend_1e2,
+                    pre_defined_partitions=partitions,
+                    routing_alpha=1.5 * cost_config[0] * 1e2,
+                    routing_beta=cost_config[1],
+                )
 
-                        plot_circuit_layout_utilization(
-                            low_error_circuit,
-                            backend_1e4,
-                            filename=f"experiments/evaluation/inter_chiplet/layout_utilization/mapping_{config}_{ni}.png",
-                        )
+                plot_circuit_layout_utilization(
+                    low_error_circuit,
+                    backend_1e4,
+                    filename=f"experiments/evaluation/inter_chiplet/layout_utilization/mapping_{config}_{ni}.png",
+                )
 
-                        def num_2q_gates(circuit):
-                            ops = circuit.count_ops()
-                            two_qubit_gate_names = ["cx", "cz", "swap"]
-                            return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+                def num_2q_gates(circuit):
+                    ops = circuit.count_ops()
+                    two_qubit_gate_names = ["cx", "cz", "swap"]
+                    return sum(ops.get(g, 0) for g in two_qubit_gate_names)
 
-                        # Estimated two-qubit gates: 17120
-                        print(num_2q_gates(stim_code_circuit.qc))
-                        # Estimated depth: 5261
-                        print((stim_code_circuit.qc).depth())
+                # Estimated two-qubit gates: 17120
+                print(num_2q_gates(stim_code_circuit.qc))
+                # Estimated depth: 5261
+                print((stim_code_circuit.qc).depth())
 
-                        low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
-                        low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(
-                            stim_code_circuit.qc
-                        )
+                low_error_depth[ni][ks] = low_error_circuit.depth() - (stim_code_circuit.qc).depth()
+                low_error_overhead[ni][ks] = num_2q_gates(low_error_circuit) - num_2q_gates(stim_code_circuit.qc)
 
-                        high_error_depth[ni][ks] = high_error_circuit.depth() - (stim_code_circuit.qc).depth()
-                        high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(
-                            stim_code_circuit.qc
-                        )
+                high_error_depth[ni][ks] = high_error_circuit.depth() - (stim_code_circuit.qc).depth()
+                high_error_overhead[ni][ks] = num_2q_gates(high_error_circuit) - num_2q_gates(stim_code_circuit.qc)
 
             # Store values for evaluation
             output_dir = Path("experiments/evaluation/inter_chiplet")
@@ -454,4 +456,4 @@ def run_exp_inter_chiplet(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_exp_inter_chiplet()
+    run_exp_inter_chiplet(reproduce=True)

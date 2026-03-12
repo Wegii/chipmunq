@@ -13,6 +13,7 @@ from scalability_exps.experiment_statistics import *
 # generate plots only
 reproduce_results = True
 
+
 # Experiments for evaluating runtime of qecc-synth and MECH
 run_runtime_scaling(reproduce=reproduce_results)
 
@@ -30,6 +31,7 @@ run_exp_inter_chiplet(reproduce=reproduce_results)
 
 # How do defective qubits affect the resulting circuit?
 run_exp_defective(reproduce=reproduce_results)
+
 
 # How does the logical error rate of lattice surgery operations change when distributed to multiple chiplets?
 run_exp_distributed_lattice_surgery(reproduce=reproduce_results)

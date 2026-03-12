@@ -479,4 +479,4 @@ def run_exp_statistics(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_exp_statistics()
+    run_exp_statistics(reproduce=True)

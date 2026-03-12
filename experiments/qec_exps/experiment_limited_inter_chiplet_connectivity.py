@@ -291,7 +291,7 @@ def run_exp_distributed_inter_chiplet(reproduce: bool = False) -> None:
     ts = [str(i) for i in num_inter_chiplet_connections]
 
     # Code size of surface code
-    ks = [2, 3]
+    ks = [3]
 
     # Routing methods
     routing_types = ["default"]  # ["cost", "default"]
@@ -424,4 +424,4 @@ def run_exp_distributed_inter_chiplet(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_exp_distributed_inter_chiplet()
+    run_exp_distributed_inter_chiplet(reproduce=True)

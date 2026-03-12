@@ -506,7 +506,6 @@ class BackendChipletV2(BackendV2):
         :return: _description_
         :rtype: dict
         """
-        # TODO: It should be possible to set the noise and amplification during construction of backend
         if noise == None:
             noise = 0.1
         if amplification == None:
@@ -527,7 +526,7 @@ class BackendChipletV2(BackendV2):
                 d[(int(k), int(v))] = min(0.9, amplification * noise)
             elif noise_type == "random":
                 # Sample a random factor in the range [1, 10]
-                random_factor = min(max(1, random.random() * rfactor), rfactor)
+                random_factor = min(max(1, self.rng_generator.random() * rfactor), rfactor)
                 d[(int(k), int(v))] = min(0.9, random_factor * amplification * noise)
                 # print(f"{random_factor} resulting in {d[(int(k), int(v))]}")
 

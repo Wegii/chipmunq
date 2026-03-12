@@ -700,7 +700,7 @@ def perform_noise_aware_routing_sweep(reproduce: bool = False) -> None:
 
 def run_noise_aware_routing(reproduce: bool = False) -> None:
     # Alpha values
-    routing_alpha = [0.5, 1, 2, 3]
+    routing_alpha = [3]
 
     # Noise level
     ps = list(np.logspace(-4, -1, 10))
@@ -715,7 +715,7 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
     rts = ["basic", "cost_inter", "cost_tradeoff"]
 
     # Iterations
-    n_iter = 10
+    n_iter = 4
 
     # Inter chiplet noise variance
     #   - Low variance: [1, 10]*inter_connect_noise
@@ -738,6 +738,7 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
                         # Circuit does not need to be transpiled again
                         print("Found")
                         return transpiled_circuits[(routing_type, inter_noise_factor, seed)]
+
                     n_icc, backend = get_backend(inter_noise_factor=inter_noise_factor, d=distance_scale, seed=seed)
 
                     # Transpile circuit to backend
@@ -766,7 +767,6 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
                     custom_circuit_stim = get_stim_circuits_with_detectors(custom_circuit)[0][0]
                     # Add circuit to dictionary, in order to not transpile this circuit configuration again
                     transpiled_circuits[(routing_type, inter_noise_factor, seed)] = custom_circuit_stim
-                    # transpiled_circuits[(routing_type)] = custom_circuit_stim
 
                     return custom_circuit_stim
 
@@ -806,7 +806,6 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
                     yield from (
                         sinter.Task(
                             circuit=circuit,
-                            # TODO: the naming is incorrect
                             json_metadata={"d": 2 * k + 1, "p": p, "run_name": rt + str(icnm), "iter": iter_seed},
                         )
                         for circuit, k, p, rt, icnm, iter_seed in (
@@ -870,7 +869,7 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
 
 if __name__ == "__main__":
     # Complete routing sweep over hyperparameters
-    perform_noise_aware_routing_sweep()
+    # perform_noise_aware_routing_sweep()
 
     # Routing for specific configurations
-    run_noise_aware_routing()
+    run_noise_aware_routing(reproduce=True)
