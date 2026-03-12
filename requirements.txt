@@ -1,12 +1,9 @@
+hypernetx==1.2.5
+networkx
 qiskit
 qiskit-ibm-runtime
-
 stim
 dill
-hypernetx
-networkx
-numpy
-pandas
 pillow
 seaborn
 kahypar
