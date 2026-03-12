@@ -1,79 +1,18 @@
-> [!WARNING]
-> This code is still under development and features may change without prior warning.
-
-# ecc_mapping
-Mapping QECC to distributed systems
+# Chipmunq
+Chipmunq is a compiler that enables mapping and routing FT circuits onto both monolithic and chiplet-based architectures in a scalable, QEC-patch-preserving, and architecture-aware manner, aligning with the evolving demands of near- and long-term quantum modular hardware architectures.
 
 
-## Tasks
+## Key Features of Chipmunq
+- **The Chipmunq compiler:** The first scalable, hardware-aware mapping and routing [`framework`](qeccm/) that bridges the gap between topological QEC codes and heterogeneous chiplet-based architectures.
+  
+- **Noise-aware heuristics:**  A novel inter-chiplet [`routing strategy`](qeccm/src/router.py) that incorporates link fidelity and congestion awareness, successfully suppressing logical error rates by up to two orders of magnitude in heterogeneous noise environments while maintaining QEC effectiveness below correction thresholds.
+
+- **Scalability benchmarking:** An [`evaluation`](experiments/) demonstrating that Chipmunq delivers 13.5$\times$ speedup on average in compilation time and an average 91.4\% reduction in SWAP overhead compared to LightSABRE.
 
 
-
-## Implementation
-
-
-### Main libraries
-- Circuit representaiton: [qiskit](https://github.com/Qiskit/qiskit)
-- Simulator: [Stim](https://github.com/quantumlib/Stim/tree/main?tab=readme-ov-file)
-- Benchmarks: [eccentric_bench](https://github.com/aswierkowska/eccentric_bench)
-
-Also implemented custom transpiler passes in qiskit (see glue/qiskit)
-It is necessary to build all rust crates in install qiskit locally. See dev/build_rust.sh
+## How do I use Chipmunq?
+See the utilization in [`experiments`](experiments/) and the existing [`compilation functions`](experiments/exp_utils/transpilation_utils.py#L15C5-L15C37).
 
 
-
-## Comparison with other mapping algorithms
-
-### SABRE
-- Publication: https://arxiv.org/abs/2409.08368
-- Utilizes the default (Light-) SABRE algorithm implemented in qiskit
-
-
-### MECH
-- Publication: https://arxiv.org/html/2305.05149v4
-
-
-### QECC-Synth
-- Publication: https://arxiv.org/abs/2308.06428
-- works for given architecture
-- does not work with the coupling graph generated from MECH -> now it works: CG needs to be a np.array
-
-
-### Lattice Surgery Compilation Beyond the Surface Code
-- Pre-print: https://arxiv.org/abs/2504.10591
-- See [implementation](https://github.com/munich-quantum-toolkit/qecc/tree/ls-compilation/scripts/co3)
-
-
-
-
-# Installation
-
-## Dependencies
-The mapping-and-routing is implemented for seamless integration into the transpilation pipeline of qiskit
-
-- qiskit
-
-
-### Constructing circuits and experiments
-For running the experiments the following additional libraries are necessary:
-
-memory experiments:<br>
--[eccentric_bench](https://github.com/aswierkowska/eccentric_bench/): Follow installation instructions in repo
-
-stability: <br>
-- TODO
-
-logical circuit: <br>
-- [Topologiq](https://github.com/jbolns/topologiq): `pip install git+https://github.com/jbolns/topologiq.git`
-- [TQEC](https://github.com/tqec/tqec): `pip install git+https://github.com/tqec/tqec.git`
-
-
-### Mapping
-
-- [KaHyPar](https://github.com/kahypar/kahypar)
-
-- hypernetx (only for visualizing)
-
-- networkx
-
-- Potential replacement for KaHyPar: [Kaminpar](https://github.com/KaHIP/KaMinPar)
+## Installation
+Chipmunq can easily be installed by running the [`install.sh`](install.sh) script.
