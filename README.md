@@ -2,10 +2,12 @@
 <div align="center">Peter Wegmann, Aleksandra Świerkowska, Emmanouil Giortamis, and Pramod Bhatotia
 <br><br></div>
 
-</div> 
+</div>
 <div align="center">
-![arXiv]([https://img.shields.io/badge/arXiv-2301.12345-red?style=flat-square](https://img.shields.io/badge/arXiv-2603.16389-red?style=flat-square))
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18985440.svg)](https://doi.org/10.5281/zenodo.18985440)
+
+[![arXiv](https://img.shields.io/badge/arXiv-2603.16389-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2603.16389)
+[![DOI](https://img.shields.io/badge/DOI-10.5281/zenodo.18985440-blue.svg?style=flat-square)](https://doi.org/10.5281/zenodo.18985440)
+
 </div>
 
 > Chipmunq is a compiler that enables mapping and routing FT circuits onto both monolithic and chiplet-based architectures in a scalable, QEC-patch-preserving, and architecture-aware manner, aligning with the evolving demands of near- and long-term quantum modular hardware architectures.
