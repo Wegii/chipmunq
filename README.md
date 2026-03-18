@@ -1,6 +1,6 @@
 <div align="center">
 
-# Chipmunq 🐿 </br> A Fault-Tolerant Compiler for Chiplet Quantum Architectures
+## Chipmunq 🐿 </br> A Fault-Tolerant Compiler for Chiplet Quantum Architectures
 
 [![arXiv](https://img.shields.io/badge/arXiv-2603.16389-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2603.16389)
 [![DOI](https://img.shields.io/badge/DOI-10.5281/zenodo.18985440-blue.svg?style=flat-square)](https://doi.org/10.5281/zenodo.18985440)
