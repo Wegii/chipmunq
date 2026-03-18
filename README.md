@@ -28,7 +28,7 @@ Chipmunq can easily be installed by running the [`install.sh`](install.sh) scrip
 
 ## Citation
 ```
-@misc{wegmann2026chipmunqfaulttolerantcompilerchiplet,
+@misc{wegmann_2026_chipmunq,
       title={Chipmunq: A Fault-Tolerant Compiler for Chiplet Quantum Architectures }, 
       author={Peter Wegmann and Aleksandra Świerkowska and Emmanouil Giortamis and Pramod Bhatotia},
       year={2026},
