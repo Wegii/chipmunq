@@ -223,6 +223,7 @@ class TrivialMapper(GenericMapper):
 
                     # TODO: Extract the type of patch from either the partition or somewhere
                     rotated_full = False
+                    gross_code = False
                     code_distance = -1
                     if pre_defined_partitions != None:
                         match pre_defined_partitions[partition_id]["type"]:
@@ -233,6 +234,9 @@ class TrivialMapper(GenericMapper):
                                 code_distance = pre_defined_partitions[partition_id]["distance"]
                             case "rotated_surface_code_ancilla":
                                 rotated_full = True
+                                code_distance = pre_defined_partitions[partition_id]["distance"]
+                            case "gross_code":
+                                gross_code = True
                                 code_distance = pre_defined_partitions[partition_id]["distance"]
                     else:
                         # TODO: Calculate partition type from number of nodes
@@ -327,6 +331,49 @@ class TrivialMapper(GenericMapper):
 
                                     col_iter += 1
                                     i = 0
+
+                    if gross_code:
+                        # Logical BB-code grid dimensions (NOT doubled — these are the values
+                        # stored directly in the patch IR, e.g. l=12, m=6 for the Gross code).
+                        l = pre_defined_partitions[partition_id]["width"]
+                        m = pre_defined_partitions[partition_id]["height"]
+                        n_sites = l * m  # == code.N // 2
+
+                        # nodes_of_partition must follow build_circuit's qubit ordering:
+                        #   [0, n_sites)            -> X-check ancillas
+                        #   [n_sites, 2*n_sites)    -> L data
+                        #   [2*n_sites, 3*n_sites)  -> R data
+                        #   [3*n_sites, 4*n_sites)  -> Z-check ancillas
+                        # Verify this matches how your DAGCircuit qubit indices were assigned
+                        # upstream -- reslice here if your ordering differs.
+                        x_check_nodes = nodes_of_partition[0:n_sites]
+                        l_data_nodes  = nodes_of_partition[n_sites:2 * n_sites]
+                        r_data_nodes  = nodes_of_partition[2 * n_sites:3 * n_sites]
+                        z_check_nodes = nodes_of_partition[3 * n_sites:4 * n_sites]
+
+                        def phys(row, col):
+                            return nodes_on_qpu[row * self.backend.m + col]
+
+                        for i in range(l):
+                            for j in range(m):
+                                site = i * m + j
+                                row_base = local_y + 2 * j
+                                col_base = local_x + 2 * i
+
+                                l_idx = phys(row_base,     col_base)
+                                r_idx = phys(row_base,     col_base + 1)
+                                x_idx = phys(row_base + 1, col_base)
+                                z_idx = phys(row_base + 1, col_base + 1)
+
+                                placement[l_data_nodes[site]]  = l_idx
+                                placement[r_data_nodes[site]]  = r_idx
+                                placement[x_check_nodes[site]] = x_idx
+                                placement[z_check_nodes[site]] = z_idx
+
+                                pq_to_partition[l_idx] = pre_defined_partitions[partition_id]
+                                pq_to_partition[r_idx] = pre_defined_partitions[partition_id]
+                                pq_to_partition[x_idx] = pre_defined_partitions[partition_id]
+                                pq_to_partition[z_idx] = pre_defined_partitions[partition_id]
 
         # Save the physical qubit to partition mapping
         self.property_set["pq_to_partition"] = pq_to_partition
@@ -495,6 +542,11 @@ class TrivialMapper(GenericMapper):
                 if pre_defined_partitions != None:
                     pw = pre_defined_partitions[partition_id]["width"]
                     ph = pre_defined_partitions[partition_id]["height"]
+
+                    # The dimensions are quadrupled, since each qubit has 4 roles (X-check, L-data, R-data, Z-check)
+                    if pre_defined_partitions[partition_id]["type"] == "gross_code":
+                        pw *= 2
+                        ph *= 2
                 else:
                     # TODO: Implement this
                     print("Calculating width and height of partition given the number of nodes!")

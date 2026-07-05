@@ -5,7 +5,7 @@ import sys
 
 sys.path.append(os.path.join(os.getcwd(), "."))
 
-from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
+from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated, generate_gross_code
 from experiments.exp_utils.transpilation_utils import *
 from experiments.exp_utils.utils import *
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
@@ -50,7 +50,7 @@ def plot_combined_split(
     ks = list(next(iter(custom_depth.values())).keys())[0]
     np_values = sorted(custom_depth.keys())
 
-    section_titles = ["Small", "Medium", "Big"]
+    section_titles = ["Small", "Medium", "Gross Code"]
 
     # Extract values
     custom_depth_vals = [depth_overall[np][ks] + custom_depth[np][ks] for np in np_values]
@@ -375,7 +375,7 @@ def run_exp_statistics(reproduce: bool = False) -> None:
     # Backend configuration
     num_inter_chiplet_connections = 8
     ps_inter = 1e-4
-    n_patches = [1, 3, 6]
+    n_patches = [6, 1]#[1, 3, 6]
 
     custom_depth = {}
     custom_overhead = {}
@@ -384,8 +384,14 @@ def run_exp_statistics(reproduce: bool = False) -> None:
     depth_overall = {}
     gate_overall = {}
 
+    def num_2q_gates(circuit):
+        ops = circuit.count_ops()
+        two_qubit_gate_names = ["cx", "cz", "swap"]
+        return sum(ops.get(g, 0) for g in two_qubit_gate_names)
+
     if reproduce:
         for ks in [2]:  # [1, 2, 3, 4]
+            # Different number of patches for surface code
             for np in n_patches:
                 if np not in custom_depth:
                     custom_depth[np] = {}
@@ -423,11 +429,6 @@ def run_exp_statistics(reproduce: bool = False) -> None:
                 print("Sabre")
                 sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
 
-                def num_2q_gates(circuit):
-                    ops = circuit.count_ops()
-                    two_qubit_gate_names = ["cx", "cz", "swap"]
-                    return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
                 custom_depth[np][ks] = custom_circuit.depth() - (stim_code_circuit.qc).depth()
                 custom_overhead[np][ks] = num_2q_gates(custom_circuit) - num_2q_gates(stim_code_circuit.qc)
 
@@ -436,6 +437,53 @@ def run_exp_statistics(reproduce: bool = False) -> None:
 
                 depth_overall[np][ks] = (stim_code_circuit.qc).depth()
                 gate_overall[np][ks] = num_2q_gates(stim_code_circuit.qc)
+
+            # Gross Code with 12 logical qubits
+            np = 12
+            custom_depth[np] = {}
+            custom_overhead[np] = {}
+            sabre_depth[np] = {}
+            sabre_overhead[np] = {}
+
+            depth_overall[np] = {}
+            gate_overall[np] = {}
+
+            # Generate circuit
+            circuit, partitions = generate_gross_code(num_qubits = 1)
+
+            backend = BackendChipletV2(
+                # 1 Chiplet with 288 qubits
+                size = (1, 1, 12, 24),                     
+                n_inter = 1, 
+                # Long range connections                               
+                connectivity="torus",
+                # Grid layout
+                topology="grid",
+                long_range_offsets=[(1,0), (2,0), (3,0),
+                                    (0,1), (0,2), (0,3)],
+                num_defective_qubits=0
+            )
+
+            stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
+
+            # Custom transpilation
+            print("Custom")
+            custom_circuit = custom_partitioned_transpilation(
+                stim_code_circuit.qc, backend, pre_defined_partitions=partitions
+            )
+
+            # Sabre transpilation
+            print("Sabre")
+            sabre_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
+
+            custom_depth[np][ks] = custom_circuit.depth() - (stim_code_circuit.qc).depth()
+            custom_overhead[np][ks] = num_2q_gates(custom_circuit) - num_2q_gates(stim_code_circuit.qc)
+
+            sabre_depth[np][ks] = sabre_circuit.depth() - (stim_code_circuit.qc).depth()
+            sabre_overhead[np][ks] = num_2q_gates(sabre_circuit) - num_2q_gates(stim_code_circuit.qc)
+
+            depth_overall[np][ks] = (stim_code_circuit.qc).depth()
+            gate_overall[np][ks] = num_2q_gates(stim_code_circuit.qc)
 
         # Save data
         output_dir = Path("experiments/evaluation/scalability")
@@ -476,6 +524,12 @@ def run_exp_statistics(reproduce: bool = False) -> None:
         gate_overall,
         "experiments/evaluation/scalability/cnot_scaling_overhead_split",
     )
+
+    # TODO: Add MECH and QECC synth 
+
+    # For gross code qecc synth times out.
+
+
 
 
 if __name__ == "__main__":

@@ -98,7 +98,9 @@ def plot_combined_backends(
 
     labels = ["center", "size-aware"]
 
-    # Depth Overhead
+    WIDTH_FIGSIZE = 6
+    HEIGHT_FIGSIZE = 2.2
+
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
 
     for i, mode in enumerate(placement_modes):

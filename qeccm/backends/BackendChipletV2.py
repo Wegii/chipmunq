@@ -40,6 +40,7 @@ class BackendChipletV2(BackendV2):
         n_inter,
         connectivity: str = "nn",
         topology: str = "grid",
+        long_range_offsets: list[tuple[int, int]] | None = None,
         inter_chiplet_noise: float = None,
         inter_chiplet_amplification: float = None,
         inter_chiplet_noise_type: str = "",
@@ -79,6 +80,9 @@ class BackendChipletV2(BackendV2):
         # - idea: https://patentimages.storage.googleapis.com/d7/d8/83/51fb5619877a47/US20250181953A1-20250605-D00004.png
         # self.chiplet_topology = "line"
         self.chiplet_topology = "grid"
+
+        # Used when connectivity == "torus"
+        self.long_range_offsets = long_range_offsets or [(1, 2), (-1, -2)]
 
         # Type of remote gate connecting chiplets
         self.remote_gate_type = "ecr"
@@ -181,40 +185,31 @@ class BackendChipletV2(BackendV2):
                     G.update_edge_by_index(edge_index, LABEL_ON_CHIP)
 
             if self.connectivity == "torus":
-                # Generate torus layout
                 G = rustworkx.generators.grid_graph(self.n, self.m, multigraph=False)
 
                 def idx(r, c):
                     return (r % self.n) * self.m + (c % self.m)
 
-                # Vertical modulo wrap
+                # Nearest neighbour connections
                 for c in range(self.m):
-                    top_node = idx(0, c)
-                    bottom_node = idx(self.n - 1, c)
+                    top_node, bottom_node = idx(0, c), idx(self.n - 1, c)
                     if not G.has_edge(bottom_node, top_node):
                         G.add_edge(bottom_node, top_node, None)
 
-                # Horizontal modulo wrap
                 for r in range(self.n):
-                    left_node = idx(r, 0)
-                    right_node = idx(r, self.m - 1)
+                    left_node, right_node = idx(r, 0), idx(r, self.m - 1)
                     if not G.has_edge(right_node, left_node):
                         G.add_edge(right_node, left_node, None)
 
-                # Long-range connections "inside" the chip
+                # Create long range connections
                 for r in range(self.n):
                     for c in range(self.m):
                         node = idx(r, c)
-
-                        # Two remote neighbors (with wrap-around)
-                        remote_neighbors = [
-                            idx(r + 1, c + 2),  # offset: +1 row, +2 columns
-                            idx(r - 1, c - 2),  # offset: -1 row, -2 columns
-                        ]
-
-                        for nb in remote_neighbors:
+                        for dr, dc in self.long_range_offsets:
+                            nb = idx(r + dr, c + dc)
                             if nb != node and not G.has_edge(node, nb):
                                 G.add_edge(node, nb, None)
+
         elif self.topology == "rotated_grid":
             if self.connectivity == "nn":
                 # Reference: https://blog.google/technology/research/google-willow-quantum-chip/

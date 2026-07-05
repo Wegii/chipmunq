@@ -50,9 +50,8 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
 
     plt.rcParams.update(tex_fonts)
 
-    # fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE*1.2, HEIGHT_FIGSIZE*1.7))
     fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
+    #fig, ax = plt.subplots(figsize=((HEIGHT_FIGSIZE * 2.5)*2, (WIDTH_FIGSIZE * 0.5)))
 
     colors_custom = ["#8FB7E1", "#5E97CC", "#3B6FA8", "#2D5682"]
     colors_sabre = ["#E38E8A", "#C85E59", "#9F3B36", "#6D2926"]
@@ -350,6 +349,7 @@ def run_single_run():
 
 
 if __name__ == "__main__":
-    run_exp_scalability(reproduce=True)
+    #run_exp_scalability(reproduce=True)
+    run_exp_scalability(reproduce=False)
 
     # run_single_run()
