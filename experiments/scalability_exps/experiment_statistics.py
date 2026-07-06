@@ -161,7 +161,7 @@ def plot_combined_split(
             timeout_bar.set_linewidth(2)
             timeout_bar.set_path_effects([])
             timeout_bar.set_edgecolor("#B2D8B2")
-    ax_bottom.text(x[-1] + width + 0.12, 4000, "T/O", ha="center", va="bottom", color="red", fontweight="bold", fontsize=10)
+    ax_bottom.text(x[-1] + width + 0.12, 2000, "T/O", ha="center", va="bottom", color="red", fontweight="bold", fontsize=10)
     ax_bottom.text(x[-2] + width+0.12, 8000, "T/O", ha="center", va="bottom", color="red", fontweight="bold", fontsize=10)
 
     print(mech_depth_vals)
@@ -169,7 +169,7 @@ def plot_combined_split(
     ax_bottom.set_ylim(0, 14000)
     ax_bottom.set_xticks(x)
     ax_bottom.set_xticklabels(section_titles)
-    ax_bottom.set_xlabel("Circuit size")
+    ax_bottom.set_xlabel("Circuit type")
     ax_bottom.tick_params(axis="y", length=5)
 
     ax_bottom.spines["top"].set_visible(False)
@@ -191,7 +191,7 @@ def plot_combined_split(
 
     ax_top.text(-0.18, 1.15, "b) Compilation overhead on circuit depth", transform=ax_top.transAxes, fontweight="bold")
    
-    ax_top.text(0.28, 1.4, "Lower is better ↓", transform=ax_top.transAxes, fontweight="bold", color=plot_lib_color)
+    ax_top.text(0.25, 1.4, "Lower is better ↓", transform=ax_top.transAxes, fontweight="bold", color=plot_lib_color)
 
     """
     # Arrows/labels all target values under 14000, so they live on ax_bottom
@@ -273,7 +273,7 @@ def plot_combined_split(
         x + 0.5 * width, sabre_over_vals, width, label="LightSABRE", color=pastel_orange, hatch="o", edgecolor="black"
     )
     bars_mech_top = ax_top.bar(
-        x + 1.5 * width, mech_over_vals, width, label="MECH", color=pastel_green, hatch="\\", edgecolor="black"
+        x + 1.5 * width, mech_over_vals, width, label="MECH", color=pastel_green, hatch="//", edgecolor="black"
     )
     
     print(mech_over_vals)
@@ -297,7 +297,7 @@ def plot_combined_split(
         x + 0.5 * width, sabre_over_vals, width, label="LightSABRE", color=pastel_orange, hatch="o", edgecolor="black"
     )
     bars_gates_mech = ax_bottom.bar(
-        x + 1.5 * width, mech_over_vals, width, label="MECH", color=pastel_green, hatch="\\", edgecolor="black"
+        x + 1.5 * width, mech_over_vals, width, label="MECH", color=pastel_green, hatch="//", edgecolor="black"
     )
     tb = [bars_gates_mech[-1], bars_gates_mech[-2]]
     for timeout_bar in tb:
@@ -396,7 +396,7 @@ def plot_combined_split(
     """
 
     fig.text(0.025, 0.5, "#2q gates", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
-    fig.text(0.46, 0.055, "Circuit size", va="center", rotation="horizontal", fontsize=FONTSIZE * 1.5)
+    fig.text(0.46, 0.055, "Circuit type", va="center", rotation="horizontal", fontsize=FONTSIZE * 1.5)
     ax_top.text(
         0.24,
         1.6,
