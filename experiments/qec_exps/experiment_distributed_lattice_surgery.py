@@ -357,5 +357,4 @@ def run_exp_distributed_lattice_surgery(reproduce: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    #run_exp_distributed_lattice_surgery(reproduce=True)
-    run_exp_distributed_lattice_surgery(reproduce=False)
+    run_exp_distributed_lattice_surgery(reproduce=True)

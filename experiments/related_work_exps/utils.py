@@ -327,6 +327,7 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
     result_mech = {
         "initial_2q_gates": initial_2q_gates,
         "depth": router.circuit.depth,
+        "depth_overhead": router.circuit.depth - initial_circuit.depth(),
         "2q_gates_overhead": (on_chip_gate_num + cross_chip_gate_num) - initial_2q_gates,
         "eff_gate_num": eff_gate_num,
         "on-chip": on_chip_gate_num,

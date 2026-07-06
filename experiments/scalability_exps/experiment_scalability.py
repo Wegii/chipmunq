@@ -166,7 +166,7 @@ def run_exp_scalability(reproduce: bool = False) -> None:
     sabre_time_storage = {}
 
     # Number of logical CNOTs constructed using lattice surgery
-    n_patches = [1, 2, 4, 6, 8]
+    n_patches = [1, 2, 4, 6, 8, 16]
 
     # Code distance of surface code
     code_distance = [1, 2, 3, 7]
@@ -349,7 +349,7 @@ def run_single_run():
 
 
 if __name__ == "__main__":
-    #run_exp_scalability(reproduce=True)
-    run_exp_scalability(reproduce=False)
+    run_exp_scalability(reproduce=True)
+    #run_exp_scalability(reproduce=False)
 
     # run_single_run()
