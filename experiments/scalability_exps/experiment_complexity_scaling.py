@@ -196,9 +196,9 @@ def plot_runtime_scaling(custom_time_storage, lq: bool = False, filename: str = 
         # Font sizes
         "axes.labelsize": FONTSIZE * 1.5,
         "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.5,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.5,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.5,
+        "legend.fontsize": (FONTSIZE - 2) * 1.1,
+        "xtick.labelsize": (FONTSIZE - 1) * 1.1,
+        "ytick.labelsize": (FONTSIZE - 1) * 1.1,
         "axes.titlesize": 10,
         # Line and marker styles
         "lines.linewidth": 2,
@@ -210,7 +210,7 @@ def plot_runtime_scaling(custom_time_storage, lq: bool = False, filename: str = 
     }
     plt.rcParams.update(tex_fonts)
     #fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    fig, ax = plt.subplots(figsize=((HEIGHT_FIGSIZE * 2.5)*0.6, (HEIGHT_FIGSIZE * 2.5)*0.6))
+    fig, ax = plt.subplots(figsize=((HEIGHT_FIGSIZE * 2.5)*0.6, (HEIGHT_FIGSIZE * 2)*0.6))
 
     colors_custom = []
     colors_custom = ["#AEC6CF", "#77DD77", "#FFB347",]
@@ -241,8 +241,8 @@ def plot_runtime_scaling(custom_time_storage, lq: bool = False, filename: str = 
         plt.ylim(0, 30)
 
     ax.text(
-        0.1,
-        1.1,
+        0.15,
+        1.14,
         "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
@@ -251,11 +251,11 @@ def plot_runtime_scaling(custom_time_storage, lq: bool = False, filename: str = 
 
     legend = plt.legend(handles=handles, loc="upper left", frameon=True, ncols=1, columnspacing=1.5)
 
-    plt.tick_params(axis="both", labelsize=14)
+    plt.tick_params(axis="both")
     plt.ylabel("Runtime [s]", fontsize=FONTSIZE * 1.5)
 
     plt.grid(axis="y", which="major", linestyle="--", alpha=0.5)
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.88, bottom=0.19)
+    fig.subplots_adjust(left=0.24, right=0.95, top=0.85, bottom=0.22)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
