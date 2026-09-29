@@ -107,7 +107,7 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     #    fontweight="bold"
     # )
 
-    plt.ylim(0.05, 10e2)
+    plt.ylim(0.05, 1e4)
 
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.tick_params(axis="both", labelsize=14)
@@ -349,7 +349,7 @@ def run_single_run():
 
 
 if __name__ == "__main__":
-    run_exp_scalability(reproduce=True)
+    run_exp_scalability(reproduce=False)
     #run_exp_scalability(reproduce=False)
 
     # run_single_run()

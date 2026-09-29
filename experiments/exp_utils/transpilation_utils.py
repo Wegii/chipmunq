@@ -41,7 +41,7 @@ from qiskit.transpiler import CouplingMap, Target  # noqa: E402
 
 # Wall-clock limit per (method, distance). Matches the 1e3 s placeholder that the
 # runtime plot already uses for QECC-Synth timeouts.
-TIMEOUT_S = 1000.0
+TIMEOUT_S = 100.0
 
 # R-SMT* (the exact MILP placement) builds pairs x n_phys^2 variables and does not fit in
 # memory for surface-code circuits beyond the smallest distance. GreedyE* is the scalable

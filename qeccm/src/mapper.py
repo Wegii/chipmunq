@@ -224,6 +224,7 @@ class TrivialMapper(GenericMapper):
                     # TODO: Extract the type of patch from either the partition or somewhere
                     rotated_full = False
                     gross_code = False
+                    grid = False
                     code_distance = -1
                     if pre_defined_partitions != None:
                         match pre_defined_partitions[partition_id]["type"]:
@@ -238,6 +239,12 @@ class TrivialMapper(GenericMapper):
                             case "gross_code":
                                 gross_code = True
                                 code_distance = pre_defined_partitions[partition_id]["distance"]
+                            case "grid":
+                                # Generic block of qubits (e.g. a QLDPC-surgery bridge), placed row-major
+                                # into its width x height rectangle
+                                grid = True
+                            case other:
+                                raise ValueError(f"Unknown partition type '{other}'")
                     else:
                         # TODO: Calculate partition type from number of nodes
                         # TODO: Calculate code distance from number of nodes
@@ -332,6 +339,17 @@ class TrivialMapper(GenericMapper):
                                     col_iter += 1
                                     i = 0
 
+                    if grid:
+                        if len(nodes_of_partition) > patch_width * patch_height:
+                            raise ValueError(f"Partition {partition_id} has {len(nodes_of_partition)} qubits, "
+                                             f"more than its {patch_width}x{patch_height} rectangle")
+                        for k, node in enumerate(nodes_of_partition):
+                            row = local_y + k // patch_width
+                            col = local_x + k % patch_width
+                            p_index = nodes_on_qpu[row * self.backend.m + col]
+                            placement[node] = p_index
+                            pq_to_partition[p_index] = pre_defined_partitions[partition_id]
+
                     if gross_code:
                         # Logical BB-code grid dimensions (NOT doubled — these are the values
                         # stored directly in the patch IR, e.g. l=12, m=6 for the Gross code).
@@ -411,6 +429,35 @@ class TrivialMapper(GenericMapper):
         )
 
         return placement, blocks
+
+    @staticmethod
+    def _place_on_nearest_qpu(
+        qpu_blocks: dict, partition_id: int, pw: int, ph: int, origin: tuple, direction: str | None
+    ) -> tuple:
+        """Place a partition on the free QPU closest (Manhattan distance) to ``origin``.
+
+        Ties are broken in favour of the intended direction ("right": larger x, "below": larger y),
+        then row-major. The origin QPU itself is tried first, anywhere on the chiplet.
+
+        :return: ((x, y) of the QPU, absolute position) or (origin, None) if no QPU has space
+        """
+        ox, oy = origin
+
+        def key(q):
+            x, y = q
+            if direction == "right":
+                pref = 0 if x > ox else 1
+            elif direction == "below":
+                pref = 0 if y > oy else 1
+            else:
+                pref = 0
+            return (abs(x - ox) + abs(y - oy), pref, y, x)
+
+        for q in sorted(qpu_blocks, key=key):
+            pos = qpu_blocks[q].place_partition(partition_id, pw, ph)
+            if pos is not None:
+                return q, pos
+        return origin, None
 
     def placement_aware_assignment(
         self, partitioned_hg: PartitionedHyperGraph, dag: DAGCircuit, width: int, height: int
@@ -523,6 +570,9 @@ class TrivialMapper(GenericMapper):
         }
 
         placement = {}
+        # QPU (chiplet) each partition was placed on. Relative placement must look up the anchor on
+        # *its* QPU; the old code assumed the anchor is always on the current QPU.
+        partition_qpu = {}
         pre_defined_partitions = self.property_set["pre_defined_partitions"]
 
         # Place the first partition at the "top left" (depending on the chiplet layout) chiplet
@@ -551,6 +601,7 @@ class TrivialMapper(GenericMapper):
                     # TODO: Implement this
                     print("Calculating width and height of partition given the number of nodes!")
 
+                pos = None
                 if li == 0:
                     # Place partition
                     # There are different options to place new partitions to the chiplet. This also heavily depends on
@@ -559,34 +610,44 @@ class TrivialMapper(GenericMapper):
                     # top to the bottom. The option implemented iterates from the top left to the bottom left
 
                     # Find placement for the first partition in this bfs
-                    while True:
+                    while 0 <= current_x < width and 0 <= current_y < height:
                         pos = qpu_blocks[(current_x, current_y)].place_partition(partition_id, pw, ph)
 
                         if pos != None:
                             print(f"Placed partition on QPU {current_x}{current_y}")
-                            placement[partition_id] = pos
                             break
 
                         current_y += 1
                         if current_y == height:
                             current_x += 1
                             current_y = 0
-                        if current_x == width:
-                            break
+
+                    if pos is None:
+                        # Walked off the chiplet grid: use the free QPU closest to the start of the walk
+                        origin = (min(max(current_x, 0), width - 1), min(max(current_y, 0), height - 1))
+                        (current_x, current_y), pos = self._place_on_nearest_qpu(
+                            qpu_blocks, partition_id, pw, ph, origin, None
+                        )
                 else:
+                    anchor_id = partition_bfs[li - 1]
+                    # Continue from the QPU the anchor actually sits on. Identical to the old behaviour whenever
+                    # the old code succeeded (it required the anchor to be on the current QPU).
+                    current_x, current_y = partition_qpu[anchor_id]
+
                     # Partition which the current partition should be placed relative to
-                    partition_anchor = partitions[partition_bfs[li - 1]]
+                    partition_anchor = partitions[anchor_id]
                     # Partition that we want to place
                     partition_current = partitions[partition_id]
 
                     if min(partition_current) < max(partition_anchor):
                         # Place at the bottom
-                        print(f"Place {partition_id} below {partition_bfs[li - 1]}")
+                        direction = "below"
+                        print(f"Place {partition_id} below {anchor_id}")
 
                         # Note that above and below is flipped in the QPUBlock, as the QPUBlock starts from top left,
                         # while the backend starts from the bottom left.
                         pos = qpu_blocks[(current_x, current_y)].place_relative(
-                            partition_id, pw, ph, partition_bfs[li - 1], "above"
+                            partition_id, pw, ph, anchor_id, "above"
                         )
                         print(pos)
                         if pos == None:
@@ -602,17 +663,15 @@ class TrivialMapper(GenericMapper):
                                 if pos != None:
                                     current_x = new_x
                                     break
-
-                        print(f"Placed partition {partition_id} on QPU {current_x}{current_y}")
-                        placement[partition_id] = pos
                     else:
                         # place to the right
-                        print(f"Place {partition_id} to the right of {partition_bfs[li - 1]}")
+                        direction = "right"
+                        print(f"Place {partition_id} to the right of {anchor_id}")
 
                         # If it is not possible to place the partition to the right on this QPU, select the next QPU
                         # to the right of the current selected one
                         pos = qpu_blocks[(current_x, current_y)].place_relative(
-                            partition_id, pw, ph, partition_bfs[li - 1], "right"
+                            partition_id, pw, ph, anchor_id, "right"
                         )
 
                         if pos == None:
@@ -629,23 +688,35 @@ class TrivialMapper(GenericMapper):
                                     current_y = new_y
                                     break
 
-                            ## Update index of utilized QPU
-                            # current_x += 1
+                    if pos is None:
+                        # The directional search only walks right/down and fails at the edge of the chiplet grid.
+                        # Fall back to the free QPU closest to the anchor (preferring the intended direction).
+                        print(f"Directional placement of {partition_id} failed, searching nearest free QPU")
+                        (current_x, current_y), pos = self._place_on_nearest_qpu(
+                            qpu_blocks, partition_id, pw, ph, partition_qpu[anchor_id], direction
+                        )
 
-                        print(f"Placed partition {partition_id} on QPU {current_x}{current_y}")
-                        placement[partition_id] = pos
+                if pos is None:
+                    raise RuntimeError(
+                        f"Could not place partition {partition_id} ({pw}x{ph}) on any of the {width}x{height} "
+                        f"chiplets of size {self.backend.m}x{self.backend.n}: the backend is too small."
+                    )
+
+                print(f"Placed partition {partition_id} on QPU {current_x}{current_y}")
+                placement[partition_id] = pos
+                partition_qpu[partition_id] = (current_x, current_y)
 
             print("\n\n")
             print("placing new bfs")
             # Try to place the partition below the last bfs_partition
             current_y += 1
 
-            if current_y == height:
+            if current_y >= height:
                 # If this is not possible, place at the top of the chiplet layout
                 current_y = 0
                 current_x += 1
             else:
                 # If it is possible to place the partition below, place it to the left
-                current_x -= 1
+                current_x = max(current_x - 1, 0)
 
         return placement, qpu_blocks

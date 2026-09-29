@@ -1,4 +1,5 @@
 """
+qlsq2.py -- A Qiskit implementation of OLSQ2, the Optimal Layout and Scheduling for Quantum Circuits.
 Qiskit wrapper around OLSQ2 (https://github.com/WanHsuanLin/OLSQ2).
 
     routed = olsq2_transpilation(circuit, backend)
@@ -9,7 +10,7 @@ a qiskit.transpiler.CouplingMap, or a plain edge list [(0, 1), (1, 2), ...].
 Setup:
     git clone https://github.com/WanHsuanLin/OLSQ2.git
     pip install z3-solver python-sat qiskit
-    export PYTHONPATH=$PYTHONPATH:/path/to/OLSQ2      # so that `import olsq` works
+    export PYTHONPATH=$PYTHONPATH:/home/peter/repos/qecc_mapping/external/baseline/qls/OLSQ2      # so that `import olsq` works
 """
 
 from __future__ import annotations
