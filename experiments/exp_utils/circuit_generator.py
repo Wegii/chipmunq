@@ -7,7 +7,6 @@ import logging
 import random
 from itertools import product
 import numpy as np
-import pyzx as zx
 import qiskit
 from functools import reduce
 from scipy.sparse import identity, hstack, kron, csr_matrix
@@ -15,8 +14,6 @@ from collections import deque
 
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 
-
-zx.settings.colors = zx.rgb_colors
 
 # Plotting
 import stim
