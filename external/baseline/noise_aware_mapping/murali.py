@@ -285,6 +285,7 @@ def noise_adaptive_transpilation(
     solver: str = "milp",            # R-SMT* backend: "milp" (HiGHS, fast) or "z3" (as in paper)
     time_limit: float = None,        # R-SMT*: seconds; returns best placement found so far
     verbose: bool = False,
+    initial_layout=None,             # optional fixed placement: list/dict program qubit -> physical qubit
 ) -> QuantumCircuit:
     """Place and route `circuit` on `backend` following Murali et al. (ASPLOS'19).
 
@@ -292,6 +293,9 @@ def noise_adaptive_transpilation(
              (then pass cx_errors / readout_errors, else uniform defaults are used).
     Returns a QuantumCircuit on physical qubits with explicit SwapGates. The mapping is static,
     so initial == final layout; it's stored in circuit.metadata['noise_adaptive_layout'].
+
+    initial_layout: skip placement (R-SMT*/GreedyE*) and only perform the noise-adaptive
+    routing from this placement. Used to compare routers from an identical mapping.
     """
     if method not in ("rsmt", "greedy_e"):
         raise ValueError("method must be 'rsmt' or 'greedy_e'")
@@ -319,7 +323,11 @@ def noise_adaptive_transpilation(
     pair_cost = np.minimum(cost, cost.T)  # either operand may be the one that moves
     ro_cost = [-math.log(max(1 - e, _MIN_REL)) for e in ro_err]
 
-    if method == "rsmt":
+    if initial_layout is not None:
+        layout = [int(initial_layout[i]) for i in range(n_prog)]
+        if len(set(layout)) != n_prog or not all(0 <= p < n_phys for p in layout):
+            raise ValueError("initial_layout must map every program qubit to a distinct physical qubit")
+    elif method == "rsmt":
         layout = _rsmt_placement(n_prog, n_phys, pair_counts, ro_weight, pair_cost, ro_cost,
                                  omega, solver, time_limit, verbose)
     else:

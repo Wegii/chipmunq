@@ -1,4 +1,3 @@
-
 """OLSQ2, SEQC and Murali et al. baselines for the related-work experiments.
 
 Shared by run_statistics and run_runtime_scaling so that both use the same backend
@@ -39,9 +38,13 @@ from qiskit.circuit import Parameter  # noqa: E402
 from qiskit.circuit.library import SwapGate, get_standard_gate_name_mapping  # noqa: E402
 from qiskit.transpiler import CouplingMap, Target  # noqa: E402
 
-# Wall-clock limit per (method, distance). Matches the 1e3 s placeholder that the
-# runtime plot already uses for QECC-Synth timeouts.
-TIMEOUT_S = 100.0
+# Wall-clock limit per (method, distance) for *every* method: a run that takes longer is killed and
+# marked TIMEOUT. Timed-out bars in the runtime plots are drawn at this height.
+TIMEOUT_S = 1000.0
+
+# Time a child process may spend starting up (spawn, imports, unpickling the arguments) before the
+# transpilation clock starts. Not counted towards TIMEOUT_S.
+STARTUP_TIMEOUT_S = 600.0
 
 # R-SMT* (the exact MILP placement) builds pairs x n_phys^2 variables and does not fit in
 # memory for surface-code circuits beyond the smallest distance. GreedyE* is the scalable
@@ -304,6 +307,10 @@ def transpile_circuit_SEQC(circuit: QuantumCircuit, coupling_map, chiplets=None)
 
 
 def transpile_circuit_Murali(circuit: QuantumCircuit, coupling_map) -> QuantumCircuit:
+    """``coupling_map`` may be a full backend (noise-adaptive: it sees the inter-chiplet error rates) or a
+    CouplingMap / edge list (noise-unaware fallback)."""
+    if hasattr(coupling_map, "coupling_map"):  # a backend: pass it through unchanged
+        return noise_adaptive_transpilation(circuit, coupling_map, method=MURALI_METHOD)
     return noise_adaptive_transpilation(circuit, as_coupling_map(coupling_map), method=MURALI_METHOD)
 
 
@@ -320,6 +327,12 @@ EXTRA_METHODS = {
 
 
 def _worker(q, fn, args, kwargs):
+    # Own process group, so a timeout also kills solver subprocesses started by ``fn``
+    try:
+        os.setsid()
+    except (AttributeError, OSError):
+        pass
+    q.put(("started", None, 0.0))  # imports and argument unpickling are done: start the clock
     start = time.perf_counter()
     try:
         result = fn(*args, **kwargs)
@@ -332,37 +345,74 @@ TIMEOUT = "T/O"  # stored instead of a result when a run hits TIMEOUT_S
 FAILED = "fail"  # stored when a run raised an exception
 
 
+def _kill(p) -> None:
+    """Kill the child and everything it started."""
+    import signal
+
+    if p.is_alive():
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except (AttributeError, OSError, ProcessLookupError):
+            p.kill()
+    p.join(10)
+
+
+def _wait(q, p, limit):
+    """Next message from the child, or None if ``limit`` seconds pass / the child dies silently."""
+    deadline = time.perf_counter() + limit
+    while True:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return None
+        try:
+            return q.get(timeout=min(1.0, remaining))
+        except queue.Empty:
+            if not p.is_alive():  # crashed (e.g. segfault / OOM kill) without reporting
+                try:
+                    return q.get(timeout=1.0)
+                except queue.Empty:
+                    return ("error", f"child process died (exit code {p.exitcode})", 0.0)
+
+
 def run_with_timeout(fn, *args, timeout: float | None = None, **kwargs):
-    """Run ``fn(*args, **kwargs)`` in a fresh process, killing it after ``timeout`` seconds
-    (default ``TIMEOUT_S``).
+    """Run ``fn(*args, **kwargs)`` in a fresh process and kill it if it runs longer than ``timeout``
+    seconds (default ``TIMEOUT_S``).
 
     Returns ``(result, runtime_s, status)`` with status ``"ok"``, ``TIMEOUT`` or ``FAILED``
-    (``result`` is ``None`` unless ok; a failure's traceback is printed). The runtime is
-    measured inside the child around the call only, so process start-up is not counted.
+    (``result`` is ``None`` unless ok; a failure's traceback is printed). The clock starts once the
+    child has finished starting up (spawn, imports, argument unpickling), so the limit and the
+    reported runtime cover only the call itself; a timed-out run reports exactly ``timeout``.
+    The child runs in its own process group, which is killed as a whole on timeout.
 
-    The child is spawned, not forked: once the parent has run Qiskit's SABRE (LightSABRE is
-    timed in-process), its Rust thread pool deadlocks a forked child in SabreLayout, which
-    OLSQ2 (for its SWAP upper bound) and SEQC both call. ``fn`` must therefore be a
-    module-level function and the arguments picklable.
+    The child is spawned, not forked: once the parent has run Qiskit's SABRE, its Rust thread pool
+    deadlocks a forked child in SabreLayout, which OLSQ2 (for its SWAP upper bound) and SEQC both
+    call. ``fn`` must therefore be a module-level function and the arguments picklable.
     """
     timeout = TIMEOUT_S if timeout is None else timeout
     ctx = mp.get_context("spawn")
     q = ctx.Queue()
-    p = ctx.Process(target=_worker, args=(q, fn, args, kwargs))
+    p = ctx.Process(target=_worker, args=(q, fn, args, kwargs), daemon=True)
     p.start()
     name = getattr(fn, "__name__", str(fn))
     try:
-        status, payload, runtime = q.get(timeout=timeout)
-    except queue.Empty:
-        p.terminate()
-        p.join()
-        print(f"[{name}] timed out after {timeout:.0f} s")
-        return None, timeout, TIMEOUT
-    p.join()
-    if status == "error":
-        print(f"[{name}] failed:\n{payload}")
-        return None, runtime, FAILED
-    return payload, runtime, "ok"
+        msg = _wait(q, p, STARTUP_TIMEOUT_S)
+        if msg is None:
+            print(f"[{name}] failed: process did not start within {STARTUP_TIMEOUT_S:.0f} s")
+            return None, 0.0, FAILED
+        if msg[0] == "error":  # died before (or while) reporting start-up
+            print(f"[{name}] failed:\n{msg[1]}")
+            return None, msg[2], FAILED
+        msg = _wait(q, p, timeout)
+        if msg is None:
+            print(f"[{name}] killed after {timeout:.0f} s (timeout)")
+            return None, timeout, TIMEOUT
+        status, payload, runtime = msg
+        if status == "error":
+            print(f"[{name}] failed:\n{payload}")
+            return None, runtime, FAILED
+        return payload, runtime, "ok"
+    finally:
+        _kill(p)
 
 
 # --------------------------------------------------------------------------------------

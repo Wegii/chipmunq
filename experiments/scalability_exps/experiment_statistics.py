@@ -6,8 +6,13 @@ import multiprocessing as mp
 import os
 import pickle
 import queue
+import shutil
 import sys
+import tempfile
 import time
+import traceback
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
 sys.path.append(os.path.join(os.getcwd(), "."))
@@ -21,6 +26,7 @@ from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from experiments.exp_utils.ghz_circuit_generator import get_tqec_ghz
 from experiments.exp_utils.bv_circuit_generator import get_tqec_bv
 from experiments.exp_utils.gross_bridge_circuit_generator import get_gross_bridge
+from experiments.exp_utils.bv_color_code_circuit_generator import get_color_code_bv, chiplet_long_range_offsets
 
 # MECH
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
@@ -38,6 +44,21 @@ from experiments.related_work_exps.utils import calc_circuit_mech_stats, generat
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/QECC_Synth/SurfStitch/MyCode/src"))
 from external.baseline.QECC_Synth.SurfStitch.MyCode.src.transpile_qeccsynth import transpile_circuit_QECCSynth
 
+# OLSQ2, SEQC, Murali et al.: same entry points as the related-work comparison. Every method (incl.
+# Chipmunq, LightSABRE and MECH) runs in its own process group under the same wall-clock limit.
+from experiments.exp_utils.transpilation_utils import (
+    EXTRA_METHODS,
+    FAILED,
+    METHOD_STYLES,
+    STARTUP_TIMEOUT_S,
+    TIMEOUT,
+    TIMEOUT_S,
+    _kill,
+    custom_partitioned_transpilation,
+    run_with_timeout,
+    sabre_transpilation,
+)
+
 # The `from ... import *` lines above pull numpy's sum/any/all/min/max/... into this module and shadow the
 # Python builtins (np.any(generator) is always True, np.sum(generator) is deprecated). Restore the builtins.
 from builtins import abs, all, any, max, min, round, sum
@@ -47,6 +68,78 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def _make_tqec_database_process_safe() -> None:
+    """tqec caches detectors in ONE pickle shared by all processes (~/.local/share/TQEC/detector_database.pkl
+    or $TQEC_DETECTOR_DATABASE_PATH) and rewrites it in place. With parallel generation jobs, one worker reads
+    the file while another is writing it ("pickle data was truncated"), tqec then moves the "faulty" file away
+    and the next worker's rename fails. Patch its reader/writer so that
+
+      * writes go to a temp file that atomically replaces the database, so readers see the old or new file,
+        never half a file;
+      * writers hold an exclusive file lock and first merge entries other workers saved in the meantime, so
+        no worker throws away another one's detectors (it is only a cache, so losing entries would just
+        cost recomputation, not correctness);
+      * a read that races with tqec's own "move faulty database" returns an empty database, not a crash.
+
+    Runs at import, so every spawned worker (which re-imports this module) is patched too.
+    """
+    try:
+        from tqec.compile.detectors.database import DetectorDatabase
+    except Exception:
+        return
+    if getattr(DetectorDatabase, "_chipmunq_process_safe", False):
+        return
+    try:
+        import fcntl
+    except ImportError:  # Windows: atomic replace still prevents truncated reads
+        fcntl = None
+
+    def atomic_writer(original, merge: bool):
+        def write(filepath, database):
+            filepath = Path(filepath)
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            with open(filepath.with_name(filepath.name + ".lock"), "a") as lock:
+                if fcntl:
+                    fcntl.flock(lock, fcntl.LOCK_EX)
+                if merge and filepath.exists():
+                    try:
+                        with open(filepath, "rb") as f:
+                            other = pickle.load(f)
+                        mine, theirs = getattr(database, "mapping", None), getattr(other, "mapping", None)
+                        if (isinstance(mine, dict) and isinstance(theirs, dict)
+                                and getattr(other, "version", None) == getattr(database, "version", None)):
+                            for k, v in theirs.items():
+                                mine.setdefault(k, v)
+                    except Exception:
+                        pass  # unreadable old file: just overwrite it
+                fd, tmp = tempfile.mkstemp(dir=filepath.parent, prefix=filepath.name + ".", suffix=".tmp")
+                os.close(fd)
+                try:
+                    original(Path(tmp), database)
+                    os.replace(tmp, filepath)
+                finally:
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
+        return write
+
+    def tolerant_reader(original):
+        def read(filepath):
+            try:
+                return original(filepath)
+            except FileNotFoundError:  # another worker moved/replaced the file while we read it
+                return DetectorDatabase()
+        return read
+
+    for fmt, writer in list(DetectorDatabase._WRITERS.items()):
+        DetectorDatabase._WRITERS[fmt] = atomic_writer(writer, merge=(fmt == "pickle"))
+    for fmt, reader in list(DetectorDatabase._READERS.items()):
+        DetectorDatabase._READERS[fmt] = tolerant_reader(reader)
+    DetectorDatabase._chipmunq_process_safe = True
+
+
+_make_tqec_database_process_safe()
+
+
 # --------------------------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------------------------
@@ -54,7 +147,7 @@ import numpy as np
 # Code distances to evaluate, as tqec scales k (d = 2k + 1). The CNOT generator has hand-written
 # partitions for k = 1, 2, 3, 7 only (d = 3, 5, 7, 15), and Chipmunq's mapper places rotated
 # surface-code patches for d = 3, 5, 7, 9, 15.
-DISTANCE_SCALES = [1, 2, 3]  # d = 3, 5, 7
+DISTANCE_SCALES = [1, 2, 3]#[1, 2, 3]#[2, 3, 4, 5]  # d = 5, 9, 11
 NUM_INTER_CHIPLET_CONNECTIONS = 8
 PS_INTER = 1e-4
 
@@ -81,27 +174,40 @@ GHZ_N = 12  # same number of logical qubits as the old 6x CNOT (6 x 2)
 BV_SECRET = "110100111010110100111010110100111010110100111010110100111010110100111010110100111010110100111010"  # 12-bit secret with mixed 0/1 so the bus is partially trimmed
 GROSS_BRIDGE_N_INTER = 6  # links between neighbouring chiplets of the Gross-bridge backend (max 6)
 
-MECH_TIMEOUT_S = 10#0.0
+# Wall-clock limit per (benchmark, distance, method) for EVERY method (Chipmunq, LightSABRE, MECH, OLSQ2,
+# SEQC, Murali et al.). Process start-up is not counted; a run exceeding the limit is killed (with all its
+# child processes) and reported as T/O. Set in transpilation_utils (TIMEOUT_S = 50 s).
+METHOD_TIMEOUT_S = TIMEOUT_S
 
 RESULTS_DIR = Path("experiments/evaluation/scalability")
 PLOT_PREFIX = RESULTS_DIR / "cnot_scaling_overhead_split"
 
 # Order = order of the bar groups in the plot.
-BENCHMARKS = ["cnot", "ghz", "bv", "gross_bridge"]
+BENCHMARKS = ["cnot", "ghz", "bv", "bv_color", "gross_bridge"]
 TITLES = {
     "cnot": "CNOT",
     "ghz": f"GHZ-{GHZ_N}",
     "bv": f"BV-{len(BV_SECRET)}",
+    "bv_color": f"BV-{len(BV_SECRET)} (color)",
     "gross_bridge": "Gross surgery",
     "gross": "Gross Code",  # memory only; no longer in BENCHMARKS
 }
 
-METRICS = [
-    "custom_depth", "custom_overhead",
-    "sabre_depth", "sabre_overhead",
-    "mech_depth", "mech_overhead", "mech_all",
-    "depth_overall", "gate_overall",
-]
+# --- Transpilation methods -------------------------------------------------------------
+# "ideal" is the untranspiled circuit; everything else is a method that can be run.
+# The extra baselines are the ones of the related-work comparison that transpilation_utils provides.
+EXTRA_TOOLS = tuple(k for k in ("olsq2", "seqc", "murali") if k in EXTRA_METHODS)
+RUN_TOOLS = ("custom", "sabre", "mech", *EXTRA_TOOLS)
+ALL_TOOLS = ("ideal", *RUN_TOOLS)
+
+# What the extra methods receive as their "cm" argument. The chiplet backend's coupling map matches
+# the related-work comparison. Murali et al. is noise-adaptive, so it gets the full backend: that way
+# it can see the inter-chiplet error rates (the noise_adaptive_transpilation wrapper accepts both).
+# Set a method to "coupling_map" here if its wrapper in transpilation_utils only takes a CouplingMap.
+EXTRA_INPUT = {"olsq2": "coupling_map", "seqc": "coupling_map", "murali": "backend"}
+
+METRICS = (["depth_overall", "gate_overall"]
+           + [f"{t}_{s}" for t in RUN_TOOLS for s in ("depth", "overhead", "all")])
 
 # Keys used by the old version of this script (n_patches / 12 logical qubits) -> new names.
 LEGACY_KEYS = {1: "cnot", 12: "gross"}
@@ -134,27 +240,54 @@ def _chiplet_grid_for(partitions: list[dict], ks: int, slack: int = 1) -> tuple[
     return (side, side, *chiplet_shape(ks))
 
 
-def build_benchmark(key: str, ks: int):
-    """Return (stim circuit, partitions, Chipmunq backend, MECH config)."""
+def generate_circuit(key: str, ks: int):
+    """Return (stim circuit, partitions). This is the expensive part, done once per (benchmark, distance)."""
     if key == "cnot":
-        circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=1, n2=0)
-        backend = _chipmunq_backend((2, 2, *chiplet_shape(ks)), ks)
-        # MECH grid side 14 was chosen for d = 5; other distances use the automatic size
-        return circuit, partitions, backend, {"mode": "run", "side": 14 if ks == 2 else None}
-
+        return get_tqec_cnot_rotated(distance_scale=ks, n1=1, n2=0)
     if key == "ghz":
-        circuit, partitions = get_tqec_ghz(GHZ_N, distance_scale=ks)
-        return circuit, partitions, _chipmunq_backend(_chiplet_grid_for(partitions, ks), ks), {"mode": "run", "side": None}
-
+        return get_tqec_ghz(GHZ_N, distance_scale=ks)
     if key == "bv":
-        circuit, partitions = get_tqec_bv(BV_SECRET, distance_scale=ks)
-        return circuit, partitions, _chipmunq_backend(_chiplet_grid_for(partitions, ks), ks), {"mode": "run", "side": None}
-
+        return get_tqec_bv(BV_SECRET, distance_scale=ks)
+    if key == "bv_color":
+        # Same secret as "bv", but on flagged color-code patches with transversal H / CNOT (no lattice
+        # surgery), d = 2ks + 1.
+        return get_color_code_bv(BV_SECRET, distance=distance(ks))
     if key == "gross_bridge":
         # Two [[144,12,12]] modules + bridge measuring Zbar_a Zbar_b (fixed d = 12, ks is not used).
+        return get_gross_bridge()
+    if key == "gross":
+        return generate_gross_code(num_qubits=1)
+    raise ValueError(f"Unknown benchmark '{key}'.")
+
+
+def make_backend(key: str, ks: int, partitions: list[dict]):
+    """Return (Chipmunq backend, MECH config) for a generated benchmark (cheap, rebuilt in every job)."""
+    if key == "cnot":
+        backend = _chipmunq_backend((2, 2, *chiplet_shape(ks)), ks)
+        # MECH grid side 14 was chosen for d = 5; other distances use the automatic size
+        return backend, {"mode": "run", "side": 14 if ks == 2 else None}
+
+    if key in ("ghz", "bv"):
+        return _chipmunq_backend(_chiplet_grid_for(partitions, ks), ks), {"mode": "run", "side": None}
+
+    if key == "bv_color":
+        # One chiplet per patch; the chiplets have the extra links under which a patch needs no SWAPs
+        # (no wrap-around), so all routing overhead comes from the transversal CNOTs between patches.
+        size = max(max(p["height"], p["width"]) for p in partitions)
+        side = math.ceil(math.sqrt(len(partitions)))
+        backend = BackendChipletV2(
+            size=(side, side, size, size),
+            n_inter=min(NUM_INTER_CHIPLET_CONNECTIONS, size // 2),  # links must fit on the chiplet edge
+            connectivity="long_range",
+            topology="grid",
+            long_range_offsets=chiplet_long_range_offsets(flags=True),
+            num_defective_qubits=0,
+        )
+        return backend, {"mode": "run", "side": None}
+
+    if key == "gross_bridge":
         # One chiplet per module and one for the bridge. n_inter <= 6: with 12 rows per chiplet,
         # BackendChipletV2 places the horizontal links at +-(n_inter - 1) rows around the centre.
-        circuit, partitions = get_gross_bridge()
         backend = BackendChipletV2(
             size=(1, 3, 12, 24),
             n_inter=GROSS_BRIDGE_N_INTER,
@@ -164,10 +297,9 @@ def build_benchmark(key: str, ks: int):
             num_defective_qubits=0,
         )
         # MECH is not run on BB codes (it timed out on the Gross memory), same as before.
-        return circuit, partitions, backend, {"mode": "timeout"}
+        return backend, {"mode": "timeout"}
 
     if key == "gross":
-        circuit, partitions = generate_gross_code(num_qubits=1)
         backend = BackendChipletV2(
             # 1 chiplet with 288 qubits, long-range connections, grid layout
             size=(1, 1, 12, 24),
@@ -177,9 +309,41 @@ def build_benchmark(key: str, ks: int):
             long_range_offsets=[(1, 0), (2, 0), (3, 0), (0, 1), (0, 2), (0, 3)],
             num_defective_qubits=0,
         )
-        return circuit, partitions, backend, {"mode": "timeout"}
+        return backend, {"mode": "timeout"}
 
     raise ValueError(f"Unknown benchmark '{key}'.")
+
+
+def build_benchmark(key: str, ks: int):
+    """Return (stim circuit, partitions, Chipmunq backend, MECH config)."""
+    circuit, partitions = generate_circuit(key, ks)
+    return (circuit, partitions, *make_backend(key, ks, partitions))
+
+
+# --------------------------------------------------------------------------------------
+# Generic timed runner (Chipmunq, LightSABRE, OLSQ2, SEQC, Murali et al.)
+# --------------------------------------------------------------------------------------
+
+
+def run_timed(fn, *args, timeout: float, **kwargs) -> tuple[object, dict]:
+    """Run ``fn(*args, **kwargs)`` in a fresh process group that is killed after ``timeout`` seconds.
+
+    Returns (circuit or None, status entry). The entry has "status" ok / timeout / error; the clock
+    (and "runtime_s") covers only the call itself, not process start-up.
+    """
+    circuit, runtime, status = run_with_timeout(fn, *args, timeout=timeout, **kwargs)
+    if status == "ok" and circuit is not None:
+        return circuit, {"status": "ok", "runtime_s": runtime}
+    if status == TIMEOUT:
+        return None, {"status": "timeout", "timeout_s": timeout, "elapsed_s": runtime}
+    return None, {"status": "error", "error": str(status), "elapsed_s": runtime}
+
+
+def run_extra_method(method: str, qc, backend, timeout: float) -> tuple[object, dict]:
+    """OLSQ2 / SEQC / Murali et al. with the coupling map (or the full backend, see EXTRA_INPUT)."""
+    target = backend if EXTRA_INPUT.get(method, "coupling_map") == "backend" else backend.coupling_map
+    print(f"  {method}: input = {'backend' if target is backend else 'coupling map'}, limit {timeout:.0f} s")
+    return run_timed(EXTRA_METHODS[method], qc, target, timeout=timeout)
 
 
 # --------------------------------------------------------------------------------------
@@ -204,6 +368,12 @@ def _mech_timeout_kwargs(timeout_s: float) -> dict:
 
 def _mech_worker(qc, side: int, timeout_s: float, out) -> None:
     import traceback
+    # Own process group, so a timeout also kills processes started by the MECH wrapper
+    try:
+        os.setsid()
+    except (AttributeError, OSError):
+        pass
+    out.put(("started", None))  # spawn, imports and argument unpickling are done: the clock starts now
     t0 = time.time()
     try:
         backend, _, _ = generate_simple_backend(side, side)
@@ -219,6 +389,9 @@ def _mech_worker(qc, side: int, timeout_s: float, out) -> None:
 def run_mech_with_timeout(qc, side: int, timeout_s: float) -> dict:
     """Run MECH in a child process. Returns the stats dict with a "status" of ok / timeout / error.
 
+    Same semantics as run_with_timeout: the clock starts once the child has started up, and on timeout
+    the child's whole process group is killed.
+
     * "spawn", not "fork": the parent has already run Qiskit's multi-threaded (Rust) SABRE, and
       forking a process that owns a thread pool can deadlock or crash the child.
     * not a daemon: daemonic processes may not start children, which MECH wrappers that enforce
@@ -228,38 +401,60 @@ def run_mech_with_timeout(qc, side: int, timeout_s: float) -> dict:
     out = ctx.Queue()
     proc = ctx.Process(target=_mech_worker, args=(qc, side, timeout_s, out), daemon=False)
     proc.start()
-    t0 = time.time()
     fwd = _mech_timeout_kwargs(timeout_s)
     print(f"  MECH on {side}x{side} grid, limit {timeout_s:.0f} s"
           + (f" (forwarded to wrapper as {list(fwd)})" if fwd else ""))
-    while True:
-        try:
-            status, payload = out.get(timeout=5)
-            break
-        except queue.Empty:
-            if not proc.is_alive():
-                return {"status": "error", "elapsed_s": time.time() - t0,
-                        "error": f"MECH process exited with code {proc.exitcode} after {time.time() - t0:.0f} s"}
-            if time.time() - t0 > timeout_s:
-                proc.terminate()
-                proc.join()
-                return {"status": "timeout", "timeout_s": timeout_s, "elapsed_s": time.time() - t0}
-    proc.join()
-    out.close()
-    out.join_thread()
+
+    try:
+        # --- Start-up (not counted towards the limit) ---
+        t_start = time.time()
+        while True:
+            try:
+                msg = out.get(timeout=1)
+                break
+            except queue.Empty:
+                if not proc.is_alive():
+                    return {"status": "error", "elapsed_s": 0.0,
+                            "error": f"MECH process exited with code {proc.exitcode} during start-up"}
+                if time.time() - t_start > STARTUP_TIMEOUT_S:
+                    return {"status": "error", "elapsed_s": 0.0,
+                            "error": f"MECH process did not start within {STARTUP_TIMEOUT_S:.0f} s"}
+        if msg[0] != "started":  # should not happen, but do not lose a result/error
+            status, payload = msg
+        else:
+            # --- The run itself ---
+            t0 = time.time()
+            while True:
+                try:
+                    status, payload = out.get(timeout=1)
+                    break
+                except queue.Empty:
+                    if not proc.is_alive():
+                        return {"status": "error", "elapsed_s": time.time() - t0,
+                                "error": f"MECH process exited with code {proc.exitcode} "
+                                         f"after {time.time() - t0:.0f} s"}
+                    if time.time() - t0 > timeout_s:
+                        print(f"  MECH killed after {timeout_s:.0f} s (timeout)")
+                        return {"status": "timeout", "timeout_s": timeout_s, "elapsed_s": timeout_s}
+            runtime = time.time() - t0
+    finally:
+        _kill(proc)  # no-op if it already finished; otherwise kills MECH and all its children
+        out.close()
+        out.cancel_join_thread()
+
     if status == "error":
-        return {"status": "error", "error": payload, "elapsed_s": time.time() - t0}
+        return {"status": "error", "error": payload, "elapsed_s": runtime}
     result = dict(payload)
-    result.update(status="ok", side=side, runtime_s=time.time() - t0)
+    result.update(status="ok", side=side, runtime_s=runtime)
     return result
 
 
-def _mech_label(entry) -> str | None:
-    """Bar annotation for a MECH result: None if it ran, T/O on timeout, N/A on error."""
+def _status_label(entry) -> str | None:
+    """Bar annotation for a result entry: None if it ran, T/O on timeout, N/A on error."""
     if isinstance(entry, dict) and "status" in entry:
         if entry["status"] == "error" and "timeout" in str(entry.get("error", "")).lower():
-            return "T/O"  # MECH's own time limit fired
-        return {"ok": None, "timeout": "T/O", "error": "N/A"}[entry["status"]]
+            return "T/O"  # the method's own time limit fired
+        return {"ok": None, "timeout": "T/O", "error": "N/A"}.get(entry["status"], "N/A")
     if entry == -1:  # legacy pickles
         return "T/O"
     return None
@@ -272,13 +467,22 @@ def _mech_label(entry) -> str | None:
 PASTEL_BLUE = "#A7D9ED"
 PASTEL_ORANGE = "#F7C6A2"
 PASTEL_GREEN = "#B5D8B0"
-SERIES_STYLE = [
-    ("Ideal", "lightcoral", "//"),
-    ("Chipmunq", PASTEL_BLUE, "/"),
-    ("LightSABRE", PASTEL_ORANGE, "o"),
-    ("MECH", PASTEL_GREEN, "//"),
-]
-TOOLS = ("ideal", "custom", "sabre", "mech")
+
+# (label, colour, hatch) per tool. The extra baselines take their style from METHOD_STYLES so they look
+# the same as in the related-work figures; the fallbacks are only used if a key is missing there.
+TOOL_STYLE = {
+    "ideal": ("Ideal", "lightcoral", "//"),
+    "custom": ("Chipmunq", PASTEL_BLUE, "/"),
+    "sabre": ("LightSABRE", PASTEL_ORANGE, "o"),
+    "mech": ("MECH", PASTEL_GREEN, "//"),
+    "olsq2": ("OLSQ2", "#D7BDE2", "\\\\"),
+    "seqc": ("SEQC", "#F9E79F", ".."),
+    "murali": ("Murali et al.", "#D5D8DC", "xx"),
+}
+for _key, _label, _color, _hatch in METHOD_STYLES:
+    if _key in EXTRA_TOOLS:
+        TOOL_STYLE[_key] = (_label, _color, _hatch)
+
 DARKEST = 0.55  # lightness reduction of the largest distance (0 = base colour)
 
 
@@ -321,39 +525,44 @@ def _nice(v: float, up: bool = True) -> float:
     return (math.ceil if up else math.floor)(v / step) * step
 
 
-def _draw_bars(fig, data, keys, ks_list, mech_labels, ylim=None, width=0.19):
-    """Grouped bars (Ideal / Chipmunq / LightSABRE / MECH), one overlaid segment per code distance.
+def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
+    """Grouped bars (one per tool in ``tools``), one overlaid segment per code distance.
 
-    ``data[tool][i]`` maps ks -> value for benchmark ``keys[i]``. For every tool the bars of all
-    distances share one x position; the largest distance is drawn first (darkest, at the back) and
-    smaller distances in front of it, so each segment shows the value of one distance "stacked" on the
-    previous one.
+    ``data[tool][i]`` maps ks -> value for benchmark ``keys[i]``; ``labels[tool][i]`` maps ks -> "T/O" /
+    "N/A" for runs without a result. For every tool the bars of all distances share one x position; the
+    largest distance is drawn first (darkest, at the back) and smaller distances in front of it, so each
+    segment shows the value of one distance "stacked" on the previous one.
     """
     x = np.arange(len(keys))
+    width = 0.8 / len(tools)
     ax = fig.add_subplot(111)
     levels = _levels(ks_list)
-    allv = [v for t in TOOLS for per_key in data[t] for v in per_key.values()]
+    allv = [v for t in tools for per_key in data[t] for v in per_key.values()]
     ymax = ylim[1] if ylim else _nice(1.05 * max(allv))
 
-    for j, (tool, (label, color, hatch)) in enumerate(zip(TOOLS, SERIES_STYLE)):
-        xpos = x + (j - 1.5) * width
+    for j, tool in enumerate(tools):
+        label, color, hatch = TOOL_STYLE[tool]
+        xpos = x + (j - (len(tools) - 1) / 2) * width
         for i, key in enumerate(keys):
             per_ks = data[tool][i]
-            timed_out = mech_labels[i] if tool == "mech" else {}
+            no_result = labels[tool][i]
             for rank, ks in enumerate(sorted(per_ks, reverse=True)):  # largest d first (back)
                 lvl = 1.0 if key in DISTANCE_INDEPENDENT else levels[ks]
                 bar = ax.bar(xpos[i], per_ks[ks], width, color=_shade(color, lvl), hatch=hatch,
                              edgecolor="black", linewidth=0.8, zorder=2 + rank)[0]
-                if ks in timed_out:  # MECH without a result: white, hatched, dashed outline
+                if ks in no_result:  # no result: white, hatched, dashed outline
                     bar.set_facecolor("white")
                     bar.set_linestyle("--")
                     bar.set_hatch("xxx")
                     bar.set_linewidth(2)
-                    bar.set_edgecolor(_shade("#B2D8B2", lvl))
-            if timed_out:
-                top = max(per_ks[ks] for ks in timed_out)
-                lab = "T/O" if len(timed_out) == len(per_ks) else \
-                      "T/O " + ",".join(f"d={distance(k)}" for k in sorted(timed_out))
+                    bar.set_edgecolor(_shade(color, lvl))
+            if no_result:
+                top = max(per_ks[ks] for ks in no_result)
+                kinds = sorted(set(no_result.values()))
+                if len(no_result) == len(per_ks):
+                    lab = "/".join(kinds)
+                else:
+                    lab = "/".join(kinds) + " " + ",".join(f"d={distance(k)}" for k in sorted(no_result))
                 ax.annotate(lab, xy=(xpos[i], min(top, ymax)), xytext=(0, 2), textcoords="offset points",
                             ha="left", va="bottom", rotation=45, rotation_mode="anchor",
                             color="red", fontweight="bold", fontsize=10, annotation_clip=False, zorder=20)
@@ -369,7 +578,8 @@ def _draw_bars(fig, data, keys, ks_list, mech_labels, ylim=None, width=0.19):
 
     # Legend handles: tools (medium shade) and distances (grey ramp)
     from matplotlib.patches import Patch
-    tool_handles = [Patch(facecolor=_shade(c, 0.5), hatch=h, edgecolor="black", label=l) for l, c, h in SERIES_STYLE]
+    tool_handles = [Patch(facecolor=_shade(TOOL_STYLE[t][1], 0.5), hatch=TOOL_STYLE[t][2], edgecolor="black",
+                          label=TOOL_STYLE[t][0]) for t in tools]
     dist_handles = [Patch(facecolor=_shade("#d9d9d9", levels[ks]), edgecolor="black", label=f"d = {distance(ks)}")
                     for ks in sorted(ks_list)]
     return ax, tool_handles + dist_handles
@@ -387,46 +597,63 @@ def _ks_for(key: str, ks_list: list[int], results: dict) -> list[int]:
     return list(ks_list)
 
 
+def _no_result_label(results: dict, tool: str, key: str, ks: int) -> str | None:
+    """None if ``tool`` has a result for (key, ks); otherwise "T/O" or "N/A"."""
+    if tool == "ideal":
+        return None
+    if not _has(results, key, ks, tool):
+        return "N/A"  # never run
+    return _status_label(results.get(f"{tool}_all", {}).get(key, {}).get(ks))
+
+
 def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], filename: str,
-                        ylim_depth=None, ylim_gates=None) -> None:
-    """Bar plots over several code distances. ylim_* = (lo, hi) to override the automatic y range."""
+                        tools=ALL_TOOLS, ylim_depth=None, ylim_gates=None) -> None:
+    """Bar plots over several code distances for the methods in ``tools`` (default: all).
+    ylim_* = (lo, hi) to override the automatic y range."""
+    tools = [t for t in ALL_TOOLS if t in tools]  # canonical order
 
     def _collect(overall: str, suffix: str) -> dict:
-        out = {t: [] for t in TOOLS}
+        out = {t: [] for t in tools}
         for key in keys:
             ks_here = _ks_for(key, ks_list, results)
             ideal = {ks: results[overall][key][ks] for ks in ks_here}
-            out["ideal"].append(ideal)
-            for t in ("custom", "sabre", "mech"):
-                out[t].append({ks: ideal[ks] + results[f"{t}_{suffix}"][key][ks] for ks in ks_here})
+            for t in tools:
+                if t == "ideal":
+                    out[t].append(ideal)
+                else:  # -1 = no result (drawn as a hollow bar just below the ideal)
+                    out[t].append({ks: ideal[ks] + results[f"{t}_{suffix}"].get(key, {}).get(ks, -1)
+                                   for ks in ks_here})
         return out
 
     depth = _collect("depth_overall", "depth")
     gates = _collect("gate_overall", "overhead")
-    mech_labels = []
+    labels = {t: [] for t in tools}
     for key in keys:
-        labs = {}
-        for ks in _ks_for(key, ks_list, results):
-            lab = _mech_label(results["mech_all"].get(key, {}).get(ks))
-            if lab:
-                labs[ks] = lab
-        mech_labels.append(labs)
+        for t in tools:
+            labs = {}
+            for ks in _ks_for(key, ks_list, results):
+                lab = _no_result_label(results, t, key, ks)
+                if lab:
+                    labs[ks] = lab
+            labels[t].append(labs)
 
     # Summary
     for i, key in enumerate(keys):
-        for ks in sorted(depth["ideal"][i]):
-            di, dc, ds, dm = (depth[t][i][ks] for t in TOOLS)
-            gi, gc, gsab, gm = (gates[t][i][ks] for t in TOOLS)
-            mech_d = mech_labels[i].get(ks) or _pct(dm, di)
-            mech_g = mech_labels[i].get(ks) or _pct(gm, gi)
+        for ks in sorted(depth[tools[0]][i]):
             d = DISTANCE_INDEPENDENT.get(key, distance(ks))
-            print(f"[{TITLES[key]} d={d}] depth ideal={di}  ours={_pct(dc, di)}  sabre={_pct(ds, di)}  mech={mech_d}"
-                  f"  | 2q ideal={gi}  ours={_pct(gc, gi)}  sabre={_pct(gsab, gi)}  mech={mech_g}")
+            di = results["depth_overall"][key][ks]
+            gi = results["gate_overall"][key][ks]
+            dep = [f"{TOOL_STYLE[t][0]}={labels[t][i].get(ks) or _pct(depth[t][i][ks], di)}"
+                   for t in tools if t != "ideal"]
+            gat = [f"{TOOL_STYLE[t][0]}={labels[t][i].get(ks) or _pct(gates[t][i][ks], gi)}"
+                   for t in tools if t != "ideal"]
+            print(f"[{TITLES[key]} d={d}] depth ideal={di}  " + "  ".join(dep)
+                  + f"  | 2q ideal={gi}  " + "  ".join(gat))
 
     # ---------------- depth ----------------
     plt.rcParams.update(_tex_fonts(1.5))
     fig = plt.figure(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    ax, _ = _draw_bars(fig, depth, keys, ks_list, mech_labels, ylim_depth)
+    ax, _ = _draw_bars(fig, depth, keys, ks_list, labels, tools, ylim_depth)
     ax.set_xlabel("Circuit type")
     fig.text(0.03, 0.5, "Circuit depth", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
     title = ax.text(-0.18, 1.04, "b) Compilation overhead on circuit depth", transform=ax.transAxes,
@@ -441,7 +668,7 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
     # ---------------- 2q gates ----------------
     plt.rcParams.update(_tex_fonts(1.3))
     fig = plt.figure(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    ax, handles = _draw_bars(fig, gates, keys, ks_list, mech_labels, ylim_gates)
+    ax, handles = _draw_bars(fig, gates, keys, ks_list, labels, tools, ylim_gates)
     fig.text(0.025, 0.5, "#2q gates", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
     fig.text(0.46, 0.055, "Circuit type", va="center", rotation="horizontal", fontsize=FONTSIZE * 1.5)
     title = ax.text(-0.075, 1.04, "c) Compilation overhead on #2q gates", transform=ax.transAxes,
@@ -466,8 +693,9 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
 
 
 def num_2q_gates(circuit) -> int:
-    ops = circuit.count_ops()
-    return sum(ops.get(g, 0) for g in ("cx", "cz", "swap"))
+    """All 2-qubit operations (cx, cz, swap, ecr, ...), so every method's native output is counted."""
+    return sum(1 for inst in circuit.data
+               if inst.operation.num_qubits == 2 and inst.operation.name != "barrier")
 
 
 def _load_results() -> dict:
@@ -492,97 +720,239 @@ def _save_results(results: dict) -> None:
             pickle.dump(results[m], f)
 
 
-def run_benchmark(key: str, ks: int, results: dict) -> None:
-    print(f"=== {TITLES[key]} (ks={ks}) ===")
-    circuit, partitions, backend, mech_cfg = build_benchmark(key, ks)
-    stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
-    qc = stim_code_circuit.qc
+# --- Jobs -------------------------------------------------------------------------------
+# One generation job per (benchmark, distance) and one job per (benchmark, distance, method). A method job
+# starts as soon as its circuit exists, so generation, distances and methods all run in parallel. Jobs
+# return {metric: value} dicts; only the main process touches `results` and the pickles.
 
-    print("Custom")
-    custom_circuit = custom_partitioned_transpilation(qc, backend, pre_defined_partitions=partitions)
-    print("Sabre")
-    sabre_circuit = sabre_transpilation(qc, backend)
 
-    print("MECH")
-    if mech_cfg["mode"] == "run":
-        side = mech_cfg["side"] or math.ceil(math.sqrt(1.3 * qc.num_qubits))
-        mech = run_mech_with_timeout(qc, side, MECH_TIMEOUT_S)
-        elapsed = mech.get("runtime_s", mech.get("elapsed_s", 0))
-        print(f"  MECH status: {mech['status']} after {elapsed:.0f} s"
-              + (f"\n{mech['error']}" if mech["status"] == "error" else ""))
-    else:
-        mech = {"status": "timeout", "note": "not rerun"}
-
-    def put(metric: str, value) -> None:
-        results[metric].setdefault(key, {})[ks] = value
-
+def _run_method(method: str, qc, partitions, backend, mech_cfg, timeout: float) -> dict:
+    """Run one transpilation method under the wall-clock limit ``timeout``; return the metrics to store."""
     depth0, gates0 = qc.depth(), num_2q_gates(qc)
-    put("depth_overall", depth0)
-    put("gate_overall", gates0)
-    put("custom_depth", custom_circuit.depth() - depth0)
-    put("custom_overhead", num_2q_gates(custom_circuit) - gates0)
-    put("sabre_depth", sabre_circuit.depth() - depth0)
-    put("sabre_overhead", num_2q_gates(sabre_circuit) - gates0)
-    put("mech_all", mech)
-    if mech["status"] == "ok":
-        put("mech_depth", mech["depth_overhead"])
-        put("mech_overhead", mech["2q_gates_overhead"])
-    else:
-        put("mech_depth", -1)
-        put("mech_overhead", -1)
+
+    def from_circuit(circ, entry: dict) -> dict:
+        return {f"{method}_all": entry,
+                f"{method}_depth": circ.depth() - depth0 if circ is not None else -1,
+                f"{method}_overhead": num_2q_gates(circ) - gates0 if circ is not None else -1}
+
+    if method == "custom":
+        print(f"  Chipmunq: limit {timeout:.0f} s")
+        return from_circuit(*run_timed(custom_partitioned_transpilation, qc, backend,
+                                       pre_defined_partitions=partitions, timeout=timeout))
+
+    if method == "sabre":
+        print(f"  LightSABRE: limit {timeout:.0f} s")
+        return from_circuit(*run_timed(sabre_transpilation, qc, backend, timeout=timeout))
+
+    if method == "mech":
+        if mech_cfg["mode"] == "run":
+            side = mech_cfg["side"] or math.ceil(math.sqrt(1.3 * qc.num_qubits))
+            mech = run_mech_with_timeout(qc, side, timeout)
+        else:
+            mech = {"status": "timeout", "note": "not rerun"}
+        ok = mech["status"] == "ok"
+        return {"mech_all": mech,
+                "mech_depth": mech["depth_overhead"] if ok else -1,
+                "mech_overhead": mech["2q_gates_overhead"] if ok else -1}
+
+    if method in EXTRA_TOOLS:
+        return from_circuit(*run_extra_method(method, qc, backend, timeout))
+
+    raise ValueError(f"Unknown method '{method}' (known: {RUN_TOOLS}).")
 
 
-_REQUIRED_METRICS = ("custom_depth", "custom_overhead", "sabre_depth", "sabre_overhead",
-                     "mech_depth", "mech_overhead", "depth_overall", "gate_overall")
+def generation_job(key: str, ks: int, cache: str | None) -> dict:
+    """Generate the circuit, cache (qc, partitions) for the method jobs, return the ideal statistics."""
+    t0 = time.time()
+    try:
+        circuit, partitions = generate_circuit(key, ks)
+        qc = StimCodeCircuit(stim_circuit=circuit).qc
+        if cache:
+            try:
+                with open(cache + ".tmp", "wb") as f:
+                    pickle.dump((qc, partitions), f)
+                os.replace(cache + ".tmp", cache)
+            except Exception as e:  # method jobs then regenerate the circuit themselves
+                print(f"  {key} d={distance(ks)}: circuit not cacheable ({e!r}), method jobs regenerate it")
+                if os.path.exists(cache + ".tmp"):
+                    os.remove(cache + ".tmp")
+        return {"ok": True, "elapsed_s": time.time() - t0,
+                "metrics": {"depth_overall": qc.depth(), "gate_overall": num_2q_gates(qc)}}
+    except Exception:
+        return {"ok": False, "elapsed_s": time.time() - t0, "error": traceback.format_exc()}
 
 
-def _has(results: dict, key: str, ks: int) -> bool:
-    return all(ks in results[m].get(key, {}) for m in _REQUIRED_METRICS)
+def method_job(key: str, ks: int, method: str, cache: str | None, timeout: float) -> dict:
+    """Run one method on a cached (or regenerated) circuit. Never raises: a crash is returned as an error
+    entry *without* depth/overhead, so it is drawn as N/A and --run-missing retries it."""
+    t0 = time.time()
+    try:
+        if cache and os.path.exists(cache):
+            with open(cache, "rb") as f:
+                qc, partitions = pickle.load(f)
+        else:
+            circuit, partitions = generate_circuit(key, ks)
+            qc = StimCodeCircuit(stim_circuit=circuit).qc
+        backend, mech_cfg = make_backend(key, ks, partitions)
+        metrics = _run_method(method, qc, partitions, backend, mech_cfg, timeout)
+        return {"ok": True, "elapsed_s": time.time() - t0, "metrics": metrics}
+    except Exception:
+        err = traceback.format_exc()
+        return {"ok": False, "elapsed_s": time.time() - t0, "error": err,
+                "metrics": {f"{method}_all": {"status": "error", "error": err, "elapsed_s": time.time() - t0}}}
 
 
-def _missing(results: dict, ks_list: list[int]) -> list[tuple[str, int]]:
-    """(benchmark, ks) pairs without saved results; distance-independent benchmarks need one run only."""
-    out = []
+def _limit_threads(threads_per_job: int) -> None:
+    """Keep N parallel jobs from each spawning a full thread pool (Qiskit's Rust SABRE, BLAS, HiGHS).
+    Set in the parent before the pool starts, so every worker and its children inherit it."""
+    for var in ("RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ.setdefault(var, str(threads_per_job))
+    os.environ.setdefault("QISKIT_PARALLEL", "FALSE")  # no nested process pools inside qiskit.transpile
+
+
+def execute_jobs(to_run: dict[tuple[str, int], list[str]], results: dict, jobs: int,
+                 timeout: float, threads_per_job: int = 1) -> None:
+    """Run all (benchmark, distance) -> methods in ``to_run`` with ``jobs`` worker processes and merge the
+    results into ``results`` (saved after every finished job). Every method run is limited to ``timeout`` s."""
+    n_total = len(to_run) + sum(len(ms) for ms in to_run.values())
+    done, lost = 0, []
+
+    def merge(key, ks, what, out) -> None:
+        nonlocal done
+        done += 1
+        for metric, value in out.get("metrics", {}).items():
+            results[metric].setdefault(key, {})[ks] = value
+        _save_results(results)
+        if what == "circuit":
+            status = "ok" if out["ok"] else "FAILED"
+        elif not out["ok"]:
+            status = "crashed"
+        else:
+            status = out["metrics"].get(f"{what}_all", {}).get("status", "ok")
+        print(f"[{done}/{n_total}] {TITLES[key]} d={DISTANCE_INDEPENDENT.get(key, distance(ks))} "
+              f"{what}: {status} ({out['elapsed_s']:.0f} s)", flush=True)
+        if not out["ok"]:
+            print(out["error"], flush=True)
+
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    cache_dir = Path(tempfile.mkdtemp(prefix=".circuits_", dir=RESULTS_DIR))
+    cache_of = {pair: str(cache_dir / f"{pair[0]}_{pair[1]}.pkl") for pair in to_run}
+    try:
+        if jobs <= 1:  # in-process, one job after the other (easiest to debug)
+            for (key, ks), methods in to_run.items():
+                gen = generation_job(key, ks, cache_of[(key, ks)])
+                merge(key, ks, "circuit", gen)
+                if gen["ok"]:
+                    for method in methods:
+                        merge(key, ks, method, method_job(key, ks, method, cache_of[(key, ks)], timeout))
+            return
+
+        _limit_threads(threads_per_job)
+        # "spawn": the parent has already run Qiskit's multi-threaded (Rust) code, forking it is unsafe.
+        # ProcessPoolExecutor workers are not daemonic (Python >= 3.9), so MECH / run_with_timeout can
+        # still start their own child processes for the time limits.
+        ex = ProcessPoolExecutor(max_workers=jobs, mp_context=mp.get_context("spawn"))
+        try:
+            pending = {ex.submit(generation_job, key, ks, cache_of[(key, ks)]): (key, ks, "circuit")
+                       for key, ks in to_run}
+            while pending:
+                finished, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for fut in finished:
+                    key, ks, what = pending.pop(fut)
+                    try:
+                        out = fut.result()
+                    except BrokenProcessPool:
+                        lost.append((key, ks, what))
+                        continue
+                    merge(key, ks, what, out)
+                    if what == "circuit" and out["ok"]:
+                        for method in to_run[(key, ks)]:
+                            f = ex.submit(method_job, key, ks, method, cache_of[(key, ks)], timeout)
+                            pending[f] = (key, ks, method)
+        except KeyboardInterrupt:
+            print("Interrupted: finished jobs are saved; rerun with --run-missing to continue.")
+            ex.shutdown(wait=False, cancel_futures=True)
+            raise
+        ex.shutdown(wait=True)
+    finally:
+        shutil.rmtree(cache_dir, ignore_errors=True)
+    if lost:
+        print("A worker process died (out of memory?), so the pool stopped. Not finished: "
+              + ", ".join(f"{k} d={DISTANCE_INDEPENDENT.get(k, distance(ks))} {w}" for k, ks, w in lost)
+              + ". Rerun with --run-missing (and fewer --jobs) to continue.")
+
+
+def _has(results: dict, key: str, ks: int, tool: str) -> bool:
+    """True if (key, ks) has saved results for ``tool`` ("ideal" = the untranspiled statistics)."""
+    metrics = ("depth_overall", "gate_overall") if tool == "ideal" else (f"{tool}_depth", f"{tool}_overhead")
+    return all(ks in results[m].get(key, {}) for m in metrics)
+
+
+def _missing(results: dict, ks_list: list[int], methods) -> dict[tuple[str, int], list[str]]:
+    """{(benchmark, ks): methods without saved results}; distance-independent benchmarks need one run only."""
+    out = {}
     for key in BENCHMARKS:
         if key in DISTANCE_INDEPENDENT:
-            if not any(_has(results, key, ks) for ks in results["depth_overall"].get(key, {})):
-                out.append((key, ks_list[0]))
+            saved = list(results["depth_overall"].get(key, {}))
+            pairs = [(key, saved[0] if saved else ks_list[0])]
         else:
-            out += [(key, ks) for ks in ks_list if not _has(results, key, ks)]
+            pairs = [(key, ks) for ks in ks_list]
+        for k, ks in pairs:
+            todo = [t for t in methods if not _has(results, k, ks, t)]
+            if todo:
+                out[(k, ks)] = todo
     return out
 
 
 def run_exp_statistics(reproduce: list[str] | None = None, ks_list: list[int] | None = None,
-                       run_missing: bool = False) -> None:
+                       run_missing: bool = False, methods=RUN_TOOLS, show=ALL_TOOLS,
+                       jobs: int = 1, threads_per_job: int = 1, timeout: float | None = None) -> None:
     """Plot the saved results for all distances in ``ks_list``. By default nothing is run.
 
-    :param reproduce: benchmarks to (re)run before plotting, for every distance in ``ks_list``
-    :param run_missing: also run every (benchmark, distance) that has no saved results
+    :param reproduce: benchmarks to (re)run with ``methods`` before plotting, for every distance in ``ks_list``
+    :param run_missing: also run every (benchmark, distance, method in ``methods``) without saved results
+    :param methods: transpilation methods that ``reproduce`` / ``run_missing`` may run (default: all)
+    :param show: methods drawn in the plots (default: all; "ideal" is the untranspiled circuit)
+    :param jobs: worker processes; circuit generation, distances and methods run in parallel (1 = serial)
+    :param threads_per_job: threads each job may use (Rust SABRE, BLAS, ...), only used if jobs > 1
+    :param timeout: wall-clock limit in seconds for every method run (default METHOD_TIMEOUT_S)
     """
     ks_list = sorted(ks_list or DISTANCE_SCALES)
+    methods = [t for t in RUN_TOOLS if t in methods]
+    timeout = METHOD_TIMEOUT_S if timeout is None else timeout
     results = _load_results()
-    to_run = []
+
+    to_run: dict[tuple[str, int], list[str]] = {}
     for key in reproduce or []:
-        to_run += [(key, ks_list[0])] if key in DISTANCE_INDEPENDENT else [(key, ks) for ks in ks_list]
+        for ks in ([ks_list[0]] if key in DISTANCE_INDEPENDENT else ks_list):
+            to_run[(key, ks)] = list(methods)
     if run_missing:
-        to_run += _missing(results, ks_list)
+        for pair, todo in _missing(results, ks_list, methods).items():
+            to_run.setdefault(pair, [])
+            to_run[pair] += [t for t in todo if t not in to_run[pair]]
     order = {k: i for i, k in enumerate(BENCHMARKS)}
-    to_run = sorted(dict.fromkeys(to_run), key=lambda p: (order[p[0]], p[1]))
+    to_run = dict(sorted(to_run.items(), key=lambda kv: (order[kv[0][0]], kv[0][1])))
 
     if to_run:
-        print("Running: " + ", ".join(f"{k} d={distance(ks)}" for k, ks in to_run))
-    for key, ks in to_run:
-        run_benchmark(key, ks, results)
-        _save_results(results)  # save after every run, so a crash doesn't lose finished runs
+        print(f"Running (limit {timeout:.0f} s per method): "
+              + "; ".join(f"{k} d={distance(ks)} [{', '.join(ms)}]" for (k, ks), ms in to_run.items()))
+        execute_jobs(to_run, results, jobs, timeout, threads_per_job)
 
-    missing = _missing(results, ks_list)
-    if missing:
-        print("No saved results for " + ", ".join(f"{k} d={distance(ks)}" for k, ks in missing)
+    # A benchmark is plotted if its ideal statistics exist for every distance; a shown method without a
+    # result is drawn as a hollow bar labelled N/A (never run) or T/O.
+    no_ideal = [k for k in BENCHMARKS if k in DISTANCE_INDEPENDENT and not results["depth_overall"].get(k)
+                or k not in DISTANCE_INDEPENDENT and not all(_has(results, k, ks, "ideal") for ks in ks_list)]
+    if no_ideal:
+        print("No saved results for " + ", ".join(no_ideal)
               + "; those benchmarks are not plotted (use --reproduce or --run-missing)")
-    keys = [k for k in BENCHMARKS if not any(m[0] == k for m in missing)]
+    missing = _missing(results, ks_list, [t for t in show if t != "ideal"])
+    for (k, ks), todo in missing.items():
+        if k not in no_ideal:
+            print(f"  {k} d={distance(ks)}: no results for {', '.join(todo)} (drawn as N/A)")
+    keys = [k for k in BENCHMARKS if k not in no_ideal]
     if not keys:
         raise SystemExit("Nothing to plot.")
-    plot_combined_split(results, keys, ks_list, str(PLOT_PREFIX))
+    plot_combined_split(results, keys, ks_list, str(PLOT_PREFIX), tools=show)
 
 
 if __name__ == "__main__":
@@ -590,15 +960,24 @@ if __name__ == "__main__":
     parser.add_argument("--reproduce", nargs="*", choices=BENCHMARKS, default=None,
                         help="benchmarks to run before plotting, for every distance (no names = all)")
     parser.add_argument("--run-missing", action="store_true",
-                        help="also run every (benchmark, distance) without saved results")
+                        help="also run every (benchmark, distance, method) without saved results")
+    parser.add_argument("--methods", nargs="+", choices=RUN_TOOLS, default=list(RUN_TOOLS),
+                        help="methods that --reproduce / --run-missing run (default: all)")
+    parser.add_argument("--show", nargs="+", choices=ALL_TOOLS, default=list(ALL_TOOLS),
+                        help="methods drawn in the plots (default: all)")
     parser.add_argument("--distances", nargs="+", type=int, default=[distance(k) for k in DISTANCE_SCALES],
                         help="code distances to evaluate/plot (odd, e.g. 3 5 7)")
-    parser.add_argument("--mech-timeout", type=float, default=MECH_TIMEOUT_S,
-                        help=f"MECH wall-clock limit in seconds (default {MECH_TIMEOUT_S})")
+    parser.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1,
+                        help="worker processes for generation / distances / methods (default: all cores; 1 = serial)")
+    parser.add_argument("--threads-per-job", type=int, default=1,
+                        help="threads per job for Qiskit's Rust passes, BLAS etc. (default 1)")
+    parser.add_argument("--timeout", type=float, default=METHOD_TIMEOUT_S,
+                        help=f"wall-clock limit per method run in seconds, for all methods "
+                             f"(default {METHOD_TIMEOUT_S:.0f}); longer runs are killed and shown as T/O")
     args = parser.parse_args()
-    MECH_TIMEOUT_S = args.mech_timeout
     if any(d < 3 or d % 2 == 0 for d in args.distances):
         parser.error("--distances must be odd and >= 3")
     to_run = None if args.reproduce is None else (args.reproduce or BENCHMARKS)
     run_exp_statistics(reproduce=to_run, ks_list=[(d - 1) // 2 for d in args.distances],
-                       run_missing=args.run_missing)
+                       run_missing=args.run_missing, methods=args.methods, show=args.show,
+                       jobs=args.jobs, threads_per_job=args.threads_per_job, timeout=args.timeout)

@@ -716,6 +716,7 @@ class StratifiedCircuit:
     xswaps: list[tuple[int, int, int, int]]  # event e -> (A, slotA, B, slotB)
     initial_slots: list[list[int]]   # chiplet -> slot -> logical at start
     final_slots: list[list[int]]     # chiplet -> slot -> logical at end
+    fixed_layout: list[int] | None = None  # logical -> physical, if the mapping was given
 
 
 def _build_chip_events(ops, schedule, assign0, arch):
@@ -1066,12 +1067,19 @@ class SEQCCompiler:
         self._sub_targets = None
 
     # ------------------------------------------------------------------ stratification
-    def stratify(self, circuit: QuantumCircuit) -> StratifiedCircuit:
+    def stratify(self, circuit: QuantumCircuit, initial_layout=None) -> StratifiedCircuit:
+        """``initial_layout``: optional logical -> physical placement (list or dict). If given, the
+        qubit-to-subcircuit and subcircuit-to-chiplet mappings (steps 1-2) are skipped and the
+        chiplet of every qubit is taken from it; elaboration then also keeps its intra-chiplet
+        positions. SEQC's routing (steps 3-8) is unchanged. Used to compare routers from an
+        identical mapping."""
         arch = self.arch
         N = arch.num_qubits
         if circuit.num_qubits > N:
             raise ValueError(f"Circuit has {circuit.num_qubits} qubits; device has {N}.")
         ops, gphase = _preprocess(circuit)
+        if initial_layout is not None:
+            return self._stratify_fixed(circuit, ops, gphase, initial_layout)
         adj = _interaction_graph(ops, N)       # padded with idle ancillas up to N
         caps = [len(c) for c in arch.chiplets]
 
@@ -1114,6 +1122,24 @@ class SEQCCompiler:
         return StratifiedCircuit(circuit, ops, gphase, circuit.num_qubits, N, assign0, schedule,
                                  n_x, events, xswaps, init_slots, final_slots)
 
+    def _stratify_fixed(self, circuit, ops, gphase, initial_layout) -> StratifiedCircuit:
+        arch = self.arch
+        N, n = arch.num_qubits, circuit.num_qubits
+        phys = [int(initial_layout[i]) for i in range(n)]
+        if len(set(phys)) != n or not all(0 <= p < N for p in phys):
+            raise ValueError("initial_layout must map every logical qubit to a distinct physical qubit")
+        free = [p for p in range(N) if p not in set(phys)]
+        full = phys + free                      # idle ancillas take the remaining physical qubits
+        assign0 = [arch.chip_of[p] for p in full]
+        E = arch.chip_dist.tolist()
+        route_args = [(ops, assign0, arch.chip_adj, E, self.seed + i) for i in range(max(1, self.routing_trials))]
+        routed = _pmap(_inter_chiplet_route, route_args, self.n_jobs)
+        best = min(range(len(routed)), key=lambda i: (routed[i][1], len(routed[i][0])))
+        schedule, n_x, _ = routed[best]
+        events, xswaps, init_slots, final_slots = _build_chip_events(ops, schedule, assign0, arch)
+        return StratifiedCircuit(circuit, ops, gphase, n, N, assign0, schedule, n_x, events, xswaps,
+                                 init_slots, final_slots, fixed_layout=full)
+
     # ------------------------------------------------------------------ elaboration
     def elaborate(self, strat: StratifiedCircuit, backend=None) -> QuantumCircuit:
         """Recurring stage. Pass an updated ``backend`` (same topology, new calibration)
@@ -1130,7 +1156,17 @@ class SEQCCompiler:
         # 4. intra-chiplet layout (parallel)
         lay_args = [(len(arch.chiplets[c]), arch.intra_edges[c], strat.chip_events[c], ncl,
                      self.seed + 101 * c) for c in range(nc)]
-        layouts = _pmap(_layout_worker, lay_args, self.n_jobs)
+        if strat.fixed_layout is not None:  # keep the given positions (no SabreLayout)
+            layouts = [[arch.local_index[strat.fixed_layout[l]] for l in strat.initial_slots[c]]
+                       for c in range(nc)]
+        else:
+            layouts = _pmap(_layout_worker, lay_args, self.n_jobs)
+        refine = 0 if strat.fixed_layout is not None else self.layout_refine_iters
+        dists = [_weighted_dist(len(arch.chiplets[c]), arch.intra_edges[c], self._sub_targets[c])
+                 for c in range(nc)]
+        intra_errs = [e for c in range(nc) for a, b in arch.intra_edges[c]
+                      for e in [_edge_error(self._sub_targets[c], a, b)]]
+        med_intra = float(np.median(intra_errs)) if intra_errs else 0.0
 
         # 5. inter-chiplet SWAP lowering (serial, greedy nearest valid link)
         est = [list(l) for l in layouts]                 # slot -> estimated local phys
@@ -1149,8 +1185,12 @@ class SEQCCompiler:
             for (pa, pb, err) in arch.links[key]:
                 a, b = (pa, pb) if A == key[0] else (pb, pa)
                 la, lb = arch.local_index[a], arch.local_index[b]
-                cost = (arch.local_dist[A][est[A][i], la] + arch.local_dist[B][est[B][j], lb]
-                        + 10.0 * err + 0.25 * usage[(a, b)])
+                # Distances and the link itself in the same fidelity units: one median intra-chiplet
+                # coupler = 1. For an error-free target this is hops + 1 for every link.
+                w_link = (math.log1p(-min(err, 0.5)) / math.log1p(-min(med_intra, 0.5))
+                          if med_intra > 0 and err > 0 else 1.0)
+                cost = (dists[A][est[A][i], la] + dists[B][est[B][j], lb]
+                        + w_link + 0.25 * usage[(a, b)])
                 if best_cost is None or cost < best_cost:
                     best, best_cost = (a, b, la, lb), cost
             a, b, la, lb = best
@@ -1165,7 +1205,7 @@ class SEQCCompiler:
         # 6+7. intra-chiplet routing, translation, optimization (parallel)
         ro_args = [(len(arch.chiplets[c]), arch.intra_edges[c], strat.chip_events[c], ports[c],
                     layouts[c], ncl, self._sub_targets[c], self.optimization_level,
-                    self.seed + 7 * c, self.swap_trials, self.layout_refine_iters)
+                    self.seed + 7 * c, self.swap_trials, refine)
                    for c in range(nc)]
         results = _pmap(_route_optimize_worker, ro_args, self.n_jobs)
 
@@ -1175,8 +1215,8 @@ class SEQCCompiler:
         self._validate(out)
         return out
 
-    def run(self, circuit: QuantumCircuit) -> QuantumCircuit:
-        return self.elaborate(self.stratify(circuit))
+    def run(self, circuit: QuantumCircuit, initial_layout=None) -> QuantumCircuit:
+        return self.elaborate(self.stratify(circuit, initial_layout=initial_layout))
 
     __call__ = run
 

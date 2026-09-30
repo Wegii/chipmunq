@@ -184,6 +184,20 @@ class BackendChipletV2(BackendV2):
                 for edge_index in range(G.num_edges()):
                     G.update_edge_by_index(edge_index, LABEL_ON_CHIP)
 
+            if self.connectivity == "long_range":
+                # Grid with extra links at long_range_offsets, without wrapping around the chiplet edges
+                G = rustworkx.generators.grid_graph(self.n, self.m, multigraph=False)
+                for edge_index in range(G.num_edges()):
+                    G.update_edge_by_index(edge_index, LABEL_ON_CHIP)
+                for r in range(self.n):
+                    for c in range(self.m):
+                        for dr, dc in self.long_range_offsets:
+                            r2, c2 = r + dr, c + dc
+                            if 0 <= r2 < self.n and 0 <= c2 < self.m:
+                                a, b = r * self.m + c, r2 * self.m + c2
+                                if a != b and not G.has_edge(a, b):
+                                    G.add_edge(a, b, LABEL_ON_CHIP)
+
             if self.connectivity == "torus":
                 G = rustworkx.generators.grid_graph(self.n, self.m, multigraph=False)
 

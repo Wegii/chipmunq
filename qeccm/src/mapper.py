@@ -340,12 +340,22 @@ class TrivialMapper(GenericMapper):
                                     i = 0
 
                     if grid:
-                        if len(nodes_of_partition) > patch_width * patch_height:
-                            raise ValueError(f"Partition {partition_id} has {len(nodes_of_partition)} qubits, "
-                                             f"more than its {patch_width}x{patch_height} rectangle")
-                        for k, node in enumerate(nodes_of_partition):
-                            row = local_y + k // patch_width
-                            col = local_x + k % patch_width
+                        # Optional per-qubit (row, col) inside the rectangle; default: row-major
+                        local_coords = pre_defined_partitions[partition_id].get("coords")
+                        if local_coords is None:
+                            if len(nodes_of_partition) > patch_width * patch_height:
+                                raise ValueError(f"Partition {partition_id} has {len(nodes_of_partition)} qubits, "
+                                                 f"more than its {patch_width}x{patch_height} rectangle")
+                            local_coords = [(k // patch_width, k % patch_width) for k in range(len(nodes_of_partition))]
+                        elif len(local_coords) != len(nodes_of_partition):
+                            raise ValueError(f"Partition {partition_id}: {len(local_coords)} coords for "
+                                             f"{len(nodes_of_partition)} qubits")
+                        for node, (r, c) in zip(nodes_of_partition, local_coords):
+                            if not (0 <= r < patch_height and 0 <= c < patch_width):
+                                raise ValueError(f"Partition {partition_id}: coordinate {(r, c)} outside its "
+                                                 f"{patch_width}x{patch_height} rectangle")
+                            row = local_y + r
+                            col = local_x + c
                             p_index = nodes_on_qpu[row * self.backend.m + col]
                             placement[node] = p_index
                             pq_to_partition[p_index] = pre_defined_partitions[partition_id]
