@@ -43,28 +43,116 @@ ROUTER_OF_RUN = {"basic": "basic", "cost_inter": "focus", "cost_tradeoff": "trad
 # Chipmunq's own routers; the SABRE-SWAP time budget is the slowest of these
 CHIPMUNQ_RUNS = ("basic", "cost_inter", "cost_tradeoff")
 
+# --- Link-noise configurations ------------------------------------------------------------------------------
+# name -> BackendChipletV2 keyword arguments (+ "mean_factor": link-noise mean in units of p_inter).
+#
+#  "10" / "100": original configurations. BackendChipletV2's "random" noise draws clip(U[0,1) * r, 1, r) * p_inter
+#     per link: mean (r^2 + 1) / (2r) * p_inter (5.05 for r = 10, 50.0 for r = 100) and coefficient of variation
+#     ~0.56 / ~0.58. They differ ~10x in MEAN, but hardly in relative spread.
+#  "fmlow" / "fmhigh": mean-preserving lognormal link noise (reviewer: vary the variance at an unchanged mean).
+#     Both have the mean of "10" (FIXED_MEAN_FACTOR * p_inter, exact per backend) and differ only in sigma. For a
+#     given seed both use the same normal draws, so the spread is the only difference between them.
+#     sigma = 0.5 gives a CV of ~0.4-0.7 (about that of "10"), sigma = 1.5 a CV of ~1.2-3.7 (36 links, d = 7).
+#  "fmzero": zero-variance control (all links equal, same mean). Not run by default; add it with
+#     --noise-configs fmzero (or uncomment it in DEFAULT_NOISE_CONFIGS).
+FIXED_MEAN_FACTOR = (10 ** 2 + 1) / (2 * 10)  # mean of "10", in units of p_inter
+LINK_NOISE = {
+    "10": dict(inter_chiplet_noise_type="random", inter_chiplet_rfactor=10),
+    "100": dict(inter_chiplet_noise_type="random", inter_chiplet_rfactor=100),
+    "fmlow": dict(inter_chiplet_noise_type="lognormal", inter_chiplet_sigma=0.5, mean_factor=FIXED_MEAN_FACTOR),
+    "fmhigh": dict(inter_chiplet_noise_type="lognormal", inter_chiplet_sigma=1.5, mean_factor=FIXED_MEAN_FACTOR),
+    "fmzero": dict(inter_chiplet_noise_type="lognormal", inter_chiplet_sigma=0.0, mean_factor=FIXED_MEAN_FACTOR),
+}
+DEFAULT_NOISE_CONFIGS = ("10", "100", "fmlow", "fmhigh")  # + "fmzero" for the zero-variance control
+# Panels: b) LER for the original low/high variance, c) LER for the fixed-mean configurations,
+# d) Chipmunq vs. LightSABRE and SEQC (low/high variance). Configurations without saved results are skipped.
+ORIGINAL_VARIANTS = ("10", "100")
+FIXED_MEAN_VARIANTS = ("fmzero", "fmlow", "fmhigh")
+
 # Plot styling per run name (without the variance suffix)
 RUN_STYLE = {
     "basic": dict(label="Basic", linestyle="-", marker=""),
     "cost_tradeoff": dict(label="Tradeoff", linestyle="--", marker="o"),
     "cost_inter": dict(label="Focus", linestyle="--", marker="x"),
-    "sabre": dict(label="SABRE-SWAP", linestyle=":", marker="^"),
+    "sabre": dict(label="LightSABRE", linestyle=":", marker="^"),
     "seqc": dict(label="SEQC", linestyle="-.", marker="D"),
 }
-VARIANCE_COLOR = {"10": "#2A5687", "100": "#7F2E2A"}
-VARIANCE_LABEL = {"10": "Low Variance", "100": "High Variance"}
+# Colour per link-noise configuration: low variance blue, high variance red; the fixed-mean configurations (panel c)
+# use a lighter shade of the same hue, so they are not mistaken for the original ones (panel b).
+VARIANCE_COLOR = {"10": "#2A5687", "100": "#7F2E2A", "fmlow": "#6FA8DC", "fmhigh": "#E06666", "fmzero": "#7F7F7F"}
+VARIANCE_LABEL = {"10": "Low variance", "100": "High variance",
+                  "fmlow": "Low variance, fixed mean", "fmhigh": "High variance, fixed mean",
+                  "fmzero": "No variance, fixed mean"}
 
 
-def remote_noise(backend):
-    return symmetric_remote_noise(backend) if SYMMETRIC_REMOTE_NOISE else backend.inter_chiplet_connections
+# --------------------------------------------------------------------------------------
+# Panel size (b, c, d and the relative-to-Basic plot): four panels side by side across the full text width of a
+# two-column paper (same size as Fig. 10). Every panel is drawn at its printed size, so include it in LaTeX at its
+# natural width (or width=0.24\textwidth for a 7.0 in text width) -- no further scaling, fonts stay FONT_PT and
+# identical across the panels. All panels share the same margins, so their axes line up next to each other.
+# --------------------------------------------------------------------------------------
+TEXT_WIDTH_IN = 7.0                   # full text width of the paper (two-column IEEE/ACM: ~7.0 in)
+N_PANELS = 4                          # panels in one row
+PANEL_W = TEXT_WIDTH_IN / N_PANELS    # 1.75 in
+PANEL_H = 1.6
+FONT_PT = 7
+MARGINS = dict(left=0.27, right=0.95, top=0.80, bottom=0.24)
+
+
+def _panel_style() -> None:
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "xtick.minor.size": 1.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "lines.linewidth": 1.0,
+        "lines.markersize": 3.5,
+        "lines.markeredgewidth": 0.6,
+        "lines.markeredgecolor": "black",
+        "errorbar.capsize": 1.5,
+    })
+
+
+def _new_panel():
+    _panel_style()
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
+    fig.subplots_adjust(**MARGINS)
+    return fig, ax
+
+
+def _panel_title(ax, title: str, better: str) -> None:
+    """Panel title and the "better" hint directly above it, both centred above the axes (plot rectangle)."""
+    t = ax.text(0.5, 1.03, title, transform=ax.transAxes, fontweight="bold", ha="center", va="bottom")
+    ax.annotate(better, xy=(0.5, 1.0), xycoords=t, xytext=(0, 1), textcoords="offset points",
+                fontweight="bold", color=plot_lib_color, ha="center", va="bottom")
 
 
 def split_run_name(t: str) -> tuple[str, str]:
-    """'cost_tradeoff100' -> ('cost_tradeoff', '100')"""
-    for v in ("100", "10"):
+    """'cost_tradeoff100' -> ('cost_tradeoff', '100'); 'basicfmhigh' -> ('basic', 'fmhigh')"""
+    for v in sorted(LINK_NOISE, key=len, reverse=True):  # longest first: "100" before "10"
         if t.endswith(v):
             return t[: -len(v)], v
     raise ValueError(t)
+
+
+def _variant_of(stat) -> str | None:
+    try:
+        return split_run_name(str(stat.json_metadata["run_name"]))[1]
+    except ValueError:
+        return None
+
+
+def link_noise_summary(backend, p_inter: float) -> str:
+    """Realized link noise of a backend: mean in units of p_inter, CV, max."""
+    v = np.array(list(backend.inter_chiplet_connections.values()))
+    return f"mean {v.mean() / p_inter:.2f}·p_inter, CV {v.std() / v.mean():.2f}, max {v.max():.2e} ({len(v)} links)"
 
 
 def ci95_bootstrap(values):
@@ -79,7 +167,8 @@ def ci95_bootstrap(values):
     return mean, mean - low_perc, high_perc - mean
 
 
-def plot_evaluation(stats, filename, inter_chiplet_noise):
+def plot_evaluation(stats, filename, inter_chiplet_noise, variants=("10", "100"),
+                    title="b) Cost-routing"):
     error_rates = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     physical_error_rates = set()
     d_values = set()
@@ -97,34 +186,13 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     d_values = sorted(d_values)
     physical_error_rates = sorted(list(physical_error_rates))
 
-    tex_fonts = {
-        # Use LaTeX to write all text
-        # "text.usetex": True,
-        "font.family": "serif",
-        # Font sizes
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.3,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
-        "axes.titlesize": 10,
-        # Line and marker styles
-        "lines.linewidth": 1.5,
-        "lines.markersize": 6,
-        "lines.markeredgewidth": 1.5,
-        "lines.markeredgecolor": "black",
-        # Error bar cap size
-        "errorbar.capsize": 3,
-    }
 
-    plt.rcParams.update(tex_fonts)
 
-    # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    fig, ax = _new_panel()
     handles = []
     # Plot identity (x = y)
     h = plt.plot(
-        physical_error_rates, physical_error_rates, linestyle="--", linewidth=1.5, color="#000000B3", label="x=y"
+        physical_error_rates, physical_error_rates, linestyle="--", linewidth=0.8, color="#000000B3", label="x=y"
     )
     # handles.extend(h)
 
@@ -133,7 +201,9 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     color_list = [colors_default, colors_transpiled]
 
     present = {str(s.json_metadata["run_name"]) for s in stats}
-    order = [rt + v for rt in ("basic", "cost_tradeoff", "cost_inter", "sabre", "seqc") for v in ("10", "100")]
+    # Only Chipmunq's routers: LightSABRE and SEQC are compared in panel d) (plot_error_improvement_vs_baselines),
+    # so they are left out here and in this panel's legend.
+    order = [rt + v for rt in ("basic", "cost_tradeoff", "cost_inter") for v in variants]
 
     for t in [t for t in order if t in present]:
         rt, var = split_run_name(t)
@@ -169,16 +239,7 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
         ps_inter_text = r"$1e^{-2}$"
     description = r"$p_{inter}$ = " + f"{ps_inter_text}, d = 5"
 
-    ax.text(0.05, 1.02, "b) Effect of cost-routing on LER", transform=ax.transAxes, fontweight="bold")
-
-    ax.text(
-        0.3,
-        1.13,
-        "Lower is better ↓",
-        transform=ax.transAxes,
-        fontweight="bold",
-        color=plot_lib_color,
-    )
+    _panel_title(ax, title, "Lower is better ↓")
 
     # plt.ylim(-0.01, 0.9)
     plt.ylim(1e-6, 1e0)
@@ -187,21 +248,17 @@ def plot_evaluation(stats, filename, inter_chiplet_noise):
     plt.yscale("log")
 
     plt.xlabel("Physical error rate")
-    plt.ylabel("Logical error rate")
+    plt.ylabel("LER")
     # plt.legend(loc="lower right", ncol=1)
     plt.grid(True, which="both", linestyle="--", alpha=0.3)
-    # fig.subplots_adjust(left=0.16, right=0.97, top=0.89, bottom=0.13)
-    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
-    legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=3, columnspacing=1.5)
-    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
-    plt.close(legend_fig)
+    # Legend: one shared legend for b-d, see save_shared_legend()
 
 
-def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta, baseline: str = "basic"):
+def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta, baseline: str = "basic",
+                           variants=("10", "100")):
     """Ratio LER_baseline / LER_method (>1: the method beats the baseline).
 
     ``baseline``: "basic" (Chipmunq without noise-aware routing, as in the original figure), "sabre"
@@ -219,27 +276,12 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta, ba
 
     methods = ["cost_inter", "cost_tradeoff"] + (["basic"] if baseline != "basic" else [])
 
-    tex_fonts = {
-        "font.family": "serif",
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.3,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
-        "axes.titlesize": 10,
-        "lines.linewidth": 1.5,
-        "lines.markersize": 6,
-        "lines.markeredgewidth": 1.5,
-        "lines.markeredgecolor": "black",
-        "errorbar.capsize": 3,
-    }
     alpha_fill = 0.15
-    plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    ax.axhline(1, color="black", linestyle="--", linewidth=1.5, alpha=0.5)
+    fig, ax = _new_panel()
+    ax.axhline(1, color="black", linestyle="--", linewidth=0.8, alpha=0.5)
 
     for d in sorted(d_values):
-        for var in ("10", "100"):
+        for var in variants:
             for m in methods:
                 xs, mean, lo, hi = [], [], [], []
                 for p in physical_error_rates:
@@ -261,8 +303,7 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta, ba
     base_label = RUN_STYLE[baseline]["label"]
     title = "c) Relative effect of cost-routing on LER" if baseline == "basic" else \
         f"c) Cost-routing vs. {RUN_STYLE[baseline]['label']}"
-    ax.text(-0.1, 1.02, title, transform=ax.transAxes, fontweight="bold")
-    ax.text(0.3, 1.13, "Higher is better ↑", transform=ax.transAxes, fontweight="bold", color=plot_lib_color)
+    _panel_title(ax, title, "Higher is better ↑")
 
     plt.ylim(0.01, 190)
     plt.xlim(1e-4, 1e-2)
@@ -271,7 +312,6 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta, ba
     plt.xlabel("Physical error rate")
     plt.ylabel(r"$LER_{" + base_label.replace("-SWAP", "") + r"}/LER_{Method}$")
     plt.grid(True, which="both", linestyle="--", alpha=0.3)
-    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
@@ -282,8 +322,9 @@ def plot_error_improvement(stats, filename, inter_chiplet_noise, alpha, beta, ba
 
 
 def plot_error_improvement_vs_baselines(stats, filename, baselines=("sabre", "seqc"),
-                                        methods=("cost_inter", "cost_tradeoff")):
-    """c) Chipmunq's cost routing against several baselines in one panel.
+                                        methods=("cost_inter", "cost_tradeoff"), variants=("10", "100"),
+                                        panel: str = "d)"):
+    """d) Chipmunq's cost routing against several baselines in one panel.
 
     y = LER_baseline / LER_Chipmunq (>1: Chipmunq is better), formed per backend seed (``iter``) so a
     seed's Chipmunq result is only compared with the same seed's baseline, then bootstrapped.
@@ -303,26 +344,11 @@ def plot_error_improvement_vs_baselines(stats, filename, baselines=("sabre", "se
 
     baseline_linestyle = {"sabre": ":", "seqc": "-.", "basic": "-"}
 
-    tex_fonts = {
-        "font.family": "serif",
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.3,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
-        "axes.titlesize": 10,
-        "lines.linewidth": 1.5,
-        "lines.markersize": 6,
-        "lines.markeredgewidth": 1.5,
-        "lines.markeredgecolor": "black",
-        "errorbar.capsize": 3,
-    }
-    plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    ax.axhline(1, color="black", linestyle="--", linewidth=1.5, alpha=0.5)
+    fig, ax = _new_panel()
+    ax.axhline(1, color="black", linestyle="--", linewidth=0.8, alpha=0.5)
 
     for d in sorted(d_values):
-        for var in ("10", "100"):
+        for var in variants:
             for b in baselines:
                 for m in methods:
                     xs, mean, lo, hi = [], [], [], []
@@ -343,61 +369,71 @@ def plot_error_improvement_vs_baselines(stats, filename, baselines=("sabre", "se
                                      edgecolor="none")
 
     names = " and ".join(RUN_STYLE[b]["label"] for b in baselines)
-    ax.text(-0.1, 1.02, f"c) Chipmunq vs. {names}", transform=ax.transAxes, fontweight="bold")
-    ax.text(0.3, 1.13, "Higher is better ↑", transform=ax.transAxes, fontweight="bold", color=plot_lib_color)
+    _panel_title(ax, f"{panel} vs. baselines", "Higher is better ↑")  # names: legend / caption
 
     plt.ylim(0.01, 190)
     plt.xlim(1e-4, 1e-2)
     plt.xscale("log")
     plt.yscale("log")
     plt.xlabel("Physical error rate")
-    plt.ylabel(r"$LER_{Baseline}/LER_{Chipmunq}$")
+    plt.ylabel(r"$LER_{base}/LER_{Chipmunq}$")
     plt.grid(True, which="both", linestyle="--", alpha=0.3)
-    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
-    # Legend as its own figure (like the other panels): baseline / router / variance explained separately,
-    # so it stays small although the panel has up to 8 curves
+    # Legend: one shared legend for b-d, see save_shared_legend()
+
+
+def save_shared_legend(filename: str, variants) -> None:
+    """One legend for panels b-d, two rows across the full text width.
+
+    Row 1, colour = link-noise configuration (b, d: low / high variance; c: the same at a fixed mean).
+    Row 2, line style / marker: Chipmunq's routers (b, c; in d the marker marks the Chipmunq router) and the
+    baselines Chipmunq is compared against in d.
+    """
     from matplotlib.lines import Line2D
-    handles = (
-        [Line2D([], [], color="black", linestyle=baseline_linestyle.get(b, "-"), label=f"vs. {RUN_STYLE[b]['label']}")
-         for b in baselines]
-        + [Line2D([], [], color="black", linestyle="", marker=RUN_STYLE[m]["marker"] or "s",
-                  markerfacecolor="white", label=f"Chipmunq {RUN_STYLE[m]['label']}") for m in methods]
-        + [Line2D([], [], color=VARIANCE_COLOR[v], linewidth=4, label=VARIANCE_LABEL[v]) for v in ("10", "100")]
-    )
-    legend_fig = plt.figure(figsize=(3, 2))
-    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=3, columnspacing=1.5)
-    legend_fig.savefig(str(filename) + "legend.pdf", bbox_inches="tight", format="pdf")
-    plt.close(legend_fig)
+    _panel_style()
+    row1 = [Line2D([], [], color=VARIANCE_COLOR[v], linewidth=3, label=VARIANCE_LABEL[v]) for v in variants]
+    row2 = [Line2D([], [], color="black", linewidth=1, linestyle=RUN_STYLE[rt]["linestyle"],
+                   marker=RUN_STYLE[rt]["marker"] or None, markerfacecolor="white", label=RUN_STYLE[rt]["label"])
+            for rt in ("basic", "cost_tradeoff", "cost_inter")]
+    row2 += [Line2D([], [], color="black", linewidth=1, linestyle=ls, label=f"vs. {RUN_STYLE[b]['label']}")
+             for b, ls in (("sabre", ":"), ("seqc", "-."))]
+    # Each row is its own one-row legend, centred: in a single two-row legend the column widths come from the
+    # longer labels of the other row, which spaces the shorter row unevenly.
+    fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.4))
+    kw = dict(frameon=False, columnspacing=1.2, handlelength=2.2, handletextpad=0.4, borderpad=0.1)
+    fig.legend(handles=row1, loc="lower center", bbox_to_anchor=(0.5, 0.5), ncols=len(row1), **kw)
+    fig.legend(handles=row2, loc="upper center", bbox_to_anchor=(0.5, 0.5), ncols=len(row2), **kw)
+    fig.savefig(filename, bbox_inches="tight", format="pdf")
+    plt.close(fig)
 
 
-def plot_routing_overhead(compile_stats: dict, filename: str) -> None:
+def plot_routing_overhead(compile_stats: dict, filename: str, variants=("10", "100")) -> None:
     """Routing runtime, 2q-gate overhead, depth overhead and inter-chiplet 2q gates per router
-    (mean and 95% CI over backend seeds), for both link-noise variances."""
+    (mean and 95% CI over backend seeds), for the link-noise configurations in ``variants``."""
     metrics = [("routing_s", "Routing time [ms]", 1e3), ("2q_overhead", "2q-gate overhead", 1),
                ("depth_overhead", "Depth overhead", 1), ("inter_chiplet_2q", "Inter-chiplet 2q", 1)]
     runs = [rt for rt in ("basic", "cost_tradeoff", "cost_inter", "sabre", "seqc")
             if any(k[0] == rt for k in compile_stats)]
     fig, axes = plt.subplots(1, len(metrics), figsize=(HEIGHT_FIGSIZE * 5, WIDTH_FIGSIZE * 0.45))
-    w = 0.38
+    w = 0.76 / len(variants)
     for ax, (key, ylabel, scale) in zip(axes, metrics):
-        for j, var in enumerate(("10", "100")):
+        for j, var in enumerate(variants):
             for i, rt in enumerate(runs):
                 vals = [v[key] * scale for k, v in compile_stats.items() if k[0] == rt and str(k[1]) == var]
                 if not vals:
                     continue
                 mu, lo, hi = ci95_bootstrap(vals)
-                ax.bar(i + (j - 0.5) * w, mu, w, yerr=[[lo], [hi]], color=VARIANCE_COLOR[var], edgecolor="black",
-                       hatch={"sabre": "//", "seqc": ".."}.get(rt, ""), alpha=0.85,
+                ax.bar(i + (j - (len(variants) - 1) / 2) * w, mu, w, yerr=[[lo], [hi]], color=VARIANCE_COLOR[var],
+                       edgecolor="black", hatch={"sabre": "//", "seqc": ".."}.get(rt, ""), alpha=0.85,
                        label=VARIANCE_LABEL[var] if (i == 0 and key == "routing_s") else None)
         ax.set_xticks(range(len(runs)))
         ax.set_xticklabels([RUN_STYLE[r]["label"] for r in runs], rotation=30, ha="right")
         ax.set_title(ylabel, fontsize=FONTSIZE)
         ax.grid(True, axis="y", linestyle="--", alpha=0.3)
     axes[0].legend(fontsize=FONTSIZE - 4)
-    fig.text(0.01, 0.98, "Routing cost from the same Chipmunq mapping (SABRE-SWAP: equal time budget; "
+    fig.text(0.01, 0.98, "Routing cost from the same Chipmunq mapping (LightSABRE: equal time budget; "
                          "SEQC: unconstrained). "
                          "Lower is better ↓", va="top", fontweight="bold", color=plot_lib_color)
     fig.tight_layout(rect=(0, 0, 1, 0.9))
@@ -602,9 +638,9 @@ def plot_hyperparameter_search(folder_path: str, filename: str):
                 ratios.append(base[0] / v[0])
         if ratios:
             sabre_improvement = float(np.exp(np.mean(np.log(ratios))))
-            print(f"SABRE-SWAP improvement over Basic: {sabre_improvement}")
+            print(f"LightSABRE improvement over Basic: {sabre_improvement}")
             cb.ax.axhline(min(sabre_improvement, 50), color="white", linewidth=2, linestyle="--")
-            cb.ax.text(1.6, min(sabre_improvement, 50), f"SABRE\n×{sabre_improvement:.1f}",
+            cb.ax.text(1.6, min(sabre_improvement, 50), f"LightSABRE\n×{sabre_improvement:.1f}",
                        transform=cb.ax.get_yaxis_transform(), va="center", fontsize=FONTSIZE - 2)
     # cb = plt.colorbar(tcf, label="Improvement Rate")
 
@@ -831,7 +867,11 @@ def compile_same_mapping(circuit, partitions, backend, ps_inter, ra, seed=0, run
     return compiled, budget
 
 
-def run_noise_aware_routing(reproduce: bool = False) -> None:
+def run_noise_aware_routing(reproduce: bool = False, noise_configs=DEFAULT_NOISE_CONFIGS) -> None:
+    """Fig. 9 b/c. ``noise_configs``: link-noise configurations (keys of LINK_NOISE) to run when ``reproduce``.
+    Their results replace those of the same configurations in the saved pickles; all other configurations are
+    kept, so e.g. ``noise_configs=("fmlow", "fmhigh")`` adds the fixed-mean runs without re-running "10"/"100".
+    Plots always use everything that is saved."""
     # Alpha values
     routing_alpha = [3]
 
@@ -851,15 +891,13 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
     # Iterations
     n_iter = 4
 
-    # Inter chiplet noise variance
-    #   - Low variance: [1, 10]*inter_connect_noise
-    #   - High variance: [1, 100]*inter_connect_noise
-    ic_noise_model = [10, 100]
+    # Link-noise configurations to (re)run, see LINK_NOISE
+    ic_noise_model = [v for v in LINK_NOISE if v in noise_configs]
 
     # Generate CNOT lattice surgery circuit
     circuit, partitions = get_tqec_cnot_rotated(distance_scale=k, n1=1, n2=0)
 
-    def get_backend(inter_noise_factor: int, d: int, seed: int, ps_inter: float) -> BackendChipletV2:
+    def get_backend(variant: str, d: int, seed: int, ps_inter: float) -> BackendChipletV2:
         # Depending on the distance, each chiplet needs to be scaled
         chiplet_size, nic = {
             1: ((2, 2, 11, 6), 5),
@@ -867,21 +905,22 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
             3: ((2, 2, 19, 10), 9),
             4: ((2, 2, 23, 12), 11),
         }[d]
+        cfg = dict(LINK_NOISE[variant])
+        mean_factor = cfg.pop("mean_factor", 1.0)  # lognormal: inter_chiplet_noise is the mean
         return BackendChipletV2(
             size=chiplet_size,
             n_inter=nic,
             connectivity="nn",
             topology="rotated_grid",
-            inter_chiplet_noise=ps_inter,
+            inter_chiplet_noise=ps_inter * mean_factor,
             inter_chiplet_amplification=1,
-            inter_chiplet_rfactor=inter_noise_factor,
-            inter_chiplet_noise_type="random",
             num_defective_qubits=0,
             rng_seed=seed,
+            **cfg,
         )
 
     output_dir = Path("experiments/evaluation/qec_routing")
-    if reproduce:
+    if reproduce and ic_noise_model:
         output_dir.mkdir(parents=True, exist_ok=True)
         for ra in routing_alpha:
             for ps_inter in inter_chiplet_noise:
@@ -891,11 +930,12 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
                     for iter_seed in range(n_iter):
                         backend = get_backend(icnm, k, iter_seed, ps_inter)
                         backends[(icnm, iter_seed)] = backend
+                        print(f"[{icnm}, seed {iter_seed}] link noise: {link_noise_summary(backend, ps_inter)}")
                         per_rt, budget = compile_same_mapping(circuit, partitions, backend, ps_inter, ra,
                                                               seed=iter_seed, runs=tuple(rts))
                         for rt, rec in per_rt.items():
                             compiled[(rt, icnm, iter_seed)] = rec
-                        print(f"[var {icnm}, seed {iter_seed}] budget {budget * 1e3:.0f} ms: " + ", ".join(
+                        print(f"[{icnm}, seed {iter_seed}] budget {budget * 1e3:.0f} ms: " + ", ".join(
                             f"{rt} {rec['routing_s'] * 1e3:.0f} ms / {rec['swaps']} swaps"
                             for rt, rec in per_rt.items()))
 
@@ -914,13 +954,25 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
                     )
 
                 # Run simulation
-                stats = run_sinter_simulation(_get_sinter_task, [k], ps)
+                stats = list(run_sinter_simulation(_get_sinter_task, [k], ps))
 
-                # Save results (Stim circuits are stored as text so the pickle stays portable)
-                with open(output_dir / f"routing_{ra}_{ps_inter}_sweep.pkl", "wb") as f:
+                # Save results, merged with the saved results of the configurations that were not re-run
+                # (Stim circuits are stored as text so the pickle stays portable)
+                stats_file = output_dir / f"routing_{ra}_{ps_inter}_sweep.pkl"
+                if stats_file.exists():
+                    with open(stats_file, "rb") as f:
+                        stats = [s for s in pickle.load(f) if _variant_of(s) not in ic_noise_model] + stats
+                with open(stats_file, "wb") as f:
                     pickle.dump(stats, f)
+
                 compile_stats = {key: {**rec, "stim": str(rec["stim"])} for key, rec in compiled.items()}
-                with open(output_dir / f"routing_{ra}_{ps_inter}_compile.pkl", "wb") as f:
+                compile_file = output_dir / f"routing_{ra}_{ps_inter}_compile.pkl"
+                if compile_file.exists():
+                    with open(compile_file, "rb") as f:
+                        old = pickle.load(f)
+                    compile_stats = {**{key: v for key, v in old.items() if str(key[1]) not in ic_noise_model},
+                                     **compile_stats}
+                with open(compile_file, "wb") as f:
                     pickle.dump(compile_stats, f)
 
     # Plot simulation results
@@ -939,30 +991,54 @@ def run_noise_aware_routing(reproduce: bool = False) -> None:
             with open(results_file, "rb") as f:
                 stats = pickle.load(f)
 
-            plot_evaluation(stats, f"experiments/evaluation/qec_routing/routing_{ra}_{ps}.pdf", ps)
-
-            # c) relative to Basic (original figure) and relative to SABRE-SWAP from the same mapping
-            plot_error_improvement(
-                stats, f"experiments/evaluation/qec_routing/routing_difference_{ra}_{ps}.pdf", ps_inter_text, ra, 1
-            )
-            # c) Chipmunq (Focus, Tradeoff) against SABRE-SWAP and SEQC in one panel
-            if any(str(s.json_metadata["run_name"]).startswith(("sabre", "seqc")) for s in stats):
-                plot_error_improvement_vs_baselines(
-                    stats, f"experiments/evaluation/qec_routing/routing_difference_baselines_{ra}_{ps}.pdf"
-                )
-
             compile_file = output_dir / f"routing_{ra}_{ps}_compile.pkl"
+            compile_stats = None
             if compile_file.exists():
                 with open(compile_file, "rb") as f:
                     compile_stats = pickle.load(f)
-                plot_routing_overhead(compile_stats, f"experiments/evaluation/qec_routing/routing_overhead_{ra}_{ps}.pdf")
-                print("run, variance: routing ms | swaps | 2q overhead | depth overhead | inter-chiplet 2q")
+
+            saved = {_variant_of(s) for s in stats}
+            original = tuple(v for v in ORIGINAL_VARIANTS if v in saved)
+            fixed_mean = tuple(v for v in FIXED_MEAN_VARIANTS if v in saved)
+            out = "experiments/evaluation/qec_routing"
+
+            # b) LER, original low / high variance
+            if original:
+                plot_evaluation(stats, f"{out}/routing_{ra}_{ps}.pdf", ps, variants=original,
+                                title="b) Cost-routing")
+                # Relative to Basic (former c), not part of b-d) any more; kept for reference
+                plot_error_improvement(stats, f"{out}/routing_difference_{ra}_{ps}.pdf", ps_inter_text, ra, 1,
+                                       variants=original)
+
+            # c) LER, low / high variance at a fixed mean link noise
+            if fixed_mean:
+                plot_evaluation(stats, f"{out}/routing_{ra}_{ps}_fixedmean.pdf", ps, variants=fixed_mean,
+                                title="c) Fixed-mean noise")
+            else:
+                print("No fixed-mean results yet: run with --noise-configs fmlow fmhigh to create panel c).")
+
+            # d) Chipmunq (Focus, Tradeoff) against LightSABRE and SEQC, original low / high variance
+            if original and any(str(s.json_metadata["run_name"]).startswith(("sabre", "seqc")) for s in stats):
+                plot_error_improvement_vs_baselines(
+                    stats, f"{out}/routing_difference_baselines_{ra}_{ps}.pdf", variants=original, panel="d)",
+                )
+
+            # One legend for b-d
+            save_shared_legend(f"{out}/routing_{ra}_{ps}_legend.pdf", original + fixed_mean)
+
+            # Routing cost of every router for all saved configurations
+            if compile_stats is not None:
+                plot_routing_overhead(compile_stats, f"{out}/routing_overhead_{ra}_{ps}.pdf",
+                                      variants=tuple(v for v in LINK_NOISE if v in saved))
+
+            if compile_stats is not None:
+                print("run, link noise: routing ms | swaps | 2q overhead | depth overhead | inter-chiplet 2q")
                 for rt in rts:
-                    for icnm in ic_noise_model:
-                        recs = [v for key, v in compile_stats.items() if key[0] == rt and key[1] == icnm]
+                    for icnm in LINK_NOISE:
+                        recs = [v for key, v in compile_stats.items() if key[0] == rt and str(key[1]) == icnm]
                         if recs:
                             m = lambda key: np.mean([r[key] for r in recs])  # noqa: E731
-                            print(f"{rt:14s} {icnm:4d}: {m('routing_s') * 1e3:7.1f} | {m('swaps'):6.0f} | "
+                            print(f"{rt:14s} {icnm:>6s}: {m('routing_s') * 1e3:7.1f} | {m('swaps'):6.0f} | "
                                   f"{m('2q_overhead'):6.0f} | {m('depth_overhead'):5.0f} | {m('inter_chiplet_2q'):5.0f}")
 
 
@@ -974,6 +1050,9 @@ if __name__ == "__main__":
                     help="only replot saved results (experiments/evaluation/qec_routing/), no compilation/simulation")
     ap.add_argument("--sweep", action="store_true",
                     help="run (or, with --plot-only, replot) the alpha/beta hyperparameter sweep instead")
+    ap.add_argument("--noise-configs", nargs="+", choices=list(LINK_NOISE), default=list(DEFAULT_NOISE_CONFIGS),
+                    help="link-noise configurations to run; others keep their saved results "
+                         "(e.g. --noise-configs fmlow fmhigh adds the fixed-mean runs)")
     a = ap.parse_args()
 
     if a.sweep:
@@ -981,4 +1060,4 @@ if __name__ == "__main__":
         perform_noise_aware_routing_sweep(reproduce=not a.plot_only)
     else:
         # Routing for specific configurations
-        run_noise_aware_routing(reproduce=not a.plot_only)
+        run_noise_aware_routing(reproduce=not a.plot_only, noise_configs=a.noise_configs)

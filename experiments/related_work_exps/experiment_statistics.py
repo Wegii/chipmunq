@@ -11,10 +11,15 @@ the circuit statistics, which are plotted as
 Results are stored per method in related_work/results_<method>.pkl as
     {d: {"runtime": seconds | TIMEOUT | FAILED, "stats": dict | TIMEOUT | FAILED}}
 and written after every distance, so an interrupted run keeps what it finished.
+
+Usage:
+    python <this file>               # run all methods, then plot
+    python <this file> --plot-only   # only re-plot from the stored result files
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import time
@@ -68,6 +73,10 @@ CODE_DISTANCES = [2, 3, 4, 5]
 # The original runtime figure marked QECC-Synth at these d as timed out by hand
 # (QECC-Synth returns after its own internal limit). Only affects the runtime plot.
 MANUAL_RUNTIME_TIMEOUTS = {"qeccsynth": {3, 4}}
+
+# Runtime plot: initial y-axis top as a multiple of TIMEOUT_S. It is raised further
+# only as far as needed for the T/O labels above the bars to fit inside the axes.
+RUNTIME_YLIM_FACTOR = 1.5
 
 PLOTS = {
     # metric: (title, title x-shift, y label, file name)
@@ -181,10 +190,26 @@ def _set_style() -> None:
     })
 
 
+def _fit_labels_in_axes(fig, ax, labels, pad_px: float = 4.0, max_iter: int = 20) -> None:
+    """Raise the (log) y-axis top just enough that every label lies inside the axes."""
+    lo, hi = ax.get_ylim()
+    ax.set_ylim(lo, max(hi, TIMEOUT_S * RUNTIME_YLIM_FACTOR))
+    if not labels:
+        return
+    for _ in range(max_iter):
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        top = max(t.get_window_extent(renderer).y1 for t in labels)
+        if top + pad_px <= ax.bbox.y1:
+            return
+        lo, hi = ax.get_ylim()
+        ax.set_ylim(lo, hi * 1.25)
+
+
 def plot_metric(results: dict, metric: str, distances: list[int]) -> list:
     """Grouped bars per code distance, one bar per method. Returns the bar handles.
 
-    Runtime: a timed-out run is a hollow bar at TIMEOUT_S labelled T/O.
+    Runtime: a timed-out run is a hollow bar at TIMEOUT_S with a T/O label inside the bar.
     Statistics: a timed-out or failed run has no circuit, so no bar, only a T/O / fail label.
     """
     title, shift, ylabel, fname = PLOTS[metric]
@@ -195,6 +220,7 @@ def plot_metric(results: dict, metric: str, distances: list[int]) -> list:
     styles = [s for s in METHOD_STYLES if s[0] in results]
     width = 0.8 / len(styles)
     handles = []
+    to_labels = []  # runtime T/O annotations, checked against the axes top below
 
     for i, (key, label, color, hatch) in enumerate(styles):
         offset = (i - (len(styles) - 1) / 2) * width
@@ -215,8 +241,14 @@ def plot_metric(results: dict, metric: str, distances: list[int]) -> list:
         for j, v in enumerate(values):
             if metric == "runtime" and timed_out[j]:
                 style_timeout_bar(bars[j], color)
-                ax.text(x[j] + offset, max(heights[j], TIMEOUT_S) * 1.2, "T/O", ha="center", va="bottom",
-                        color="red", fontweight="bold", fontsize=9, rotation=90)
+                # Label sits a few points above the top of the bar as actually drawn. For
+                # QECC-Synth's manual timeouts the bar has its measured runtime as height,
+                # not TIMEOUT_S, so anchoring at TIMEOUT_S would leave the label floating.
+                bar_top = bars[j].get_height()
+                y_top = bar_top if bar_top > 0 else TIMEOUT_S
+                to_labels.append(ax.annotate(
+                    "T/O", xy=(x[j] + offset, y_top), xytext=(0, 3), textcoords="offset points",
+                    ha="center", va="bottom", color="red", fontweight="bold", fontsize=9, rotation=90))
             elif not numeric[j] and v is not None:  # no bar: say why
                 ax.text(x[j] + offset, 0.03, "T/O" if v == TIMEOUT else "fail", transform=ax.get_xaxis_transform(),
                         ha="center", va="bottom", color="red", fontweight="bold", fontsize=9, rotation=90)
@@ -231,11 +263,12 @@ def plot_metric(results: dict, metric: str, distances: list[int]) -> list:
     plt.xlabel("Surface code distance", fontsize=16)
     plt.ylabel(ylabel, fontsize=16)
     plt.yscale("log")
-    if metric == "runtime":
-        ax.set_ylim(top=2e4)  # headroom for the rotated T/O labels above TIMEOUT_S
     plt.grid(True, which="major", linestyle="--", alpha=0.5)
 
     fig.subplots_adjust(left=0.175, right=0.95, top=0.83, bottom=0.2)
+    if metric == "runtime":
+        # After subplots_adjust, so the check uses the final axes size.
+        _fit_labels_in_axes(fig, ax, to_labels)
     plt.savefig(OUTPUT_DIR / f"{fname}.pdf", format="pdf")
     plt.close(fig)
     return handles
@@ -290,8 +323,19 @@ def run_experiment(reproduce: bool = False, methods=ALL_METHODS, distances=CODE_
 
     # Load pre-computed results
     results = load_results(OUTPUT_DIR, RESULTS_PATTERN)
+    if not results:
+        print(f"No result files matching '{RESULTS_PATTERN}' in {OUTPUT_DIR}; nothing to plot.")
+        return
     plot_all(results, distances)
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--plot-only", action="store_true",
+                        help="Skip transpilation and only re-plot from the stored result files.")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_experiment(reproduce=True)
+    args = _parse_args()
+    run_experiment(reproduce=not args.plot_only)

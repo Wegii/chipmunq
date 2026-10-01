@@ -35,7 +35,9 @@ Part 2 -- d) LER, e) utilization tradeoff:
     [2] https://github.com/SophLin/superstabilizer_demo  (clone into external/baseline/superstabilizer_demo;
         only needed to run part 2)
 
-All panels are drawn at their printed size for four panels side by side across the full page width.
+All panels are drawn at their printed size for four panels side by side across the full page width. One legend
+(combined_overheadlegend.pdf) covers all panels a-e; it only depends on the styles below, so it is written on
+every run, also with --plot-only and for a single --part.
 
 Run from the repo root:
     python experiments/scalability_exps/experiment_defective_qubits.py                    # both parts
@@ -83,6 +85,16 @@ PANEL_H = 1.6
 FONT_PT = 7
 # identical margins for all panels, so the axes line up when placed next to each other
 MARGINS = dict(left=0.27, right=0.97, top=0.80, bottom=0.24)
+
+# --------------------------------------------------------------------------------------
+# Bar styles of panels a-c, shared with the single legend (save_legend). Every entry of the legend must have
+# its own colour/hatch, so panels d, e (SERIES) use different colours than a-c.
+# --------------------------------------------------------------------------------------
+# Chipmunq: single-patch center, single-patch size-aware, multi-patch center, multi-patch size-aware
+COLORS_CUSTOM = ["#A7D9ED", "#5B9BD5", "#D9D9D9", "#7F7F7F"]
+# LightSABRE: index 0 = single patch, 2 = multi patch (1, 3 unused: LightSABRE has no placement modes)
+COLORS_SABRE = ["#F7C6A2", "#E68A5C", "#F7A2A2", "#D65C5C"]
+HATCHES = ["...", "//", "xxx", "ooo"]  # one hatch per placement mode (center, size-aware)
 
 
 # ######################################################################################
@@ -136,12 +148,10 @@ def plot_combined_backends(
 
     title_left = ""
 
-    # Colors
-    # colors = ["#4682B4", "#AEC6CF", "#F08080", "#F7C6A2"]
-    colors_custom = ["#A7D9ED", "#5B9BD5", "#D9D9D9", "#7F7F7F"]
-    colors_sabre = ["#F7C6A2", "#E68A5C", "#F7A2A2", "#D65C5C"]
-
-    hatches = ["...", "//", "xxx", "ooo"]  # one hatch per placement mode
+    # Colors and hatches: module-level COLORS_CUSTOM / COLORS_SABRE / HATCHES (shared with the legend)
+    colors_custom = COLORS_CUSTOM
+    colors_sabre = COLORS_SABRE
+    hatches = HATCHES
 
     # Panel size, fonts and margins: module-level PANEL_* / FONT_PT / MARGINS (shared with d, e)
     tex_fonts = {
@@ -364,14 +374,13 @@ def plot_combined_backends(
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
     fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
 
-    handles = []
     for i, mode in enumerate(placement_modes):
         # Single patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_utilization[0], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[0], df_values, mode, ks)
 
         # Custom
-        h = ax.bar(
+        ax.bar(
             x + i * 1 * width - 2.5 * width,
             values_mean_custom,
             width,
@@ -384,10 +393,9 @@ def plot_combined_backends(
             hatch=hatches[i],
             edgecolor="black",
         )
-        handles.append(h)
         if i < 1:
             # SABRE
-            h = ax.bar(
+            ax.bar(
                 x + i * 2 * width - 0.5 * width,
                 values_mean_sabre,
                 width,
@@ -400,13 +408,12 @@ def plot_combined_backends(
                 # hatch=hatches[i],
                 edgecolor="black",
             )
-            handles.append(h)
 
         # Multi patch
         values_mean_custom, values_err_custom = ci95_bootstrap(custom_utilization[1], df_values, mode, ks)
         values_mean_sabre, values_err_sabre = ci95_bootstrap(sabre_utilization[1], df_values, mode, ks)
         # Custom
-        h = ax.bar(
+        ax.bar(
             x + (2 + i) * width * 2 - 3.5 * width - i * width,
             values_mean_custom,
             width,
@@ -419,11 +426,10 @@ def plot_combined_backends(
             hatch=hatches[i],
             edgecolor="black",
         )
-        handles.append(h)
 
         if i < 1:
             # SABRE
-            h = ax.bar(
+            ax.bar(
                 x + (2 + i) * width * 2 - 1.5 * width,
                 values_mean_sabre,
                 width,
@@ -436,7 +442,6 @@ def plot_combined_backends(
                 # hatch=hatches[i + 2],
                 edgecolor="black",
             )
-            handles.append(h)
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(df) for df in df_values])
@@ -461,24 +466,7 @@ def plot_combined_backends(
     fig.subplots_adjust(**MARGINS)
     fig.savefig(f"{filename}_utilization.pdf", format="pdf")
     plt.close(fig)
-
-    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.3))
-    legend = legend_fig.legend(
-        handles=[handles[0], handles[4], handles[2], handles[5]],
-        loc="center",
-        frameon=False,
-        ncols=2,  # two rows: four labels in one row are wider than the page at 7 pt
-        columnspacing=1.5,
-    )
-    legend_fig.savefig(filename + "legend_custom.pdf", bbox_inches="tight", format="pdf")
-    plt.close(legend_fig)
-
-    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.3))
-    legend = legend_fig.legend(
-        handles=[handles[1], handles[3]], loc="center", frameon=False, ncols=4, columnspacing=1.5
-    )
-    legend_fig.savefig(filename + "legend_sabre.pdf", bbox_inches="tight", format="pdf")
-    plt.close(legend_fig)
+    # The legend for all panels is written by save_legend()
 
 
 def calculate_qpu_utilization(circuit, backend):
@@ -888,11 +876,14 @@ def _ci95(vals, n_boot=5000, seed=0):
     return mean, mean - np.percentile(boots, 2.5), np.percentile(boots, 97.5) - mean
 
 
-SERIES = [  # (method, L index, label, colour, hatch). Tight: L = D, slack: L = D + 2 (explain in the caption)
-    ("chipmunq", 0, "Chipmunq (avoid), tight", "#A7D9ED", "..."),
-    ("deform", 0, "Lin et al. (deform), tight", "#B5D8B0", "\\\\"),
-    ("chipmunq", 1, "Chipmunq (avoid), slack", "#5B9BD5", "//"),
-    ("deform", 1, "Lin et al. (deform), slack", "#6AA84F", "xx"),
+# (method, L index, label, colour, hatch). Tight: L = D, slack: L = D + 2 (explain in the caption).
+# Chipmunq uses purple here: the blues/greys of a-c already stand for Chipmunq's single/multi-patch placements,
+# and all panels share one legend. Labels are short so the legend fits the page width in two rows.
+SERIES = [
+    ("chipmunq", 0, "Avoiding, tight", "#C9BEE6", "++"),
+    ("deform", 0, "Deform, tight", "#B5D8B0", "\\\\"),
+    ("chipmunq", 1, "Avoiding, slack", "#8E7CC3", "xx"),
+    ("deform", 1, "Deform, slack", "#6AA84F", "xx"),
 ]
 
 
@@ -939,7 +930,6 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
     width = 0.84 / len(SERIES)
     all_ok = [r["ler"] for r in rows if r["ok"]]
     floor = min(all_ok) / 3 if all_ok else 1e-7
-    handles = []
     for j, (method, li, label, color, hatch) in enumerate(SERIES):
         L = Ls[li]
         xpos = x + (j - (len(SERIES) - 1) / 2) * width
@@ -953,12 +943,11 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
             else:  # no chiplet could host the patch: hollow dashed bar
                 ax.bar(xpos[i], floor * 3, width, bottom=floor, color="white", hatch="xxx",
                        edgecolor=color, linewidth=0.8, linestyle="--")
-        handles.append(Patch(facecolor=color, hatch=hatch, edgecolor="black", linewidth=0.4, label=label))
     ax.set_yscale("log")
     ax.set_ylim(bottom=floor)
     ax.set_xticks(x, [str(k) for k in DEFECTS])
     ax.set_xlabel("#Defective qubits")
-    ax.set_ylabel("LER per QEC cycle")
+    ax.set_ylabel("LER")  # per QEC cycle (state in the caption)
     ax.grid(True, which="major", axis="y", linestyle="--", linewidth=0.4, alpha=0.5)
     ax.set_axisbelow(True)
     _title(ax, "d) Avoid vs. deform", "Lower is better ↓")
@@ -983,17 +972,47 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
             ax.annotate(str(kk), xy=(ui, lk), xytext=(2, 2), textcoords="offset points", fontsize=FONT_PT - 2.5)
     ax.set_yscale("log")
     ax.set_xlabel("Utilization")  # active code qubits / chiplet qubits (state in the caption)
-    ax.set_ylabel("LER per QEC cycle")
+    ax.set_ylabel("LER")  # per QEC cycle (state in the caption)
     ax.grid(True, which="both", linestyle="--", linewidth=0.4, alpha=0.5)
     _title(ax, "e) Utilization tradeoff", "Lower, right is better")
     fig.savefig(f"{filename}_deformation_tradeoff.pdf", format="pdf")
     plt.close(fig)
+    # The legend for all panels is written by save_legend()
 
-    # ---------------- legend (one row, full page width) ----------------
-    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.3))
-    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=len(handles), columnspacing=1.0,
-                      handlelength=1.4, handletextpad=0.4)
-    legend_fig.savefig(f"{filename}legend_deformation.pdf", bbox_inches="tight", format="pdf")
+
+# ######################################################################################
+# One legend for all panels (a-e)
+# ######################################################################################
+def save_legend(filename=str(OUT_DIR / "combined_overhead")) -> None:
+    """Single legend for panels a-e, full page width, two rows of five entries.
+
+    Column by column: Chipmunq single patch (center / size-aware), Chipmunq multi patch (center / size-aware),
+    LightSABRE (single / multi), Avoiding (tight / slack), Deform (tight / slack). matplotlib
+    fills legends column by column, so the entries are listed in that order.
+    Built from the style constants only (no data), so it is written whatever part is run or replotted.
+    """
+    _fonts()
+
+    def patch(label, color, hatch=""):
+        return Patch(facecolor=color, hatch=hatch, edgecolor="black", linewidth=0.4, label=label)
+
+    handles = [
+        patch("Chipmunq single, center", COLORS_CUSTOM[0], HATCHES[0]),
+        patch("Chipmunq single, size-aware", COLORS_CUSTOM[1], HATCHES[1]),
+        patch("Chipmunq multi, center", COLORS_CUSTOM[2], HATCHES[0]),
+        patch("Chipmunq multi, size-aware", COLORS_CUSTOM[3], HATCHES[1]),
+        patch("LightSABRE single", COLORS_SABRE[0]),
+        patch("LightSABRE multi", COLORS_SABRE[2]),
+    ]
+    for method in ("chipmunq", "deform"):  # tight above slack
+        handles += [patch(label, color, hatch) for m, _, label, color, hatch in sorted(SERIES, key=lambda s: s[1])
+                    if m == method]
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.4))
+    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=math.ceil(len(handles) / 2),
+                      columnspacing=0.8, handlelength=1.2, handletextpad=0.35)
+    legend_fig.savefig(f"{filename}legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
@@ -1022,3 +1041,6 @@ if __name__ == "__main__":
             data = run_deformation(a.jobs, a.quick)
         summarize_deformation(data["rows"])
         plot_deformation(data)
+
+    # One legend for all panels a-e
+    save_legend()

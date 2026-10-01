@@ -184,14 +184,21 @@ PLOT_PREFIX = RESULTS_DIR / "cnot_scaling_overhead_split"
 
 # Order = order of the bar groups in the plot.
 BENCHMARKS = ["cnot", "ghz", "bv", "bv_color", "gross_bridge"]
+# Short names: used as x tick labels (two lines where needed) and in the console output.
+# Logical-qubit counts (GHZ_N, len(BV_SECRET)) go in the caption.
 TITLES = {
     "cnot": "CNOT",
-    "ghz": f"GHZ-{GHZ_N}",
-    "bv": f"BV-{len(BV_SECRET)}",
-    "bv_color": f"BV-{len(BV_SECRET)} (color)",
-    "gross_bridge": "Gross surgery",
-    "gross": "Gross Code",  # memory only; no longer in BENCHMARKS
+    "ghz": "GHZ",
+    "bv": "BV",
+    "bv_color": "BV\n(color)",
+    "gross_bridge": "Gross\nsurgery",
+    "gross": "Gross",  # memory only; no longer in BENCHMARKS
 }
+
+
+def _title(key: str) -> str:
+    """Single-line name for console output."""
+    return TITLES[key].replace("\n", " ")
 
 # --- Transpilation methods -------------------------------------------------------------
 # "ideal" is the untranspiled circuit; everything else is a method that can be run.
@@ -484,6 +491,7 @@ for _key, _label, _color, _hatch in METHOD_STYLES:
         TOOL_STYLE[_key] = (_label, _color, _hatch)
 
 DARKEST = 0.55  # lightness reduction of the largest distance (0 = base colour)
+TIMEOUT_BAR_FACTOR = 1.3  # a timed-out run is drawn as a hollow bar 30 % above the ideal
 
 
 def _shade(color, level: float):
@@ -532,6 +540,9 @@ def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
     "N/A" for runs without a result. For every tool the bars of all distances share one x position; the
     largest distance is drawn first (darkest, at the back) and smaller distances in front of it, so each
     segment shows the value of one distance "stacked" on the previous one.
+
+    Runs without a result are drawn as white, hatched, dashed bars without any text: a timeout
+    TIMEOUT_BAR_FACTOR above the ideal, N/A (never run / error) just below the ideal.
     """
     x = np.arange(len(keys))
     width = 0.8 / len(tools)
@@ -558,22 +569,11 @@ def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
                     bar.set_hatch("xxx")
                     bar.set_linewidth(2)
                     bar.set_edgecolor(_shade(color, lvl))
-            if no_result:
-                top = max(per_ks[ks] for ks in no_result)
-                kinds = sorted(set(no_result.values()))
-                if len(no_result) == len(per_ks):
-                    lab = "/".join(kinds)
-                else:
-                    lab = "/".join(kinds) + " " + ",".join(f"d={distance(k)}" for k in sorted(no_result))
-                ax.annotate(lab, xy=(xpos[i], min(top, ymax)), xytext=(0, 2), textcoords="offset points",
-                            ha="left", va="bottom", rotation=45, rotation_mode="anchor",
-                            color="red", fontweight="bold", fontsize=10, annotation_clip=False, zorder=20)
 
     ax.set_yscale("log", nonpositive="clip")
     ax.set_ylim(ymin, ymax)
     ax.set_xticks(x)
-    ax.set_xticklabels([TITLES[k] + (f"\n(d={DISTANCE_INDEPENDENT[k]})" if k in DISTANCE_INDEPENDENT else "")
-                        for k in keys])
+    ax.set_xticklabels([TITLES[k] for k in keys])
     ax.tick_params(axis="x", which="both", top=False)
     ax.tick_params(axis="y", length=5)
     ax.grid(True, which="major", axis="y", linestyle="--", alpha=0.5)
@@ -586,6 +586,25 @@ def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
     dist_handles = [Patch(facecolor=_shade("#d9d9d9", levels[ks]), edgecolor="black", label=f"d = {distance(ks)}")
                     for ks in sorted(ks_list)]
     return ax, tool_handles + dist_handles
+
+
+def _fit_vertical(fig, ax, pad_px: float = 3.0, max_iter: int = 10) -> None:
+    """Use the full figure height: move the top and bottom margins so that everything drawn with the axes
+    (title and "Lower is better" above, tick labels and x label below) ends ``pad_px`` from the
+    figure edge. Iterates because the title sits in axes coordinates and moves with the axes."""
+    for _ in range(max_iter):
+        fig.canvas.draw()
+        bb = ax.get_tightbbox(fig.canvas.get_renderer())
+        h = fig.bbox.height
+        d_top = (h - pad_px - bb.y1) / h  # > 0: free space above -> raise the axes top
+        d_bot = (bb.y0 - pad_px) / h      # > 0: free space below -> lower the axes bottom
+        if abs(d_top) * h < 0.5 and abs(d_bot) * h < 0.5:
+            return
+        p = fig.subplotpars
+        top, bottom = p.top + d_top, p.bottom - d_bot
+        if top - bottom < 0.1:  # never collapse the axes
+            return
+        fig.subplots_adjust(top=top, bottom=bottom)
 
 
 def _pct(v: float, ideal: float) -> str:
@@ -615,21 +634,7 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
     ylim_* = (lo, hi) to override the automatic y range."""
     tools = [t for t in ALL_TOOLS if t in tools]  # canonical order
 
-    def _collect(overall: str, suffix: str) -> dict:
-        out = {t: [] for t in tools}
-        for key in keys:
-            ks_here = _ks_for(key, ks_list, results)
-            ideal = {ks: results[overall][key][ks] for ks in ks_here}
-            for t in tools:
-                if t == "ideal":
-                    out[t].append(ideal)
-                else:  # -1 = no result (drawn as a hollow bar just below the ideal)
-                    out[t].append({ks: ideal[ks] + results[f"{t}_{suffix}"].get(key, {}).get(ks, -1)
-                                   for ks in ks_here})
-        return out
-
-    depth = _collect("depth_overall", "depth")
-    gates = _collect("gate_overall", "overhead")
+    # No-result labels first: they decide the height of the hollow bars below
     labels = {t: [] for t in tools}
     for key in keys:
         for t in tools:
@@ -639,6 +644,27 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
                 if lab:
                     labs[ks] = lab
             labels[t].append(labs)
+
+    def _collect(overall: str, suffix: str) -> dict:
+        out = {t: [] for t in tools}
+        for i, key in enumerate(keys):
+            ks_here = _ks_for(key, ks_list, results)
+            ideal = {ks: results[overall][key][ks] for ks in ks_here}
+            for t in tools:
+                if t == "ideal":
+                    out[t].append(ideal)
+                    continue
+                vals = {}
+                for ks in ks_here:
+                    if labels[t][i].get(ks) == "T/O":
+                        vals[ks] = TIMEOUT_BAR_FACTOR * ideal[ks]  # hollow bar 30 % above the ideal
+                    else:  # -1 = no result (N/A: hollow bar just below the ideal)
+                        vals[ks] = ideal[ks] + results[f"{t}_{suffix}"].get(key, {}).get(ks, -1)
+                out[t].append(vals)
+        return out
+
+    depth = _collect("depth_overall", "depth")
+    gates = _collect("gate_overall", "overhead")
 
     # Summary
     for i, key in enumerate(keys):
@@ -650,14 +676,14 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
                    for t in tools if t != "ideal"]
             gat = [f"{TOOL_STYLE[t][0]}={labels[t][i].get(ks) or _pct(gates[t][i][ks], gi)}"
                    for t in tools if t != "ideal"]
-            print(f"[{TITLES[key]} d={d}] depth ideal={di}  " + "  ".join(dep)
+            print(f"[{_title(key)} d={d}] depth ideal={di}  " + "  ".join(dep)
                   + f"  | 2q ideal={gi}  " + "  ".join(gat))
 
     # ---------------- depth ----------------
     plt.rcParams.update(_tex_fonts(1.5))
     fig = plt.figure(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
     ax, _ = _draw_bars(fig, depth, keys, ks_list, labels, tools, ylim_depth)
-    ax.set_xlabel("Circuit type")
+    ax.set_xlabel("Circuit type", fontsize=FONTSIZE * 1.5)
     fig.text(0.03, 0.5, "Circuit depth", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
     title = ax.text(-0.18, 1.04, "b) Compilation overhead on circuit depth", transform=ax.transAxes,
                     fontweight="bold", va="bottom", ha="left")
@@ -665,6 +691,7 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
     ax.annotate("Lower is better ↓", xy=(0.5, 1.0), xycoords=title, xytext=(0, 2), textcoords="offset points",
                 fontweight="bold", color=plot_lib_color, va="bottom", ha="center")
     fig.subplots_adjust(left=0.24, right=0.95, top=0.72, bottom=0.21)
+    _fit_vertical(fig, ax)  # fill the height, nothing cut off
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
@@ -672,20 +699,29 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
     plt.rcParams.update(_tex_fonts(1.3))
     fig = plt.figure(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
     ax, handles = _draw_bars(fig, gates, keys, ks_list, labels, tools, ylim_gates)
+    ax.set_xlabel("Circuit type", fontsize=FONTSIZE * 1.5)
     fig.text(0.025, 0.5, "#2q gates", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
-    fig.text(0.46, 0.055, "Circuit type", va="center", rotation="horizontal", fontsize=FONTSIZE * 1.5)
     title = ax.text(-0.075, 1.04, "c) Compilation overhead on #2q gates", transform=ax.transAxes,
                     fontweight="bold", va="bottom", ha="left")
     # "Lower is better" centred directly above the title, independent of figure size
     ax.annotate("Lower is better ↓", xy=(0.5, 1.0), xycoords=title, xytext=(0, 2), textcoords="offset points",
                 fontweight="bold", color=plot_lib_color, va="bottom", ha="center")
     fig.subplots_adjust(left=0.24, right=0.95, top=0.72, bottom=0.21)
+    _fit_vertical(fig, ax)  # fill the height, nothing cut off
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
     # ---------------- legend ----------------
+    # Two rows with the same number of entries: methods first, then code distances, filled row by row.
+    # matplotlib fills legends column by column, so the two rows are interleaved; with an odd number of
+    # entries the second row gets one invisible entry at the end.
+    from matplotlib.patches import Patch
+    ncols = math.ceil(len(handles) / 2)
+    row1, row2 = handles[:ncols], handles[ncols:]
+    row2 += [Patch(visible=False, label="") for _ in range(ncols - len(row2))]
+    two_rows = [h for pair in zip(row1, row2) for h in pair]
     legend_fig = plt.figure(figsize=(4, 2))
-    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=len(handles), columnspacing=1.5)
+    legend_fig.legend(handles=two_rows, loc="center", frameon=False, ncols=ncols, columnspacing=1.5)
     legend_fig.savefig(f"{filename}legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
@@ -832,7 +868,7 @@ def execute_jobs(to_run: dict[tuple[str, int], list[str]], results: dict, jobs: 
             status = "crashed"
         else:
             status = out["metrics"].get(f"{what}_all", {}).get("status", "ok")
-        print(f"[{done}/{n_total}] {TITLES[key]} d={DISTANCE_INDEPENDENT.get(key, distance(ks))} "
+        print(f"[{done}/{n_total}] {_title(key)} d={DISTANCE_INDEPENDENT.get(key, distance(ks))} "
               f"{what}: {status} ({out['elapsed_s']:.0f} s)", flush=True)
         if not out["ok"]:
             print(out["error"], flush=True)
@@ -942,7 +978,7 @@ def run_exp_statistics(reproduce: list[str] | None = None, ks_list: list[int] | 
         execute_jobs(to_run, results, jobs, timeout, threads_per_job)
 
     # A benchmark is plotted if its ideal statistics exist for every distance; a shown method without a
-    # result is drawn as a hollow bar labelled N/A (never run) or T/O.
+    # result is drawn as a hollow bar (N/A: just below the ideal; T/O: 30 % above the ideal), unlabelled.
     no_ideal = [k for k in BENCHMARKS if k in DISTANCE_INDEPENDENT and not results["depth_overall"].get(k)
                 or k not in DISTANCE_INDEPENDENT and not all(_has(results, k, ks, "ideal") for ks in ks_list)]
     if no_ideal:

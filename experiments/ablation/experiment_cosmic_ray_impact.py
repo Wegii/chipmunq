@@ -5,6 +5,8 @@ Motivation: Wu et al., PR Applied 24, 044022 (2025) [R1]. CRL events suppress T1
 struck module (85-94 % intra-module coincidence), are nearly confined to it (~2 % inter-module), and last
 ~2-6 ms, i.e. thousands of QEC cycles.
 
+Configurations: Ideal (untranspiled CNOT, no links), Chipmunq, LightSABRE.
+
 Workload: the same logical CNOT as experiment_distributed_lattice_surgery (tqec, control/ancilla/target
 patches + merge strips, predefined partitions), on the same BackendChipletV2 sizes, so each patch fits on
 one chiplet. Chipmunq places one patch per chiplet; LightSABRE (TrivialLayout + SabreSwap) packs them.
@@ -25,7 +27,7 @@ Decoder: pymatching from the plain modsi1000 DEM (unaware of bursts, as events a
 Estimator: P_L = e^-Lambda P_L(modsi1000) + (1 - e^-Lambda) E[P_L | >=1 event]; the modsi1000 term is
 the reference point itself, so it is simulated once and shared by every k.
 
-Run from the repo root:  python experiments/ablation/experiment_cosmic_ray_impact.py [--toy]
+Run from the repo root:  python experiments/ablation/experiment_cosmic_ray_impact.py [--quick] [--plot-only]
 """
 from __future__ import annotations
 
@@ -35,7 +37,7 @@ import multiprocessing
 import os
 import pickle
 import sys
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -46,12 +48,13 @@ import numpy as np
 import pymatching
 import stim
 from matplotlib.lines import Line2D
+from matplotlib.transforms import ScaledTranslation
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from experiments.exp_utils.circuit_noise import get_noise_model
 from experiments.exp_utils.simulation_utils import transpile_stim_circuit
 from experiments.exp_utils.transpilation_utils import sabre_transpilation
-from experiments.exp_utils.utils import FONTSIZE, HEIGHT_FIGSIZE, WIDTH_FIGSIZE
+from experiments.exp_utils.utils import plot_lib_color
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from glue.qiskit_qec.stim_tools import get_stim_circuits_with_detectors
 from qeccm.backends.BackendChipletV2 import BackendChipletV2
@@ -60,8 +63,10 @@ from qeccm.backends.BackendChipletV2 import BackendChipletV2
 # Experiment parameters
 # ======================================================================================
 DISTANCE_SCALES = [2, 3]                 # d = 2k+1 -> d = 5, 7
-COMPILERS = ["compiled", "sabre"]        # naming as in experiment_distributed_lattice_surgery
-LABELS = {"compiled": "Chipmunq", "sabre": "LightSABRE"}
+COMPILERS = ["default", "compiled", "sabre"]   # naming as in experiment_distributed_lattice_surgery
+LABELS = {"default": "Ideal", "compiled": "Chipmunq", "sabre": "LightSABRE"}
+# default = Ideal: the CNOT without any transpilation (modsi1000, no inter-chiplet links). Its patches sit on
+# the chiplets Chipmunq assigns them to, so cosmic-ray events strike the same patch groups.
 K_VALUES = [1, 4, 16, 64, None]          # None = whole chiplet (the R1-realistic footprint)
 EVENT_ROUNDS = 1000                      # ms-scale event (R1: tau ≈ 2-6 ms at ~1 µs cycles); outlasts the CNOT
 P_PHYS = 1e-3                            # modsi1000 strength
@@ -94,6 +99,7 @@ class Hardware:
     chiplet_of: dict[int, int]                  # every backend qubit -> chiplet
     edges: list[tuple[int, int]]                # coupling edges (inter-chiplet ones are ignored)
     used: set[int]                              # qubits the circuit acts on
+    areas: dict[int, int] | None = None         # chiplet -> #qubits (default: from chiplet_of); lists ALL chiplets
     adj: dict[int, list[int]] = field(init=False)
     chiplets: dict[int, list[int]] = field(init=False)
     used_on: dict[int, list[int]] = field(init=False)
@@ -109,11 +115,13 @@ class Hardware:
             self.chiplets.setdefault(c, []).append(q)
             if q in self.used:
                 self.used_on.setdefault(c, []).append(q)
-        self._all = sorted(self.chiplets)
+        if self.areas is None:
+            self.areas = {c: len(qs) for c, qs in self.chiplets.items()}
+        self._all = sorted(self.areas)
         self._act = sorted(self.used_on)          # chiplets the circuit touches
 
     def _probs(self, ids):
-        s = np.array([len(self.chiplets[c]) for c in ids], float)   # hit prob ∝ chiplet area
+        s = np.array([self.areas[c] for c in ids], float)            # hit prob ∝ chiplet area
         return s / s.sum()
 
     @property
@@ -298,9 +306,15 @@ def get_backend(k):
 
 
 def compile_cnot(k, t, backend):
-    """Returns (noisy stim circuit on physical qubits, reference ticks/round, patch->chiplets)."""
+    """Returns (noisy stim circuit, reference ticks/round, patch->chiplets, partitions).
+
+    t = "default": no transpilation (ideal), circuit qubit indices, modsi1000 without inter-chiplet links;
+    patch->chiplets is None (filled in from Chipmunq's placement by hardware_ideal)."""
     circuit, partitions = get_tqec_cnot_rotated(distance_scale=k, n1=1, n2=0)
     ref = get_stim_circuits_with_detectors(StimCodeCircuit(circuit).qc)[0][0]
+    if t == "default":
+        noisy = get_noise_model("modsi1000", None, P_PHYS, None, remote=None).noisy_circuit(ref)
+        return noisy, ticks_per_round(ref), None, partitions
     if t == "compiled":
         _, qc, _, _ = transpile_stim_circuit(circuit, backend, pre_defined_partitions=partitions,
                                              routing_type="cost", routing_alpha=0, routing_beta=0)
@@ -311,7 +325,41 @@ def compile_cnot(k, t, backend):
     phys = get_stim_circuits_with_detectors(qc)[0][0]
     noisy = get_noise_model("modsi1000", None, P_PHYS, None,
                             remote=backend.inter_chiplet_connections).noisy_circuit(phys)
-    return noisy, ticks_per_round(ref), patch_chiplets
+    return noisy, ticks_per_round(ref), patch_chiplets, partitions
+
+
+def hardware_ideal(backend, circ, partitions, patch_chiplets):
+    """Chiplet view of the untranspiled circuit: every patch / merge strip on the chiplet Chipmunq puts it on,
+    chiplets as large as the backend's, neighbourhood = the circuit's own two-qubit interactions."""
+    chiplet_of = {}
+    for part, chips in zip(partitions, patch_chiplets):
+        for q in part["indices"]:
+            chiplet_of.setdefault(int(q), chips[0])
+    edges = set()
+    for inst in circ.flattened():
+        if inst.name in _ANNOT:
+            continue
+        gd = stim.gate_data(inst.name)
+        if gd.is_two_qubit_gate and not gd.is_noisy_gate:
+            qs = _qubits_of(inst)
+            edges.update(tuple(sorted(e)) for e in zip(qs[::2], qs[1::2]))
+    used = active_qubits(circ)
+    # qubits outside every partition join the chiplet of an interaction neighbour (BFS)
+    nbrs = defaultdict(set)
+    for a, b in edges:
+        nbrs[a].add(b)
+        nbrs[b].add(a)
+    todo = deque(q for q in chiplet_of)
+    while todo:
+        q = todo.popleft()
+        for nb in nbrs[q]:
+            if nb not in chiplet_of:
+                chiplet_of[nb] = chiplet_of[q]
+                todo.append(nb)
+    for q in used - set(chiplet_of):         # isolated qubits (none expected)
+        chiplet_of[q] = patch_chiplets[0][0]
+    areas = {c: len(qs) for c, qs in backend.chiplet_to_nodes.items()}
+    return Hardware(chiplet_of=chiplet_of, edges=sorted(edges), used=used, areas=areas)
 
 
 def hardware_for(backend, circ):
@@ -356,12 +404,12 @@ def _worker(job):
     return kind, key, p["k"], rates
 
 
-def run_exp_cosmic_ray_impact(reproduce=True, toy=False):
+def run_exp_cosmic_ray_impact(reproduce=True, quick=False):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    pkl = OUT_DIR / f"cosmic_ray_impact{'_toy' if toy else ''}.pkl"
-    scales = [1] if toy else DISTANCE_SCALES
+    pkl = OUT_DIR / f"cosmic_ray_impact{'_quick' if quick else ''}.pkl"
+    scales = [1] if quick else DISTANCE_SCALES
     n_configs, shots_cfg, shots_base, cfg_per_job, base_per_job = (
-        (20, 200, 20_000, 5, 10_000) if toy else
+        (20, 200, 20_000, 5, 10_000) if quick else
         (N_CONFIGS, SHOTS_PER_CONFIG, SHOTS_BASE, CONFIGS_PER_JOB, SHOTS_BASE_PER_JOB))
 
     if reproduce:
@@ -369,10 +417,19 @@ def run_exp_cosmic_ray_impact(reproduce=True, toy=False):
         for k in scales:
             d = 2 * k + 1
             backend = get_backend(k)
-            for t in COMPILERS:
+            chipmunq_patches = None
+            for t in sorted(COMPILERS, key=lambda c: c == "default"):    # Ideal last: needs Chipmunq's placement
                 key = (d, t)
-                circ, tpr, patch_chiplets = compile_cnot(k, t, backend)
-                hw = hardware_for(backend, circ)
+                circ, tpr, patch_chiplets, partitions = compile_cnot(k, t, backend)
+                if t == "compiled":
+                    chipmunq_patches = patch_chiplets
+                if t == "default":
+                    if chipmunq_patches is None:
+                        chipmunq_patches = compile_cnot(k, "compiled", backend)[2]
+                    patch_chiplets = chipmunq_patches
+                    hw = hardware_ideal(backend, circ, partitions, patch_chiplets)
+                else:
+                    hw = hardware_for(backend, circ)
                 T = num_layers(circ)
                 circ_strs[key], hws[key] = str(circ), hw
                 occ = {c: len(hw.used_on[c]) for c in hw._act}
@@ -430,52 +487,111 @@ def run_exp_cosmic_ray_impact(reproduce=True, toy=False):
 
 
 # ======================================================================================
+# Paper figure style
+# ======================================================================================
+# Figure style: identical to experiment_defective_qubits (Fig. 10). Figures are drawn at their printed
+# size (7 pt fonts) -- include them at their natural width, no scaling. The components ablation and the
+# cosmic-ray experiment share one row: 2/3 and 1/3 of the text width.
+# (identical block in experiment_mapping_routing_ablation.py and experiment_cosmic_ray_impact.py)
+TEXT_WIDTH_IN = 7.0                   # full text width of the paper (two-column IEEE/ACM: ~7.0 in)
+PANEL_H = 1.6
+FONT_PT = 7
+# Absolute margins [in] = Fig. 10's MARGINS on its 1.75 x 1.6 in panels, so the axes line up
+MARGIN_IN = dict(left=0.27 * 1.75, right=0.03 * 1.75, top=0.20 * PANEL_H, bottom=0.24 * PANEL_H)
+
+
+def _fonts():
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "hatch.linewidth": 0.4,
+        "lines.linewidth": 1.0,
+        "lines.markersize": 3.5,
+        "errorbar.capsize": 1.5,
+    })
+
+
+def _panel(width: float):
+    fig, ax = plt.subplots(figsize=(width, PANEL_H))
+    fig.subplots_adjust(left=MARGIN_IN["left"] / width, right=1 - MARGIN_IN["right"] / width,
+                        top=1 - MARGIN_IN["top"] / PANEL_H, bottom=MARGIN_IN["bottom"] / PANEL_H)
+    return fig, ax
+
+
+def _keep_inside(fig, text, pad_in: float = 0.02) -> None:
+    """Shift a text horizontally (in inches, dpi-independent) just enough to stay inside the figure."""
+    bb = text.get_window_extent(fig.canvas.get_renderer())
+    lo, hi = fig.bbox.x0 + pad_in * fig.dpi, fig.bbox.x1 - pad_in * fig.dpi
+    shift = min(0.0, hi - bb.x1) or max(0.0, lo - bb.x0)
+    if shift:
+        text.set_transform(text.get_transform() + ScaledTranslation(shift / fig.dpi, 0, fig.dpi_scale_trans))
+
+
+def _title(fig, ax, text: str, better: str = "Lower is better ↓") -> None:
+    """Centred panel title with the "better" hint on a second line above it (as in Fig. 10)."""
+    for y, s, kw in ((1.03, text, {}), (1.16, better, {"color": plot_lib_color})):
+        _keep_inside(fig, ax.text(0.5, y, s, transform=ax.transAxes, fontweight="bold", ha="center",
+                                  va="bottom", **kw))
+
+
+# ======================================================================================
 # Single figure
 # ======================================================================================
 def plot_evaluation(results, filename):
-    plt.rcParams.update({"font.family": "serif", "axes.labelsize": FONTSIZE * 1.2,
-                         "font.size": FONTSIZE, "legend.fontsize": FONTSIZE - 3,
-                         "lines.markeredgecolor": "black", "lines.markeredgewidth": 1.0})
-    colors = {"compiled": "#3B6FA8", "sabre": "#C85E59"}
+    _fonts()
+    colors = {"default": "black", "compiled": "#3B6FA8", "sabre": "#C85E59"}
     ds = sorted({r["d"] for r in results})
+    comps = [t for t in COMPILERS if any(r["compiler"] == t for r in results)]
     ls = {d: ["-", "--", ":", "-."][i % 4] for i, d in enumerate(ds)}
     mk = {d: ["o", "s", "^", "D"][i % 4] for i, d in enumerate(ds)}
     xkeys = ["ref"] + [str(k) if k else "chiplet" for k in K_VALUES]     # keys as stored in results
-    xlab = ["0"] + [str(k) if k else "Chiplet" for k in K_VALUES]        # 0 = plain SI1000, no events
+    xlab = ["0"] + [str(k) if k else "All" for k in K_VALUES]            # 0 = plain SI1000, All = whole chiplet
     xpos = {key: i for i, key in enumerate(xkeys)}
 
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5 * 0.9, WIDTH_FIGSIZE * 0.6))
+    fig, ax = _panel(TEXT_WIDTH_IN / 3)
     for d in ds:
-        for t in COMPILERS:
+        for t in comps:
             rows = [r for r in results if r["d"] == d and r["compiler"] == t]
             pts = sorted(rows, key=lambda r: xpos[str(r["k"])])
-            x = [xpos[str(r["k"])] for r in pts]
-            ax.errorbar(x, [r["P_L"] for r in pts], yerr=[r["se"] for r in pts], ls=ls[d],
-                        marker=mk[d], color=colors[t], ms=5, lw=1.2, capsize=2)
+            ax.errorbar([xpos[str(r["k"])] for r in pts], [r["P_L"] for r in pts],
+                        yerr=[r["se"] for r in pts], ls=ls[d], marker=mk[d], color=colors[t],
+                        markeredgecolor="black", markeredgewidth=0.5, elinewidth=0.6, capthick=0.6)
     ax.set_xticks(range(len(xlab)), xlab)
-    ax.set_xlabel("Circuit qubits affected per event $k$")
-    ax.set_ylabel("LER (logical CNOT)")
+    ax.set_xlabel("Qubits affected per event $k$")
+    ax.set_ylabel("LER")  # per logical CNOT (state in the caption)
     ax.set_yscale("log")
-    ax.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
+    ax.set_axisbelow(True)
+
     # Two legend columns: left = compilers, right = code distances (legend fills column-major,
     # so pad the shorter column with invisible entries)
-    left = [Line2D([], [], color=colors[t], lw=2, label=LABELS[t]) for t in COMPILERS]
+    left = [Line2D([], [], color=colors[t], label=LABELS[t]) for t in comps]
     right = [Line2D([], [], color="gray", ls=ls[d], marker=mk[d], mfc="gray", mec="black",
-                    label=f"$d={d}$") for d in ds]
+                    markeredgewidth=0.5, label=f"$d={d}$") for d in ds]
     n = max(len(left), len(right))
-    blank = lambda: Line2D([], [], ls="none", marker="none", label=" ")
+    blank = lambda: Line2D([], [], ls="none", marker="none", label=" ")  # noqa: E731
     h = left + [blank() for _ in range(n - len(left))] + right + [blank() for _ in range(n - len(right))]
     lo, hi = ax.get_ylim()
-    ax.set_ylim(lo, hi * 10)               # headroom for the legend (log axis)
-    ax.legend(handles=h, ncol=2, frameon=False, loc="upper right")
-    fig.tight_layout()
+    ax.set_ylim(lo, hi * 150)              # headroom for the three-row legend (log axis)
+    ax.legend(handles=h, ncol=2, frameon=False, loc="upper right", handlelength=1.8, handletextpad=0.4,
+              columnspacing=0.8, labelspacing=0.2, borderaxespad=0.2)
+    _title(fig, ax, "b) Effect of large-scale correlated errors")
     fig.savefig(filename + ".pdf", format="pdf")
     plt.close(fig)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--toy", action="store_true", help="d=3, tiny budget: pipeline smoke test")
+    ap.add_argument("--quick", action="store_true", help="d=3, tiny budget: pipeline smoke test")
     ap.add_argument("--plot-only", action="store_true")
     a = ap.parse_args()
-    run_exp_cosmic_ray_impact(reproduce=not a.plot_only, toy=a.toy)
+    run_exp_cosmic_ray_impact(reproduce=not a.plot_only, quick=a.quick)

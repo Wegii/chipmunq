@@ -24,6 +24,8 @@ import argparse
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.legend_handler import HandlerBase
+from matplotlib.patches import Patch, Rectangle
 from pathlib import Path
 
 OUTPUT_DIR = Path("experiments/evaluation/inter_chiplet")
@@ -38,11 +40,14 @@ METHODS = [
     ("basic", "Basic", "#A7D9ED", "#5B9BD5"),
     ("tradeoff", "Tradeoff", "#F7C6A2", "#E68A5C"),
     ("focus", "Focus", "#F7A2A2", "#D65C5C"),
-    ("sabre", "SABRE-SWAP", "#D9D9D9", "#7F7F7F"),
+    ("sabre", "LightSABRE", "#D9D9D9", "#7F7F7F"),
     ("murali", "Murali et al.", "#B2D8B2", "#5E9E5E"),
     ("seqc", "SEQC", "#C9B7E3", "#8E6BBF"),
 ]
 LABEL = {m: l for m, l, _, _ in METHODS}
+
+# Hatch per link-noise level (light shade = low p_inter, dark shade = high p_inter)
+HATCHES = {"low": "ooo", "high": "xxx"}  # dense: the bars are narrow at the 1.75 in panel width
 
 # Cost routing configurations [alpha factor, beta]
 COST_CONFIGS = {"basic": [0, 0], "tradeoff": [1, 1], "focus": [6, 1]}
@@ -54,6 +59,44 @@ NOISE_LEVELS = {
 }
 
 SECTION_TITLES = ["Full", "Half", "Limited"]
+
+# --------------------------------------------------------------------------------------
+# Panel size: identical to the noise-aware routing panels (b-d), so this plot sits next to them -- four panels
+# side by side across the full text width of a two-column paper. Drawn at printed size: include it in LaTeX at its
+# natural width (or width=0.24\textwidth for a 7.0 in text width), no further scaling.
+# --------------------------------------------------------------------------------------
+TEXT_WIDTH_IN = 7.0                   # full text width of the paper (two-column IEEE/ACM: ~7.0 in)
+N_PANELS = 4                          # panels in one row
+PANEL_W = TEXT_WIDTH_IN / N_PANELS    # 1.75 in
+PANEL_H = 1.6
+FONT_PT = 7
+MARGINS = dict(left=0.27, right=0.95, top=0.80, bottom=0.24)
+
+
+def _panel_style() -> None:
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "xtick.minor.size": 1.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "hatch.linewidth": 0.4,
+        "lines.linewidth": 1.0,
+        "errorbar.capsize": 1.5,
+    })
+
+
+def _panel_title(ax, title: str, better: str) -> None:
+    """Panel title and the "better" hint directly above it, both centred above the axes (plot rectangle)."""
+    t = ax.text(0.5, 1.03, title, transform=ax.transAxes, fontweight="bold", ha="center", va="bottom")
+    ax.annotate(better, xy=(0.5, 1.0), xycoords=t, xytext=(0, 1), textcoords="offset points",
+                fontweight="bold", color=plot_lib_color, ha="center", va="bottom")
 
 
 def num_2q_gates(circuit):
@@ -76,49 +119,34 @@ def link_error_sum(routed, backend) -> float:
     return total
 
 
-def plot_metric(results: dict, metric: str, ylabel: str, title: str, filename: str, logy: bool = False) -> list:
+def plot_metric(results: dict, metric: str, ylabel: str, title: str, filename: str, logy: bool = False) -> None:
     """Grouped bars: one group per interconnection density, one bar per (router, noise level)."""
     nis = sorted({ni for m in results for ni in results[m]["low"]}, reverse=True)
     methods = [m for m, *_ in METHODS if m in results]
     x = np.arange(len(nis))
     n_bars = 2 * len(methods)
     width = 0.8 / n_bars
-    hatches = {"low": "o", "high": "xx"}
 
-    tex_fonts = {
-        "font.family": "serif",
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.3,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
-        "axes.titlesize": 10,
-        "hatch.linewidth": 0.5,
-        "lines.linewidth": 1.5,
-        "lines.markersize": 6,
-        "lines.markeredgewidth": 1.5,
-        "lines.markeredgecolor": "black",
-        "errorbar.capsize": 3,
-    }
-    plt.rcParams.update(tex_fonts)
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    _panel_style()
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
+    fig.subplots_adjust(**MARGINS)
 
-    handles, i = [], 0
+    i = 0
     for level in ("low", "high"):
         for m, label, c_low, c_high in METHODS:
             if m not in results:
                 continue
             vals = [results[m][level][ni][metric] for ni in nis]
-            h = ax.bar(
+            ax.bar(
                 x + (i - (n_bars - 1) / 2) * width,
                 vals,
                 width,
                 label=f"{label}, " + r"$p_{inter}$ = " + NOISE_LEVELS[level]["text"],
                 color=c_low if level == "low" else c_high,
-                hatch=hatches[level],
+                hatch=HATCHES[level],
                 edgecolor="black",
+                linewidth=0.4,
             )
-            handles.append(h)
             i += 1
 
     ax.set_xticks(x)
@@ -127,27 +155,62 @@ def plot_metric(results: dict, metric: str, ylabel: str, title: str, filename: s
     ax.set_ylabel(ylabel)
     if logy:
         ax.set_yscale("log")
-    ax.text(-0.1, 1.04, title, transform=ax.transAxes, fontweight="bold")
-    ax.text(0.3, 1.14, "Lower is better ↓", transform=ax.transAxes, fontweight="bold", color=plot_lib_color)
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    fig.subplots_adjust(left=0.22, right=0.95, top=0.85, bottom=0.21)
+    _panel_title(ax, title, "Lower is better ↓")
+    ax.grid(True, which="both", axis="y", linestyle="--", linewidth=0.4, alpha=0.5)
+    ax.set_axisbelow(True)
     fig.savefig(filename, format="pdf")
     plt.close(fig)
-    return handles
+
+
+# --------------------------------------------------------------------------------------
+# Compressed legend: one entry per router, its handle split into the light (low p_inter) and the dark
+# (high p_inter) bar style, plus two grey entries that explain light/dark (and their hatches).
+# --------------------------------------------------------------------------------------
+
+
+class SplitPatch:
+    """Legend proxy: a rectangle whose left and right halves have different styles (Rectangle kwargs)."""
+
+    def __init__(self, left: dict, right: dict):
+        self.left, self.right = left, right
+
+
+class HandlerSplitPatch(HandlerBase):
+    def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):
+        half = width / 2
+        return [Rectangle((-xdescent + i * half, -ydescent), half, height, transform=trans, **style)
+                for i, style in enumerate((orig_handle.left, orig_handle.right))]
+
+
+def save_legend(results: dict, filename: str) -> None:
+    _panel_style()
+
+    def style(color, level):
+        return dict(facecolor=color, hatch=HATCHES[level], edgecolor="black", linewidth=0.4)
+
+    methods = [(label, c_low, c_high) for m, label, c_low, c_high in METHODS if m in results]
+    handles = [SplitPatch(style(c_low, "low"), style(c_high, "high")) for _, c_low, c_high in methods]
+    labels = [label for label, _, _ in methods]
+    # Shade / hatch key
+    handles += [Patch(**style("#E6E6E6", "low")), Patch(**style("#8C8C8C", "high"))]
+    labels += [r"Light: $p_{inter}$ = " + NOISE_LEVELS["low"]["text"],
+               r"Dark: $p_{inter}$ = " + NOISE_LEVELS["high"]["text"]]
+
+    legend_fig = plt.figure(figsize=(3, 2))
+    legend_fig.legend(handles, labels, handler_map={SplitPatch: HandlerSplitPatch()}, loc="center",
+                      frameon=False, ncols=int(np.ceil(len(handles) / 2)), columnspacing=1.5, handlelength=2.4)
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
+    plt.close(legend_fig)
 
 
 def plot_combined(results: dict, filename: str) -> None:
-    plot_metric(results, "depth", "Depth Overhead", "a) Connectivity affecting circuit depth", f"{filename}_depth.pdf")
-    plot_metric(results, "overhead", "#2q gate overhead ", "a) Effect of cost-routing on #2q gates",
-                f"{filename}_overhead.pdf")
-    plot_metric(results, "link_error_sum", "Expected link faults", "a) Link errors accumulated by routing",
-                f"{filename}_link_errors.pdf", logy=True)
-    handles = plot_metric(results, "routing_s", "Routing time [s]", "a) Routing time", f"{filename}_runtime.pdf",
-                          logy=True)
-    legend_fig = plt.figure(figsize=(3, 2))
-    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=len(handles) // 2, columnspacing=1.5)
-    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
-    plt.close(legend_fig)
+    # Short titles: the panel is 1.75 in wide (details in the caption)
+    plot_metric(results, "depth", "Depth overhead", "a) Circuit depth", f"{filename}_depth.pdf")
+    plot_metric(results, "overhead", "#2q gate overhead", "a) #2q gates", f"{filename}_overhead.pdf")
+    plot_metric(results, "link_error_sum", "Expected link faults", "a) Link errors", f"{filename}_link_errors.pdf",
+                logy=True)
+    plot_metric(results, "routing_s", "Routing time [s]", "a) Routing time", f"{filename}_runtime.pdf", logy=True)
+    save_legend(results, filename)
 
 
 def print_summary(results: dict) -> None:

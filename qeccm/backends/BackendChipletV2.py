@@ -22,6 +22,9 @@ from qiskit.transpiler import InstructionProperties, Target
 LABEL_ON_CHIP = "on_chip_connection"
 LABEL_INTER_CHIP = "inter_chip_connection"
 
+# Upper bound for the error probability of a single inter-chiplet link
+MAX_LINK_ERROR = 0.9
+
 
 class BackendChipletV2(BackendV2):
     """Simple chiplet backend
@@ -45,6 +48,7 @@ class BackendChipletV2(BackendV2):
         inter_chiplet_amplification: float = None,
         inter_chiplet_noise_type: str = "",
         inter_chiplet_rfactor: int = 10,
+        inter_chiplet_sigma: float = 0.0,
         num_defective_qubits: int = 0,
         rng_seed: int = 42,
         sabre_defective: bool = False,
@@ -55,6 +59,9 @@ class BackendChipletV2(BackendV2):
         :type size: _type_
         :param n_inter: _description_
         :type n_inter: _type_
+        :param inter_chiplet_noise_type: "constant", "random" (factor in [1, rfactor]) or "lognormal"
+            (mean-preserving: mean = amplification * noise, spread set by ``inter_chiplet_sigma``)
+        :param inter_chiplet_sigma: log-space standard deviation of the "lognormal" link noise (0 = all equal)
         """
         super().__init__(name="GenericChiplet")
 
@@ -134,6 +141,7 @@ class BackendChipletV2(BackendV2):
             amplification=inter_chiplet_amplification,
             noise_type=inter_chiplet_noise_type,
             rfactor=inter_chiplet_rfactor,
+            sigma=inter_chiplet_sigma,
         )
 
         # Build coupling map for defective_target
@@ -508,11 +516,26 @@ class BackendChipletV2(BackendV2):
         return cb_idx + offset, ct_idx + offset, cr_idx + offset, cl_idx + offset
 
     def get_inter_chiplet_mapping(
-        self, noise: float = None, amplification: float = None, noise_type: str = "constant", rfactor: int = 10
+        self,
+        noise: float = None,
+        amplification: float = None,
+        noise_type: str = "constant",
+        rfactor: int = 10,
+        sigma: float = 0.0,
     ) -> dict:
-        """Generate dictionary containing inter_chiplet connections and their noise level
+        """Generate dictionary containing inter_chiplet connections and their noise level.
 
-        :return: _description_
+        Noise types (base = amplification * noise):
+          - "constant": every link has error ``base``.
+          - "random": factor ``clip(U[0, 1) * rfactor, 1, rfactor)`` per link, i.e. a point mass at 1 (probability
+            1 / rfactor) plus U[1, rfactor). Mean (rfactor^2 + 1) / (2 rfactor) * base, coefficient of variation
+            ~0.56 (rfactor = 10) to ~0.58 (rfactor = 100): rfactor changes the mean, hardly the relative spread.
+          - "lognormal": mean-preserving, ``base * exp(sigma * z)`` with z ~ N(0, 1), rescaled so that the realized
+            mean over this backend's links is exactly ``base``. ``sigma`` sets the spread only (sigma = 0: all links
+            equal to ``base``). For a fixed rng_seed the z draws are identical for every sigma, so backends that
+            differ only in sigma differ only in the spread of their link noise.
+
+        :return: {(q0, q1): error probability} for every inter-chiplet link
         :rtype: dict
         """
         if noise == None:
@@ -527,16 +550,31 @@ class BackendChipletV2(BackendV2):
         edges = list(ecr_gate.keys())
 
         d = {}
+        if noise_type == "lognormal":
+            base = amplification * noise
+            z = self.rng_generator.standard_normal(len(edges))
+            values = np.exp(sigma * z)
+            values *= base / values.mean()
+            if np.any(values > MAX_LINK_ERROR):
+                logging.warning(
+                    f"lognormal link noise: {int(np.sum(values > MAX_LINK_ERROR))} link(s) capped at "
+                    f"{MAX_LINK_ERROR}; the realized mean is below {base:g}"
+                )
+                values = np.minimum(values, MAX_LINK_ERROR)
+            for (k, v), err in zip(edges, values):
+                d[(int(k), int(v))] = float(err)
+            return d
+
         for k, v in edges:
             # Calculate noise levels for every inter-chiplet connection:
-            #       - Random: Varies between [amplification*noise, 10*amplification*noise]
+            #       - Random: Varies between [amplification*noise, rfactor*amplification*noise]
             #       - Constant: Does not vary at all
             if noise_type == "constant":
-                d[(int(k), int(v))] = min(0.9, amplification * noise)
+                d[(int(k), int(v))] = min(MAX_LINK_ERROR, amplification * noise)
             elif noise_type == "random":
-                # Sample a random factor in the range [1, 10]
+                # Sample a random factor in the range [1, rfactor]
                 random_factor = min(max(1, self.rng_generator.random() * rfactor), rfactor)
-                d[(int(k), int(v))] = min(0.9, random_factor * amplification * noise)
+                d[(int(k), int(v))] = min(MAX_LINK_ERROR, random_factor * amplification * noise)
                 # print(f"{random_factor} resulting in {d[(int(k), int(v))]}")
 
         d = dict(d)

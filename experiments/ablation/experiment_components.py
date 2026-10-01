@@ -32,6 +32,9 @@ Reported per variant and backend (clean / defective): mapping + routing runtime,
 Noise: circuit-level ``modsi1000`` with per-link inter-chiplet noise, applied
 orientation-independently (see ``symmetric_remote_noise``).
 
+Paper figure (a, next to the cosmic-ray experiment b): ``ablation_ler_ratio_*.pdf``, drawn at its printed
+size (2/3 of the text width, Fig. 10 style) -- include it at its natural width, no scaling.
+
 Usage:
     python experiments/qec_exps/experiment_mapping_routing_ablation.py            # full
     python experiments/qec_exps/experiment_mapping_routing_ablation.py --quick    # smoke test
@@ -54,6 +57,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import sinter  # noqa: E402
 import stim  # noqa: E402
+from matplotlib.transforms import ScaledTranslation  # noqa: E402
 
 from experiments.exp_utils.ablation_utils import (  # noqa: E402
     DefectBlindMapper,
@@ -309,6 +313,63 @@ def _rc():
     })
 
 
+# --------------------------------------------------------------------------------------
+# Paper figure style
+# --------------------------------------------------------------------------------------
+# Figure style: identical to experiment_defective_qubits (Fig. 10). Figures are drawn at their printed
+# size (7 pt fonts) -- include them at their natural width, no scaling. The components ablation and the
+# cosmic-ray experiment share one row: 2/3 and 1/3 of the text width.
+# (identical block in experiment_mapping_routing_ablation.py and experiment_cosmic_ray_impact.py)
+TEXT_WIDTH_IN = 7.0                   # full text width of the paper (two-column IEEE/ACM: ~7.0 in)
+PANEL_H = 1.6
+FONT_PT = 7
+# Absolute margins [in] = Fig. 10's MARGINS on its 1.75 x 1.6 in panels, so the axes line up
+MARGIN_IN = dict(left=0.27 * 1.75, right=0.03 * 1.75, top=0.20 * PANEL_H, bottom=0.24 * PANEL_H)
+
+
+def _fonts():
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "hatch.linewidth": 0.4,
+        "lines.linewidth": 1.0,
+        "lines.markersize": 3.5,
+        "errorbar.capsize": 1.5,
+    })
+
+
+def _panel(width: float):
+    fig, ax = plt.subplots(figsize=(width, PANEL_H))
+    fig.subplots_adjust(left=MARGIN_IN["left"] / width, right=1 - MARGIN_IN["right"] / width,
+                        top=1 - MARGIN_IN["top"] / PANEL_H, bottom=MARGIN_IN["bottom"] / PANEL_H)
+    return fig, ax
+
+
+def _keep_inside(fig, text, pad_in: float = 0.02) -> None:
+    """Shift a text horizontally (in inches, dpi-independent) just enough to stay inside the figure."""
+    bb = text.get_window_extent(fig.canvas.get_renderer())
+    lo, hi = fig.bbox.x0 + pad_in * fig.dpi, fig.bbox.x1 - pad_in * fig.dpi
+    shift = min(0.0, hi - bb.x1) or max(0.0, lo - bb.x0)
+    if shift:
+        text.set_transform(text.get_transform() + ScaledTranslation(shift / fig.dpi, 0, fig.dpi_scale_trans))
+
+
+def _title(fig, ax, text: str, better: str = "Lower is better ↓") -> None:
+    """Centred panel title with the "better" hint on a second line above it (as in Fig. 10)."""
+    for y, s, kw in ((1.03, text, {}), (1.16, better, {"color": plot_lib_color})):
+        _keep_inside(fig, ax.text(0.5, y, s, transform=ax.transAxes, fontweight="bold", ha="center",
+                                  va="bottom", **kw))
+
+
 def _ci95(vals):
     vals = np.asarray(vals, dtype=float)
     if len(vals) == 0:
@@ -422,34 +483,42 @@ def ler_ratio(t, b, v, ref, ps):
     return float(np.exp(np.mean(np.log(r)))) if r else np.nan
 
 
-# Short tick labels for the ratio plot; the group label below the axis carries the context.
+# Tick labels for the paper figure (a): at 7 pt and 2/3 text width each bar pair gets ~0.3 in, so labels
+# are two short lines; the one-word group names carry the context (spell the abbreviations out in the caption).
 SHORT = {
     "chipmunq_focus": "Focus",
     "chipmunq_basic": "Basic",
-    "chipmunq_sabre": "SABRE\n(equal time)",
-    "chipmunq_sabre_default": "SABRE\n(default)",
-    "no_partitioning": "w/o patch\npartitioning",
-    "no_patch_contraction": "w/o patch\ncontraction",
-    "no_sequencing": "w/o\nsequencing",
-    "no_global_mapping": "w/o global\nmapping",
-    "no_defect_aware": "w/o defect\nawareness",
-    "sabre_tradeoff": "SABRE map\n+ Tradeoff",
-    "lightsabre": "LightSABRE",
+    "chipmunq_sabre": "SABRE\n(equal)",
+    "chipmunq_sabre_default": "SABRE\n(Qiskit)",
+    "no_partitioning": "w/o\nPart.",
+    "no_patch_contraction": "w/o\nContr.",
+    "no_sequencing": "w/o\nSeq.",
+    "no_global_mapping": "w/o\nGlobal",
+    "no_defect_aware": "w/o\nDefect",
+    "sabre_tradeoff": "SABRE\n+Trade.",
+    "lightsabre": "Light-\nSABRE",
 }
+# Routing: other routers on the Chipmunq mapping. Mapping: one mapping stage removed (Tradeoff routing).
+# Baselines: SABRE mapping (+ Tradeoff routing) and LightSABRE.
 RATIO_GROUPS = [
-    ("Router\n(on Chipmunq mapping)", ["chipmunq_focus", "chipmunq_basic", "chipmunq_sabre", "chipmunq_sabre_default"]),
-    ("Mapping stage removed\n(Tradeoff routing)", ["no_partitioning", "no_patch_contraction", "no_sequencing",
-                                                   "no_global_mapping", "no_defect_aware"]),
+    ("Routing", ["chipmunq_focus", "chipmunq_basic", "chipmunq_sabre", "chipmunq_sabre_default"]),
+    ("Mapping", ["no_partitioning", "no_patch_contraction", "no_sequencing", "no_global_mapping",
+                 "no_defect_aware"]),
     ("Baselines", ["sabre_tradeoff", "lightsabre"]),
 ]
+GROUP_GAP = 0.4                       # extra space between groups [bar slots]
 
 
 def plot_ler_ratio(results, stats, filename):
-    _rc()
+    """Paper figure a): LER of each variant relative to full Chipmunq (Tradeoff), per backend."""
+    from matplotlib.patches import Patch
+    from matplotlib.ticker import FuncFormatter, LogLocator
+
+    _fonts()
     t = ler_table(stats)
     ps = sorted(results["config"]["ps"])
     bkinds = list(results["config"]["defects"])
-    fig, ax = plt.subplots(figsize=(WIDTH_FIGSIZE * 1.6, HEIGHT_FIGSIZE * 1.4))
+    fig, ax = _panel(TEXT_WIDTH_IN * 2 / 3)
 
     # x positions with a gap between groups; skip variants that were never compiled
     present = {v for b in bkinds for v in present_variants(results, b)}
@@ -464,42 +533,44 @@ def plot_ler_ratio(results, stats, filename):
             order.append(v)
             x += 1
         spans.append((name, start, x - 1))
-        x += 0.6  # group gap
+        x += GROUP_GAP
     xs = np.array(xs)
 
     w = 0.8 / len(bkinds)
     for j, b in enumerate(bkinds):
         vals = [ler_ratio(t, b, v, REFERENCE, ps) for v in order]
         ax.bar(xs + (j - (len(bkinds) - 1) / 2) * w, vals, w, color=[COLOR[v] for v in order],
-               edgecolor="black", hatch="" if j == 0 else "////", label=b)
+               edgecolor="black", linewidth=0.4, hatch="" if j == 0 else "////", label=b)
 
-    ax.axhline(1, color="black", linestyle="--", linewidth=1)
+    ax.axhline(1, color="black", linestyle="--", linewidth=0.6)
     ax.set_yscale("log")
     ax.set_xticks(xs)
-    ax.set_xticklabels([SHORT[v] for v in order], fontsize=7, linespacing=1.0)
-    ax.set_xlim(xs[0] - 0.6, xs[-1] + 0.6)
-    ax.set_ylabel(r"$LER_{variant}/LER_{Chipmunq}$")
-
-    # Group labels and separators below the tick labels
-    for i, (name, a, b) in enumerate(spans):
-        ax.annotate(name, xy=((a + b) / 2, 0), xycoords=("data", "axes fraction"), xytext=(0, -30),
-                    textcoords="offset points", ha="center", va="top", fontsize=7, fontweight="bold")
-        if i:
-            ax.axvline(a - 0.8, color="grey", linewidth=0.8, alpha=0.6)
-
-    # Neutral legend swatches: colour identifies the variant, hatching the backend
-    from matplotlib.patches import Patch
-    from matplotlib.ticker import FuncFormatter, LogLocator
-    ax.legend(handles=[Patch(facecolor="white", edgecolor="black", hatch="" if j == 0 else "////", label=b)
-                       for j, b in enumerate(bkinds)], fontsize=7, loc="upper left", title="Backend",
-              title_fontsize=7)
-    ax.yaxis.set_major_locator(LogLocator(base=10, subs=(0.25, 0.5, 1.0, 2.0, 5.0)))
+    ax.set_xticklabels([SHORT[v] for v in order], linespacing=0.95)
+    ax.tick_params(axis="x", length=0)
+    ax.set_xlim(xs[0] - 0.55, xs[-1] + 0.55)
+    ax.set_ylabel("Relative LER")  # LER_variant / LER_Chipmunq(Tradeoff), geometric mean over p (caption)
+    ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
     ax.yaxis.set_minor_formatter(FuncFormatter(lambda y, _: ""))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
-    ax.text(0, 1.03, "Contribution of each stage to LER (>1: removing it hurts)", transform=ax.transAxes,
-            fontweight="bold")
-    ax.grid(True, axis="y", which="both", linestyle="--", alpha=0.3)
-    fig.subplots_adjust(left=0.12, right=0.98, top=0.88, bottom=0.3)
+    ax.grid(True, axis="y", which="major", linestyle="--", linewidth=0.4, alpha=0.5)
+    ax.set_axisbelow(True)
+
+    # Group names inside the axes (top) and separators between the groups
+    for i, (name, a, b) in enumerate(spans):
+        ax.text((a + b) / 2, 0.97, name, transform=ax.get_xaxis_transform(), ha="center", va="top",
+                fontweight="bold")
+        if i:
+            ax.axvline(a - (1 + GROUP_GAP) / 2, color="grey", linewidth=0.6, alpha=0.6)
+    lo, hi = ax.get_ylim()
+    ax.set_ylim(lo, hi * 2.5)              # headroom for the group names and the legend (log axis)
+
+    # Backend legend (hatching = backend; colour = variant), below the first group name
+    ax.legend(handles=[Patch(facecolor="white", edgecolor="black", linewidth=0.4,
+                             hatch="" if j == 0 else "////", label=f"{b} backend")
+                       for j, b in enumerate(bkinds)],
+              loc="upper left", bbox_to_anchor=(0.0, 0.86), ncols=1, frameon=False, handlelength=1.2,
+              handletextpad=0.35, labelspacing=0.2, borderaxespad=0.2)
+    _title(fig, ax, "a) Contribution of each stage")
     fig.savefig(filename, format="pdf")
     plt.close(fig)
 
