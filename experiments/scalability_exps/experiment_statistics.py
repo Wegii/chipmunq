@@ -537,8 +537,10 @@ def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
     width = 0.8 / len(tools)
     ax = fig.add_subplot(111)
     levels = _levels(ks_list)
-    allv = [v for t in tools for per_key in data[t] for v in per_key.values()]
-    ymax = ylim[1] if ylim else _nice(1.05 * max(allv))
+    # Log scale: axis limits snap to full decades around the positive values
+    allv = [v for t in tools for per_key in data[t] for v in per_key.values() if v > 0]
+    ymin = ylim[0] if ylim else 10 ** math.floor(math.log10(min(allv)))
+    ymax = ylim[1] if ylim else 10 ** math.ceil(math.log10(1.3 * max(allv)))
 
     for j, tool in enumerate(tools):
         label, color, hatch = TOOL_STYLE[tool]
@@ -567,7 +569,8 @@ def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
                             ha="left", va="bottom", rotation=45, rotation_mode="anchor",
                             color="red", fontweight="bold", fontsize=10, annotation_clip=False, zorder=20)
 
-    ax.set_ylim(*(ylim or (0, ymax)))
+    ax.set_yscale("log", nonpositive="clip")
+    ax.set_ylim(ymin, ymax)
     ax.set_xticks(x)
     ax.set_xticklabels([TITLES[k] + (f"\n(d={DISTANCE_INDEPENDENT[k]})" if k in DISTANCE_INDEPENDENT else "")
                         for k in keys])

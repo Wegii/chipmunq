@@ -1,9 +1,59 @@
+"""
+Fig. 10: defective qubits.
+
+Part 1 -- a) circuit depth, b) #2q gates, c) chiplet utilization:
+    Chipmunq vs. LightSABRE on backends with defective qubits (single-/multi-patch chiplets, center /
+    size-aware placement).
+
+Part 2 -- d) LER, e) utilization tradeoff:
+    Defect avoidance (Chipmunq) vs. patch deformation with super-stabilizers (Lin et al., ASPLOS'24 [1]).
+    Reviewer request (Comment #6 / B4): compare Chipmunq's regular-patch defect avoidance with prior work that
+    deforms patches around defects, and discuss the tradeoff between preserving patch structure and resource
+    utilization.
+
+    Setup (one logical qubit per chiplet, as in [1] and in part 1):
+      * A chiplet is the qubit set of an L x L rotated surface-code patch (2L^2 - 1 qubits, coordinates as in [1]).
+      * k defective qubits are drawn uniformly from the chiplet (qubit defects, as in BackendChipletV2).
+      * The program asks for a distance-D patch (D = 5, as in a-c).
+
+      Chipmunq (avoid):   place an intact D x D patch on a defect-free window of the chiplet (window nearest to
+                          the centre first). If no defect-free window exists, the chiplet cannot host the patch.
+      Lin et al. (deform): use the whole L x L chiplet and deform it around the defects (boundary deformation +
+                          super-stabilizers, their code [2]). Distance d_eff varies per chiplet; the patch can fail
+                          (percolation) at high defect counts.
+
+      L = D     : tight chiplet (no slack) -- avoidance fails as soon as one defect is present.
+      L = D + 2 : chiplet with slack -- avoidance keeps d = D, deformation reaches d_eff <= L.
+
+    Both strategies use the same memory-experiment generator ([2], LogicalQubit.generate_stim) and the noise
+    model of [1] (2q: p, 1q: 0.8p, readout: 8/15 p), decoded with PyMatching. Patches with super-stabilizers
+    measure X and Z gauges in alternate half-rounds (one generate_stim round = 2 QEC cycles), so the LER is
+    reported per QEC cycle.
+
+    [1] S. F. Lin et al., "Codesign of quantum error-correcting codes and modular chiplets in the presence of
+        defects", ASPLOS 2024, arXiv:2305.00138.
+    [2] https://github.com/SophLin/superstabilizer_demo  (clone into external/baseline/superstabilizer_demo;
+        only needed to run part 2)
+
+All panels are drawn at their printed size for four panels side by side across the full page width.
+
+Run from the repo root:
+    python experiments/scalability_exps/experiment_defective_qubits.py                    # both parts
+    python experiments/scalability_exps/experiment_defective_qubits.py --plot-only        # replot both
+    python experiments/scalability_exps/experiment_defective_qubits.py --part compile     # a-c only
+    python experiments/scalability_exps/experiment_defective_qubits.py --part deformation [--jobs N] [--quick]
+"""
 from __future__ import annotations
 
+import argparse
+import math
+import multiprocessing
 import os
 import sys
+import time
 
 sys.path.append(os.path.join(os.getcwd(), "."))
+sys.path.append(os.path.join(os.getcwd(), "./external/baseline/superstabilizer_demo"))
 
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
@@ -16,7 +66,28 @@ import pickle
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
+import pymatching
+import stim
+from matplotlib.patches import Patch
 from pathlib import Path
+
+# --------------------------------------------------------------------------------------
+# Figure size (all panels a-e): four panels side by side across the full page width. Every panel is drawn
+# at its printed size, so include it in LaTeX at its natural width (or width=0.24\textwidth for a 7.0 in
+# text width) -- no further scaling, fonts stay 7 pt and identical across the panels.
+# --------------------------------------------------------------------------------------
+TEXT_WIDTH_IN = 7.0                   # full text width of the paper (two-column IEEE/ACM: ~7.0 in)
+N_PANELS = 4                          # panels in one row
+PANEL_W = TEXT_WIDTH_IN / N_PANELS    # 1.75 in
+PANEL_H = 1.6
+FONT_PT = 7
+# identical margins for all panels, so the axes line up when placed next to each other
+MARGINS = dict(left=0.27, right=0.97, top=0.80, bottom=0.24)
+
+
+# ######################################################################################
+# Part 1: Chipmunq vs. LightSABRE on defective backends (Fig. 10 a-c)
+# ######################################################################################
 
 
 def ci95_bootstrap(values, df_values, mode, ks):
@@ -72,26 +143,25 @@ def plot_combined_backends(
 
     hatches = ["...", "//", "xxx", "ooo"]  # one hatch per placement mode
 
+    # Panel size, fonts and margins: module-level PANEL_* / FONT_PT / MARGINS (shared with d, e)
     tex_fonts = {
-        # Use LaTeX to write all text
-        # "text.usetex": True,
         "font.family": "serif",
-        # Font sizes
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.5,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.3,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.3,
-        "axes.titlesize": 10,
-        # Hatches
-        "hatch.linewidth": 0.5,
-        # Line and marker styles
-        "lines.linewidth": 2,
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "hatch.linewidth": 0.4,
+        "lines.linewidth": 1.0,
         "lines.markersize": 3,
-        "lines.markeredgewidth": 1.5,
+        "lines.markeredgewidth": 0.5,
         "lines.markeredgecolor": "black",
-        # Error bar cap size
-        "errorbar.capsize": 3,
+        "errorbar.capsize": 1.5,
     }
 
     plt.rcParams.update(tex_fonts)
@@ -101,7 +171,7 @@ def plot_combined_backends(
     WIDTH_FIGSIZE = 6
     HEIGHT_FIGSIZE = 2.2
 
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
 
     for i, mode in enumerate(placement_modes):
         # Single patch
@@ -114,8 +184,9 @@ def plot_combined_backends(
             values_mean_custom,
             width,
             yerr=values_err_custom,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
+            capsize=1.5,
+            error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+            linewidth=0.4,
             label=labels[i],
             color=colors_custom[i],
             hatch=hatches[i],
@@ -128,8 +199,9 @@ def plot_combined_backends(
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
-                capsize=2,
-                error_kw={"elinewidth": 1, "ecolor": "black"},
+                capsize=1.5,
+                error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+                linewidth=0.4,
                 label=labels[i],
                 color=colors_sabre[i],
                 # hatch=hatches[i],
@@ -145,8 +217,9 @@ def plot_combined_backends(
             values_mean_custom,
             width,
             yerr=values_err_custom,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
+            capsize=1.5,
+            error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+            linewidth=0.4,
             label=labels[i] + "multi",
             color=colors_custom[i + 2],
             hatch=hatches[i],
@@ -159,8 +232,9 @@ def plot_combined_backends(
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
-                capsize=2,
-                error_kw={"elinewidth": 1, "ecolor": "black"},
+                capsize=1.5,
+                error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+                linewidth=0.4,
                 label=labels[i] + "multi",
                 color=colors_sabre[i + 2],
                 # hatch=hatches[i + 2],
@@ -174,23 +248,25 @@ def plot_combined_backends(
     # ax.legend(loc='upper left')
     # ax.set_ylim(0, 1250)
 
-    ax.text(-0.1, 1.02, "a) Defective qubits affecting circuit depth", transform=ax.transAxes, fontweight="bold")
+    ax.text(0.5, 1.03, "a) Circuit depth", transform=ax.transAxes, fontweight="bold", ha="center", va="bottom")
 
     ax.text(
-        0.27,
-        1.15,
+        0.5,
+        1.16,
         "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
+        ha="center",
+        va="bottom",
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
+    fig.subplots_adjust(**MARGINS)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
     # 2Q Gate Overhead
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
 
     for i, mode in enumerate(placement_modes):
         # Single patch
@@ -203,8 +279,9 @@ def plot_combined_backends(
             values_mean_custom,
             width,
             yerr=values_err_custom,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
+            capsize=1.5,
+            error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+            linewidth=0.4,
             label=labels[i],
             color=colors_custom[i],
             hatch=hatches[i],
@@ -217,8 +294,9 @@ def plot_combined_backends(
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
-                capsize=2,
-                error_kw={"elinewidth": 1, "ecolor": "black"},
+                capsize=1.5,
+                error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+                linewidth=0.4,
                 label=labels[i],
                 color=colors_sabre[i],
                 # hatch=hatches[i],
@@ -234,8 +312,9 @@ def plot_combined_backends(
             values_mean_custom,
             width,
             yerr=values_err_custom,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
+            capsize=1.5,
+            error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+            linewidth=0.4,
             label=labels[i] + "multi",
             color=colors_custom[i + 2],
             hatch=hatches[i],
@@ -248,8 +327,9 @@ def plot_combined_backends(
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
-                capsize=2,
-                error_kw={"elinewidth": 1, "ecolor": "black"},
+                capsize=1.5,
+                error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+                linewidth=0.4,
                 label=labels[i] + "multi",
                 color=colors_sabre[i + 2],
                 # hatch=hatches[i + 2],
@@ -263,24 +343,26 @@ def plot_combined_backends(
     # ax.legend(loc='upper left')
     # ax.set_ylim(0, 5500)
 
-    ax.text(-0.05, 1.02, "b) Defective qubits affecting #2q gates", transform=ax.transAxes, fontweight="bold")
+    ax.text(0.5, 1.03, "b) #2q gates", transform=ax.transAxes, fontweight="bold", ha="center", va="bottom")
 
     ax.text(
-        0.27,
-        1.15,
+        0.5,
+        1.16,
         "Lower is better ↓",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
+        ha="center",
+        va="bottom",
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
+    fig.subplots_adjust(**MARGINS)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
 
     # Backend Utilization
     # fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE*2.6, WIDTH_FIGSIZE*0.7))
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
 
     handles = []
     for i, mode in enumerate(placement_modes):
@@ -294,8 +376,9 @@ def plot_combined_backends(
             values_mean_custom,
             width,
             yerr=values_err_custom,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
+            capsize=1.5,
+            error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+            linewidth=0.4,
             label="Chipmunq, single patch, " + labels[i],
             color=colors_custom[i],
             hatch=hatches[i],
@@ -309,8 +392,9 @@ def plot_combined_backends(
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
-                capsize=2,
-                error_kw={"elinewidth": 1, "ecolor": "black"},
+                capsize=1.5,
+                error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+                linewidth=0.4,
                 label="LightSABRE, single patch",
                 color=colors_sabre[i],
                 # hatch=hatches[i],
@@ -327,8 +411,9 @@ def plot_combined_backends(
             values_mean_custom,
             width,
             yerr=values_err_custom,
-            capsize=2,
-            error_kw={"elinewidth": 1, "ecolor": "black"},
+            capsize=1.5,
+            error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+            linewidth=0.4,
             label="Chipmunq, multi patch, " + labels[i],
             color=colors_custom[i + 2],
             hatch=hatches[i],
@@ -343,8 +428,9 @@ def plot_combined_backends(
                 values_mean_sabre,
                 width,
                 yerr=values_err_sabre,
-                capsize=2,
-                error_kw={"elinewidth": 1, "ecolor": "black"},
+                capsize=1.5,
+                error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6},
+                linewidth=0.4,
                 label="LightSABRE, multi patch",
                 color=colors_sabre[i + 2],
                 # hatch=hatches[i + 2],
@@ -359,33 +445,35 @@ def plot_combined_backends(
     # ax.legend(loc='upper left')
     ax.set_ylim(0, 1.2)
 
-    ax.text(-0.22, 1.02, "c) Defective qubits affecting chiplet utilization", transform=ax.transAxes, fontweight="bold")
+    ax.text(0.0, 1.03, "c) Chiplet utilization", transform=ax.transAxes, fontweight="bold", ha="left", va="bottom")
 
     ax.text(
-        0.27,
-        1.15,
+        0.5,
+        1.16,
         "Higher is better ↑",
         transform=ax.transAxes,
         fontweight="bold",
         color=plot_lib_color,
+        ha="center",
+        va="bottom",
     )
 
-    fig.subplots_adjust(left=0.2, right=0.95, top=0.85, bottom=0.21)
+    fig.subplots_adjust(**MARGINS)
     fig.savefig(f"{filename}_utilization.pdf", format="pdf")
     plt.close(fig)
 
-    legend_fig = plt.figure(figsize=(3, 2))
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.3))
     legend = legend_fig.legend(
         handles=[handles[0], handles[4], handles[2], handles[5]],
         loc="center",
         frameon=False,
-        ncols=4,
+        ncols=2,  # two rows: four labels in one row are wider than the page at 7 pt
         columnspacing=1.5,
     )
     legend_fig.savefig(filename + "legend_custom.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
-    legend_fig = plt.figure(figsize=(3, 2))
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.3))
     legend = legend_fig.legend(
         handles=[handles[1], handles[3]], loc="center", frameon=False, ncols=4, columnspacing=1.5
     )
@@ -597,5 +685,340 @@ def run_exp_defective(reproduce: bool = False) -> None:
     )
 
 
+# ######################################################################################
+# Part 2: defect avoidance (Chipmunq) vs. patch deformation (Lin et al. [1]) (Fig. 10 d, e)
+# ######################################################################################
+# ======================================================================================
+# Parameters
+# ======================================================================================
+D_TARGET = 5                          # distance requested by the program (Fig. 10 a-c use d = 5)
+L_VALUES = [D_TARGET, D_TARGET + 2]   # tight chiplet / chiplet with slack
+DEFECTS = [0, 1, 2, 3, 5, 8]          # defective qubits per chiplet (0-3 as in Fig. 10 a-c, plus higher)
+N_SAMPLES = 20                        # random defect placements per (L, k)
+P_PHYS = 1e-3                         # 2q gate error; 1q = 0.8 p, readout = 8/15 p (noise model of [1])
+MAX_SHOTS, MAX_ERRORS, BATCH = 2_000_000, 100, 50_000
+OUT_DIR = Path("experiments/evaluation/defective_qubits")
+DEFORM_PKL = OUT_DIR / "defect_deformation.pkl"
+
+# ======================================================================================
+# Geometry (coordinates of [2]: data at (2x, 2y), syndromes at (2x+1, 2y+1))
+# ======================================================================================
+def patch_coords(n: int) -> set[tuple[int, int]]:
+    """All qubit coordinates of an n x n rotated surface-code patch in the convention of [2] (2n^2 - 1)."""
+    s = {(2 * x, 2 * y) for x in range(n) for y in range(n)}
+    for x in range(-1, n):
+        for y in range(-1, n):
+            if (x + y) % 2 == 1 and x not in (-1, n - 1):      # X syndrome
+                s.add((2 * x + 1, 2 * y + 1))
+            elif (x + y) % 2 == 0 and y not in (-1, n - 1):    # Z syndrome
+                s.add((2 * x + 1, 2 * y + 1))
+    assert len(s) == 2 * n * n - 1
+    return s
+
+
+def find_window(chip: set, defects: set, L: int, D: int):
+    """Chipmunq-style placement: offset (a, b) of a defect-free D x D window inside the L x L chiplet,
+    closest to the centre first; None if the patch cannot be placed without touching a defect."""
+    base = patch_coords(D)
+    c = (L - D) / 2
+    offsets = sorted(((a, b) for a in range(L - D + 1) for b in range(L - D + 1)),
+                     key=lambda ab: (abs(ab[0] - c) + abs(ab[1] - c), ab))
+    for a, b in offsets:
+        win = {(u + 2 * a, v + 2 * b) for u, v in base}
+        if win <= chip and not (win & defects):
+            return a, b
+    return None
+
+
+def _LogicalQubit():
+    """Lin et al.'s LogicalQubit [2], imported only when the deformation experiment is run, so Fig. 10 a-c
+    (and plotting d, e) work without their code installed."""
+    from surface_general_defect import LogicalQubit
+    return LogicalQubit
+
+
+def noise_args(p: float):
+    return dict(readout_err=8 / 15 * p, gate1_err=0.8 * p, gate2_err=p)
+
+
+def deformed_patch(L: int, defects: set, p: float):
+    """Lin et al.: deform the L x L chiplet around the defects. Returns None if no valid patch exists."""
+    try:
+        lq = _LogicalQubit()(L, **noise_args(p), missing_coords=sorted(defects), get_metrics=True)
+    except (RuntimeError, AssertionError, KeyError, IndexError):
+        return None
+    if lq.is_percolated() or lq.terminated_due_to_qubit_loss():
+        return None
+    return lq
+
+
+# ======================================================================================
+# Sampling
+# ======================================================================================
+def _sample(task):
+    """Sample one circuit until MAX_ERRORS logical errors or MAX_SHOTS shots. Returns (errors, shots)."""
+    circ_str, seed, max_shots, max_errors, batch = task
+    circ = stim.Circuit(circ_str)
+    dem = circ.detector_error_model(decompose_errors=True, ignore_decomposition_failures=True)
+    matcher = pymatching.Matching.from_detector_error_model(dem)
+    sampler = circ.compile_detector_sampler(seed=seed)
+    errors = shots = 0
+    while shots < max_shots and errors < max_errors:
+        n = min(batch, max_shots - shots)
+        det, obs = sampler.sample(n, separate_observables=True)
+        errors += int(np.any(matcher.decode_batch(det) != obs, axis=1).sum())
+        shots += n
+    return errors, shots
+
+
+def per_cycle(errors: int, shots: int, cycles: int) -> float:
+    """LER per QEC cycle; zero observed errors -> 0.5/shots (plotted as an upper bound)."""
+    P = max(errors, 0.5) / shots
+    return 1 - (1 - P) ** (1 / cycles)
+
+
+def run_deformation(jobs: int, quick: bool) -> dict:
+    n_samples = 4 if quick else N_SAMPLES
+    max_shots = 200_000 if quick else MAX_SHOTS
+    rounds = D_TARGET
+
+    # --- Build all circuits (cheap, serial) ------------------------------------------
+    rows, circuits = [], {}  # circuits: circuit string -> index into the sampling task list
+
+    def register(circ: stim.Circuit) -> int:
+        s = str(circ)
+        if s not in circuits:
+            circuits[s] = len(circuits)
+        return circuits[s]
+
+    # Chipmunq: an intact, defect-free D x D patch (identical circuit for every successful placement)
+    lq_ref = _LogicalQubit()(D_TARGET, **noise_args(P_PHYS), get_metrics=True)
+    ref_idx = register(lq_ref.generate_stim(rounds))
+    ref_cycles = rounds
+    ref_qubits = 2 * D_TARGET ** 2 - 1
+
+    for L in L_VALUES:
+        chip = sorted(patch_coords(L))
+        for k in DEFECTS:
+            for s in range(n_samples):
+                rng = np.random.default_rng(10_000 * L + 100 * k + s)
+                idx = rng.choice(len(chip), size=k, replace=False) if k else []
+                defects = {chip[i] for i in idx}
+
+                # Chipmunq: avoid the defects with an intact patch
+                win = find_window(set(chip), defects, L, D_TARGET)
+                rows.append(dict(method="chipmunq", L=L, k=k, sample=s, ok=win is not None,
+                                 d_eff=D_TARGET if win is not None else 0,
+                                 util=ref_qubits / len(chip) if win is not None else 0.0,
+                                 circ=ref_idx if win is not None else None, cycles=ref_cycles))
+
+                # Lin et al.: deform the whole chiplet around the defects
+                lq = deformed_patch(L, defects, P_PHYS)
+                if lq is None:
+                    rows.append(dict(method="deform", L=L, k=k, sample=s, ok=False, d_eff=0, util=0.0,
+                                     circ=None, cycles=None))
+                else:
+                    cycles = rounds * (2 if len(lq.x_gauges) > 0 else 1)
+                    rows.append(dict(method="deform", L=L, k=k, sample=s, ok=True,
+                                     d_eff=min(lq.actual_distance_vertical(), lq.actual_distance_horizontal()),
+                                     util=len(lq.all_qubits) / len(chip),
+                                     circ=register(lq.generate_stim(rounds)), cycles=cycles))
+
+    # --- Sample all distinct circuits in parallel ----------------------------------------
+    circ_list = sorted(circuits, key=circuits.get)
+    seeds = np.random.SeedSequence(994).generate_state(len(circ_list), dtype=np.uint32)
+    tasks = [(c, int(seed), max_shots, MAX_ERRORS, BATCH) for c, seed in zip(circ_list, seeds)]
+    print(f"{len(rows)} (method, L, k, sample) points, {len(tasks)} distinct circuits on {jobs} workers",
+          flush=True)
+    t0 = time.time()
+    for var in ("RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ.setdefault(var, "1")
+    with multiprocessing.get_context("spawn").Pool(jobs) as pool:
+        sampled = []
+        for i, out in enumerate(pool.imap(_sample, tasks, chunksize=1), 1):
+            sampled.append(out)
+            if i % max(1, len(tasks) // 10) == 0 or i == len(tasks):
+                print(f"  {i}/{len(tasks)} circuits sampled ({time.time() - t0:.0f} s)", flush=True)
+
+    for r in rows:
+        if r["ok"]:
+            e, n = sampled[r["circ"]]
+            r.update(errors=e, shots=n, ler=per_cycle(e, n, r["cycles"]))
+        else:
+            r.update(errors=None, shots=None, ler=None)
+        r.pop("circ")
+
+    data = dict(rows=rows, params=dict(D=D_TARGET, L=L_VALUES, defects=DEFECTS, samples=n_samples,
+                                       p=P_PHYS, rounds=rounds, max_shots=max_shots, max_errors=MAX_ERRORS))
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(DEFORM_PKL, "wb") as f:
+        pickle.dump(data, f)
+    return data
+
+
+# ======================================================================================
+# Summary and plots
+# ======================================================================================
+def _group(rows, method, L, k):
+    return [r for r in rows if r["method"] == method and r["L"] == L and r["k"] == k]
+
+
+def summarize_deformation(rows):
+    print(f"{'method':10s} {'L':>3s} {'k':>3s} {'success':>8s} {'d_eff':>6s} {'util':>6s} {'LER/cycle':>10s}")
+    for L in L_VALUES:
+        for method in ("chipmunq", "deform"):
+            for k in DEFECTS:
+                g = _group(rows, method, L, k)
+                ok = [r for r in g if r["ok"]]
+                succ = len(ok) / len(g)
+                if ok:
+                    print(f"{method:10s} {L:3d} {k:3d} {succ:8.0%} {np.mean([r['d_eff'] for r in ok]):6.2f} "
+                          f"{np.mean([r['util'] for r in ok]):6.2f} {np.mean([r['ler'] for r in ok]):10.2e}")
+                else:
+                    print(f"{method:10s} {L:3d} {k:3d} {succ:8.0%} {'-':>6s} {'-':>6s} {'-':>10s}")
+
+
+def _ci95(vals, n_boot=5000, seed=0):
+    vals = np.asarray(vals)
+    mean = vals.mean()
+    if len(vals) < 2:
+        return mean, 0.0, 0.0
+    rng = np.random.default_rng(seed)
+    boots = rng.choice(vals, size=(n_boot, len(vals)), replace=True).mean(axis=1)
+    return mean, mean - np.percentile(boots, 2.5), np.percentile(boots, 97.5) - mean
+
+
+SERIES = [  # (method, L index, label, colour, hatch). Tight: L = D, slack: L = D + 2 (explain in the caption)
+    ("chipmunq", 0, "Chipmunq (avoid), tight", "#A7D9ED", "..."),
+    ("deform", 0, "Lin et al. (deform), tight", "#B5D8B0", "\\\\"),
+    ("chipmunq", 1, "Chipmunq (avoid), slack", "#5B9BD5", "//"),
+    ("deform", 1, "Lin et al. (deform), slack", "#6AA84F", "xx"),
+]
+
+
+def _fonts():
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "hatch.linewidth": 0.4,
+        "lines.linewidth": 1.0,
+        "lines.markersize": 3.5,
+        "errorbar.capsize": 1.5,
+    })
+
+
+def _panel():
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
+    fig.subplots_adjust(**MARGINS)
+    return fig, ax
+
+
+def _title(ax, text: str, better: str):
+    """Panel title (left-aligned to the axes) with the "better" hint on a second line above it."""
+    ax.text(0.0, 1.03, text, transform=ax.transAxes, fontweight="bold", ha="left", va="bottom")
+    ax.text(0.5, 1.16, better, transform=ax.transAxes, fontweight="bold", color=plot_lib_color,
+            ha="center", va="bottom")
+
+
+def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
+    rows, Ls = data["rows"], data["params"]["L"]
+    _fonts()
+
+    # ---------------- d) LER per QEC cycle vs #defects ----------------
+    fig, ax = _panel()
+    x = np.arange(len(DEFECTS))
+    width = 0.84 / len(SERIES)
+    all_ok = [r["ler"] for r in rows if r["ok"]]
+    floor = min(all_ok) / 3 if all_ok else 1e-7
+    handles = []
+    for j, (method, li, label, color, hatch) in enumerate(SERIES):
+        L = Ls[li]
+        xpos = x + (j - (len(SERIES) - 1) / 2) * width
+        for i, k in enumerate(DEFECTS):
+            g = _group(rows, method, L, k)
+            ok = [r["ler"] for r in g if r["ok"]]
+            if ok:
+                m, lo, hi = _ci95(ok)
+                ax.bar(xpos[i], m, width, yerr=[[lo], [hi]], color=color, hatch=hatch, edgecolor="black",
+                       linewidth=0.4, error_kw={"elinewidth": 0.6, "ecolor": "black", "capthick": 0.6})
+            else:  # no chiplet could host the patch: hollow dashed bar
+                ax.bar(xpos[i], floor * 3, width, bottom=floor, color="white", hatch="xxx",
+                       edgecolor=color, linewidth=0.8, linestyle="--")
+        handles.append(Patch(facecolor=color, hatch=hatch, edgecolor="black", linewidth=0.4, label=label))
+    ax.set_yscale("log")
+    ax.set_ylim(bottom=floor)
+    ax.set_xticks(x, [str(k) for k in DEFECTS])
+    ax.set_xlabel("#Defective qubits")
+    ax.set_ylabel("LER per QEC cycle")
+    ax.grid(True, which="major", axis="y", linestyle="--", linewidth=0.4, alpha=0.5)
+    ax.set_axisbelow(True)
+    _title(ax, "d) Avoid vs. deform", "Lower is better ↓")
+    fig.savefig(f"{filename}_deformation_ler.pdf", format="pdf")
+    plt.close(fig)
+
+    # ---------------- e) tradeoff: utilization vs LER ----------------
+    fig, ax = _panel()
+    markers = {0: "o", 1: "s"}
+    for method, li, label, color, hatch in SERIES:
+        L = Ls[li]
+        pts = []
+        for k in DEFECTS:
+            ok = [r for r in _group(rows, method, L, k) if r["ok"]]
+            if ok:
+                pts.append((np.mean([r["util"] for r in ok]), np.mean([r["ler"] for r in ok]), k))
+        if not pts:
+            continue
+        u, l, ks = zip(*pts)
+        ax.plot(u, l, marker=markers[li], color=color, markeredgecolor="black", markeredgewidth=0.5)
+        for ui, lk, kk in pts:
+            ax.annotate(str(kk), xy=(ui, lk), xytext=(2, 2), textcoords="offset points", fontsize=FONT_PT - 2.5)
+    ax.set_yscale("log")
+    ax.set_xlabel("Utilization")  # active code qubits / chiplet qubits (state in the caption)
+    ax.set_ylabel("LER per QEC cycle")
+    ax.grid(True, which="both", linestyle="--", linewidth=0.4, alpha=0.5)
+    _title(ax, "e) Utilization tradeoff", "Lower, right is better")
+    fig.savefig(f"{filename}_deformation_tradeoff.pdf", format="pdf")
+    plt.close(fig)
+
+    # ---------------- legend (one row, full page width) ----------------
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.3))
+    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=len(handles), columnspacing=1.0,
+                      handlelength=1.4, handletextpad=0.4)
+    legend_fig.savefig(f"{filename}legend_deformation.pdf", bbox_inches="tight", format="pdf")
+    plt.close(legend_fig)
+
+
+# ######################################################################################
+# Entry point
+# ######################################################################################
 if __name__ == "__main__":
-    run_exp_defective(reproduce=True)
+    ap = argparse.ArgumentParser(description="Fig. 10: defective qubits (a-c compilation, d-e deformation)")
+    ap.add_argument("--plot-only", action="store_true", help="only replot the saved results")
+    ap.add_argument("--part", choices=["all", "compile", "deformation"], default="all",
+                    help="compile = a-c (Chipmunq vs. LightSABRE), deformation = d-e (vs. Lin et al.)")
+    ap.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1, help="workers for part 2 sampling")
+    ap.add_argument("--quick", action="store_true", help="part 2: 4 samples, 200k shots (pipeline smoke test)")
+    a = ap.parse_args()
+
+    if a.part in ("all", "compile"):
+        run_exp_defective(reproduce=not a.plot_only)
+
+    if a.part in ("all", "deformation"):
+        if a.plot_only:
+            if not DEFORM_PKL.exists():
+                raise SystemExit(f"No results to plot: {DEFORM_PKL} not found. Run without --plot-only first.")
+            with open(DEFORM_PKL, "rb") as f:
+                data = pickle.load(f)
+        else:
+            data = run_deformation(a.jobs, a.quick)
+        summarize_deformation(data["rows"])
+        plot_deformation(data)
