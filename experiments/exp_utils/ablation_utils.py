@@ -498,6 +498,50 @@ def _n_swaps(qc: QuantumCircuit) -> int:
     return qc.count_ops().get("swap", 0)
 
 
+def sabre_swap_fixed_layout(placed: QuantumCircuit, cmap: CouplingMap, seed: int = 0,
+                            trials: int | None = None) -> QuantumCircuit:
+    """SabreSwap restricted to routing: the circuit is split at barriers (Stim TICKs), each segment that
+    needs routing is routed by SabreSwap from the fixed placement, and the resulting permutation is undone
+    with a SWAP network, so every segment starts from the same (Chipmunq) qubit map."""
+    from qiskit.transpiler.passes.routing.algorithms import ApproximateTokenSwapper
+
+    edges = {tuple(e) for e in cmap.get_edges()}
+    edges |= {(b, a) for a, b in edges}
+    swapper = ApproximateTokenSwapper(cmap.graph.to_undirected(multigraph=False), seed=seed)
+    idx = {q: i for i, q in enumerate(placed.qubits)}
+    out = placed.copy_empty_like()
+    seg = placed.copy_empty_like()
+
+    def flush():
+        nonlocal seg
+        if not seg.data:
+            return
+        needs = any(ins.operation.num_qubits == 2 and ins.operation.name != "barrier"
+                    and (idx[ins.qubits[0]], idx[ins.qubits[1]]) not in edges for ins in seg.data)
+        if not needs:
+            out.compose(seg, inplace=True)
+        else:
+            pm = PassManager([SabreSwap(cmap, heuristic="decay", seed=seed, trials=trials)])
+            routed = pm.run(seg)
+            out.compose(routed, inplace=True)
+            final = pm.property_set["final_layout"]
+            if final is not None:
+                # qubit i of the segment ended on physical final[i]; move every state back to i
+                back = {final[seg.qubits[i]]: i for i in range(seg.num_qubits) if final[seg.qubits[i]] != i}
+                for a, b in swapper.map(back) if back else []:
+                    out.swap(int(a), int(b))
+        seg = placed.copy_empty_like()
+
+    for ins in placed.data:
+        if ins.operation.name == "barrier":
+            flush()
+            out.append(ins)
+        else:
+            seg.append(ins)
+    flush()
+    return out
+
+
 def route_from_mapping(circuit: QuantumCircuit, backend: BackendChipletV2, mapping: dict[int, int], router: str,
                        ps_inter: float, *, ra: float = ROUTING_ALPHA, seed: int = 0, budget_s: float | None = None,
                        sabre_trials: int | None = None, timing_repeats: int = 3,
@@ -508,6 +552,8 @@ def route_from_mapping(circuit: QuantumCircuit, backend: BackendChipletV2, mappi
     router: "basic" | "focus" | "tradeoff" -> Chipmunq's CostRouter with the Fig. 9 params
                                               (``alpha``/``beta`` override them if given)
             "sabre"                        -> LightSABRE SabreSwap on the defect-free coupling map
+            "sabre_fixed"                  -> SabreSwap per barrier segment, layout restored after each
+                                              segment (routing only, the qubit map stays fixed)
             "murali"                       -> Murali et al.'s noise-adaptive routing (most reliable
                                               path, swap-and-return) from the same placement
             "seqc"                         -> SEQC's inter-chiplet routing (Alg. 2), noise-weighted link
@@ -554,6 +600,13 @@ def route_from_mapping(circuit: QuantumCircuit, backend: BackendChipletV2, mappi
         t0 = time.perf_counter()
         out, stim_c = seqc_route(circuit, backend, mapping, seed=seed)
         info.update(routing_s=time.perf_counter() - t0, trials=1, stim=stim_c)
+        return out, info
+    if router == "sabre_fixed":
+        _warm_up_sabre()
+        t0 = time.perf_counter()
+        placed = PassManager(_placement_passes(circuit, backend, mapping)).run(circuit)
+        out = sabre_swap_fixed_layout(placed, backend.defective_coupling_map, seed=seed, trials=sabre_trials)
+        info.update(routing_s=time.perf_counter() - t0, trials=sabre_trials or float("nan"))
         return out, info
     if router != "sabre":
         raise ValueError(router)

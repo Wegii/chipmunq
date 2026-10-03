@@ -7,48 +7,52 @@ BackendChipletV2 object (identical defects and link noise); only one stage chang
 
     Variant                   mapping                                   routing
     ------------------------  ----------------------------------------  --------------------
-    chipmunq_tradeoff         Chipmunq (full)                           Tradeoff   <- reference
-    chipmunq_focus            Chipmunq                                  Focus
-    chipmunq_basic            Chipmunq                                  Basic      (-noise-aware routing)
-    chipmunq_sabre            Chipmunq                                  SABRE-SWAP, budget-matched  [todo 2]
-    chipmunq_sabre_default    Chipmunq                                  SABRE-SWAP, Qiskit default trials
-    no_partitioning           KaHyPar blocks instead of patch IR        Tradeoff
-    no_patch_contraction      qubit-level SABRE inside assigned chiplet Tradeoff
-    no_sequencing             random patch order instead of BFS         Tradeoff
-    no_global_mapping         random patch->chiplet assignment          Tradeoff
-    no_defect_aware           placement blind to defects + repair       Tradeoff   (defective backend only)
-    sabre_tradeoff            SabreLayout (qubit level)                 Tradeoff               [todo 1]
-    lightsabre                SabreLayout                               SABRE-SWAP (default)
+    chipmunq_basic            Chipmunq (full)                           Basic      <- reference
+    chipmunq_sabre_default    Chipmunq                                  SABRE-SWAP, qubit map restored after each TICK segment
+    no_partitioning           KaHyPar blocks instead of patch IR        Basic
+    no_patch_contraction      qubit-level SABRE inside assigned chiplet Basic
+    no_sequencing             random patch order instead of BFS         Basic
+    no_global_mapping         random patch->chiplet assignment          Basic
+    lightsabre                SabreLayout                               SABRE-SWAP (default)       (baseline)
+    seqc                      SEQC (own layout)                         SEQC, noise-aware links    (baseline)
+    olsq2                     OLSQ2 (SMT layout synthesis, SWAP objective)                         (baseline)
+    murali                    Murali et al. GreedyE* placement          noise-adaptive routing     (baseline)
 
-Equal compilation-time budgets: Basic, Focus and Tradeoff are deterministic single-pass
-routers, so their budget is their runtime. The budget B of a backend instance is the
-largest of the three; ``chipmunq_sabre`` gets exactly B, spent on independent SabreSwap
-restarts, keeping the one with the fewest SWAPs (SABRE's own criterion: it gets no noise
-information). ``chipmunq_sabre_default`` shows SABRE with its standard trial count.
+Baselines compile the full circuit themselves on the working qubits only (defective qubits removed,
+indices mapped back), each in its own process with a wall-clock limit (``baseline_timeout_s``);
+runs over the limit are recorded and drawn as T/O.
 
-Reported per variant and backend (clean / defective): mapping + routing runtime, LER vs p,
+``chipmunq_sabre_default`` routes the Chipmunq mapping with LightSABRE's SabreSwap (standard trial count)
+as a pure router: every segment between Stim TICKs is routed from the same placement and the permutation
+is undone afterwards, so the qubit map stays fixed as with Basic. The reported budget B (runtime of Basic
+routing) is informational only.
+
+Reported per variant and backend (clean / defective): mapping + routing runtime, LER at P_PHYS,
 2q-gate overhead (SWAP = 3), depth overhead, inter-chiplet 2q gates, compile failures.
 
-Noise: circuit-level ``modsi1000`` with per-link inter-chiplet noise, applied
-orientation-independently (see ``symmetric_remote_noise``).
+Noise: circuit-level ``modsi1000`` with the same inter-chiplet noise ``ps_inter`` on every link,
+applied orientation-independently (see ``symmetric_remote_noise``).
 
 Paper figure (a, next to the cosmic-ray experiment b): ``ablation_ler_ratio_*.pdf``, drawn at its printed
 size (2/3 of the text width, Fig. 10 style) -- include it at its natural width, no scaling.
 
 Usage:
-    python experiments/qec_exps/experiment_mapping_routing_ablation.py            # full
-    python experiments/qec_exps/experiment_mapping_routing_ablation.py --quick    # smoke test
-    python experiments/qec_exps/experiment_mapping_routing_ablation.py --plot-only
+    python experiments/ablation/experiment_components.py            # full
+    python experiments/ablation/experiment_components.py --quick    # smoke test
+    python experiments/ablation/experiment_components.py --plot-only
+    python experiments/ablation/experiment_components.py --clean-only [--plot-only]  # clean backend only
 """
 
 from __future__ import annotations
 
 import argparse
+import multiprocessing
 import os
 import pickle
 import sys
 import traceback
-from collections import defaultdict
+from collections import Counter, defaultdict
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.append(os.path.join(os.getcwd(), "."))
@@ -59,56 +63,62 @@ import sinter  # noqa: E402
 import stim  # noqa: E402
 from matplotlib.transforms import ScaledTranslation  # noqa: E402
 
+from qiskit import QuantumCircuit  # noqa: E402
+
 from experiments.exp_utils.ablation_utils import (  # noqa: E402
-    DefectBlindMapper,
     RandomSequenceMapper,
     check_routed,
     chipmunq_mapping,
     intra_chiplet_sabre_mapping,
     kahypar_grid_partitions,
     lightsabre,
+    murali_noise,
     overhead_stats,
     permute_chiplets,
     quiet,
     repair_defects,
+    reduced_coupling_map,
     route_from_mapping,
     sabre_mapping,
+    split_annotations,
+    stim_with_annotations,
     symmetric_remote_noise,
 )
+from experiments.exp_utils.transpilation_utils import TIMEOUT, run_with_timeout  # noqa: E402
 from experiments.exp_utils.circuit_generator import get_tqec_cnot_rotated  # noqa: E402
 from experiments.exp_utils.circuit_noise import get_noise_model  # noqa: E402
 from experiments.exp_utils.simulation_utils import run_sinter_simulation  # noqa: E402
 from experiments.exp_utils.utils import FONTSIZE, HEIGHT_FIGSIZE, WIDTH_FIGSIZE, plot_lib_color  # noqa: E402
 from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit  # noqa: E402
 from qeccm.backends.BackendChipletV2 import BackendChipletV2  # noqa: E402
+from qeccm.backends.backend_utils import generate_coordinates  # noqa: E402
 
 OUTPUT_DIR = Path("experiments/evaluation/mapping_routing_ablation")
 
 # (key, label, colour, hatch) -- order is the plotting order
 VARIANTS = [
-    ("chipmunq_tradeoff", "Chipmunq (Tradeoff)", "#2A5687", ""),
-    ("chipmunq_focus", "Chipmunq (Focus)", "#5E97CC", ""),
     ("chipmunq_basic", "Chipmunq (Basic)", "#A7D9ED", ""),
-    ("chipmunq_sabre", "Chipmunq map + SABRE-SWAP (equal budget)", "#F3C98B", "//"),
-    ("chipmunq_sabre_default", "Chipmunq map + SABRE-SWAP (default)", "#E6A96B", "\\\\"),
-    ("no_partitioning", "- patch-IR partitioning", "#B2D8B2", ".."),
-    ("no_patch_contraction", "- patch contraction", "#8CC08C", "xx"),
-    ("no_sequencing", "- sequencing", "#C9B7E3", "--"),
-    ("no_global_mapping", "- global mapping", "#A68BCB", "++"),
-    ("no_defect_aware", "- defect-aware placement", "#D5D5D5", "oo"),
-    ("sabre_tradeoff", "SABRE map + Tradeoff routing", "#E68A5C", "//"),
+    ("chipmunq_sabre_default", "Chipmunq map + SABRE-SWAP (fixed map)", "#E6A96B", "\\\\"),
+    ("no_partitioning", "- patch-IR partitioning", "#CFE8CF", ".."),
+    ("no_patch_contraction", "- patch contraction", "#A9D3A9", "xx"),
+    ("no_sequencing", "- sequencing", "#82BD82", "--"),
+    ("no_global_mapping", "- global mapping", "#5E9E5E", "++"),
+    # Baselines: colours as in the other paper figures (transpilation_utils.METHOD_STYLES)
     ("lightsabre", "LightSABRE", "lightcoral", "o"),
+    ("seqc", "SEQC", "#C9B7E3", ".."),
+    ("olsq2", "OLSQ2", "#F3C98B", "\\\\"),
+    ("murali", "Murali et al.", "#D5D5D5", "--"),
 ]
+BASELINES = ("seqc", "olsq2", "murali")  # full compilers run under baseline_timeout_s (LightSABRE runs inline)
 LABEL = {k: l for k, l, _, _ in VARIANTS}
 COLOR = {k: c for k, _, c, _ in VARIANTS}
 HATCH = {k: h for k, _, _, h in VARIANTS}
-REFERENCE = "chipmunq_tradeoff"
+REFERENCE = "chipmunq_basic"
 
 FULL_CONFIG = dict(
     k=3,  # distance_scale; d = 2k + 1
-    ps=list(np.logspace(-4, -1, 10)),
+    ps=[1e-3],  # single physical error rate: the paper reports one relative LER per variant
     ps_inter=1e-3,
-    rfactor=100,  # "high variance" link noise, as in Fig. 9
     n_seeds=4,
     defects={"clean": 0, "defective": 2},  # defective qubits per chiplet
     max_backend_retries=20,
@@ -116,9 +126,11 @@ FULL_CONFIG = dict(
     num_shots=10_000_000,
     max_errors=5_000,
     num_workers=None,
+    baseline_timeout_s=600,  # wall-clock limit per baseline compilation (SEQC, OLSQ2, Murali et al.)
+    compile_workers=None,    # parallel configurations; None -> #CPUs / (1 + #baselines), 1 -> serial
 )
-QUICK_CONFIG = dict(FULL_CONFIG, k=1, ps=[2e-3, 5e-3], n_seeds=1, defects={"clean": 0, "defective": 1},
-                    num_shots=20_000, max_errors=200)
+QUICK_CONFIG = dict(FULL_CONFIG, k=2, n_seeds=1, defects={"clean": 0, "defective": 1},
+                    num_shots=20_000, max_errors=200, baseline_timeout_s=1000)
 
 BACKEND_SIZES = {1: ((2, 2, 11, 6), 5), 2: ((2, 2, 15, 8), 7), 3: ((2, 2, 19, 10), 9), 4: ((2, 2, 23, 12), 11)}
 
@@ -128,7 +140,7 @@ def make_backend(k: int, n_defects: int, seed: int, cfg: dict) -> BackendChiplet
     return BackendChipletV2(
         size=size, n_inter=nic, connectivity="nn", topology="rotated_grid",
         inter_chiplet_noise=cfg["ps_inter"], inter_chiplet_amplification=1,
-        inter_chiplet_rfactor=cfg["rfactor"], inter_chiplet_noise_type="random",
+        inter_chiplet_noise_type="constant",  # identical noise on every link
         num_defective_qubits=n_defects, rng_seed=seed,
     )
 
@@ -136,8 +148,8 @@ def make_backend(k: int, n_defects: int, seed: int, cfg: dict) -> BackendChiplet
 # --------------------------------------------------------------------------------------
 # Compilation
 # --------------------------------------------------------------------------------------
-def _finish(name, routed, route_info, t_map, qc, stim_ref, backend, extra=None):
-    stim_c = check_routed(routed, stim_ref, backend)
+def _finish(name, routed, route_info, t_map, qc, stim_ref, backend, extra=None, stim_circuit=None):
+    stim_c = check_routed(routed, stim_ref, backend, stim_circuit=stim_circuit)
     rec = {
         "ok": True,
         "mapping_s": t_map,
@@ -150,6 +162,90 @@ def _finish(name, routed, route_info, t_map, qc, stim_ref, backend, extra=None):
     }
     rec.update(extra or {})
     return rec
+
+
+# --------------------------------------------------------------------------------------
+# Baselines (full compilers). Module-level so they can run in a spawned, killable process.
+# --------------------------------------------------------------------------------------
+def _working_view(backend: BackendChipletV2):
+    """Coupling map on the working qubits only, with local <-> global index maps."""
+    cmap, l2g = reduced_coupling_map(backend)
+    return cmap, l2g, {g: i for i, g in enumerate(l2g)}
+
+
+def _to_global(out: QuantumCircuit, l2g: list, n_total: int) -> QuantumCircuit:
+    """Place a circuit compiled on the working-qubit view back onto the backend's physical qubits
+    (clbit indices are kept, so detectors can be re-attached)."""
+    full = QuantumCircuit(n_total, out.num_clbits, name=out.name)
+    full.compose(out, qubits=[l2g[i] for i in range(out.num_qubits)], clbits=list(range(out.num_clbits)),
+                 inplace=True)
+    return full
+
+
+def _seqc_target_local(backend: BackendChipletV2, core: QuantumCircuit, cmap, l2g, g2l):
+    """SEQC device model (as ablation_utils.seqc_target) on the working-qubit view: the circuit's own gates
+    native, 2q gates on intra-chiplet couplers with their error, links SWAP-only with the per-link noise."""
+    from qiskit.circuit import Parameter
+    from qiskit.circuit.library import SwapGate, get_standard_gate_name_mapping
+    from qiskit.transpiler import InstructionProperties, Target
+
+    from experiments.exp_utils.ablation_utils import ANNOTATIONS
+
+    _, errs = murali_noise(backend)
+    remote = symmetric_remote_noise(backend)
+    std = get_standard_gate_name_mapping()
+    t = Target(num_qubits=len(l2g))
+    names = {i.operation.name for i in core.data} - ANNOTATIONS - {"swap"}
+    names |= {"measure", "reset"}
+    err = lambda a, b: errs[(min(l2g[a], l2g[b]), max(l2g[a], l2g[b]))]  # noqa: E731
+    edges = list(cmap.get_edges())
+    intra = [(a, b) for a, b in edges if (l2g[a], l2g[b]) not in remote]
+    links = [(a, b) for a, b in edges if (l2g[a], l2g[b]) in remote]
+    for name in sorted(names):
+        op = std[name]
+        if op.params:
+            op = op.__class__(*[Parameter(f"{name}_{i}") for i in range(len(op.params))])
+        if op.num_qubits == 1:
+            t.add_instruction(op, {(q,): None for q in range(len(l2g))})
+        else:
+            t.add_instruction(op, {e: InstructionProperties(error=err(*e)) for e in intra})
+    t.add_instruction(SwapGate(), {**{e: InstructionProperties(error=err(*e)) for e in intra},
+                                   **{e: InstructionProperties(error=remote[(l2g[e[0]], l2g[e[1]])]) for e in links}})
+    chiplets = [[g2l[int(q)] for q in backend.get_chiplet_at(c) if int(q) in g2l] for c in range(backend.get_num_chips())]
+    return t, [c for c in chiplets if c]
+
+
+def compile_baseline(method: str, qc: QuantumCircuit, backend: BackendChipletV2, seed: int = 0):
+    """Full mapping + routing by a baseline on the working qubits. Returns (routed circuit on physical
+    qubits without annotations, Stim circuit as string with the detectors re-attached, initial placement
+    virtual qubit -> physical qubit)."""
+    core, anns = split_annotations(qc)
+    cmap, l2g, g2l = _working_view(backend)
+    with quiet():
+        if method == "seqc":
+            from external.baseline.seqc.seqc import SEQCCompiler
+
+            target, chiplets = _seqc_target_local(backend, core, cmap, l2g, g2l)
+            out = SEQCCompiler(target, chiplets=chiplets, optimization_level=0, seed=seed, n_jobs=1).run(core)
+            init = out.layout.initial_index_layout(filter_ancillas=True)
+        elif method == "olsq2":
+            from external.baseline.qls.qlsq2 import olsq2_transpilation
+
+            out = olsq2_transpilation(core, cmap, objective="swap", mode="transition")
+            init = out.metadata["olsq2_initial_layout"]
+        elif method == "murali":
+            from external.baseline.noise_aware_mapping.murali import noise_adaptive_transpilation
+
+            _, errs = murali_noise(backend)
+            local = {(g2l[a], g2l[b]): e for (a, b), e in errs.items() if a in g2l and b in g2l}
+            local.update({(b, a): e for (a, b), e in list(local.items())})
+            out = noise_adaptive_transpilation(core, cmap, method="greedy_e", cx_errors=local)
+            init = out.metadata["noise_adaptive_layout"]
+        else:
+            raise ValueError(method)
+    routed = _to_global(out, l2g, backend.num_qubits_total)
+    layout = {v: l2g[int(init[v])] for v in range(qc.num_qubits)}  # initial placement, physical indices
+    return routed, str(stim_with_annotations(routed, anns)), layout
 
 
 def compile_instance(qc, stim_ref, partitions, backend, n_defects, cfg, seed) -> dict:
@@ -171,28 +267,24 @@ def compile_instance(qc, stim_ref, partitions, backend, n_defects, cfg, seed) ->
     base, t_base = chipmunq_mapping(qc, backend, partitions)
 
     # Chipmunq mapping + the three Chipmunq routers
-    for router in ("tradeoff", "focus", "basic"):
+    for router in ("basic",):
         def run(_, router=router):
             out, info = route_from_mapping(qc, backend, base, router, ps_inter)
-            return _finish(router, out, info, t_base, qc, stim_ref, backend)
+            return _finish(router, out, info, t_base, qc, stim_ref, backend, {"initial_layout": dict(base)})
         attempt(f"chipmunq_{router}", run)
 
-    budget = max(res[f"chipmunq_{r}"]["routing_s"] for r in ("tradeoff", "focus", "basic") if res[f"chipmunq_{r}"]["ok"])
-
-    def run_sabre_budget(_):
-        out, info = route_from_mapping(qc, backend, base, "sabre", ps_inter, seed=seed, budget_s=budget)
-        return _finish("sabre", out, info, t_base, qc, stim_ref, backend)
-    attempt("chipmunq_sabre", run_sabre_budget)
+    budget = res["chipmunq_basic"]["routing_s"] if res["chipmunq_basic"]["ok"] else float("nan")
 
     def run_sabre_default(_):
-        out, info = route_from_mapping(qc, backend, base, "sabre", ps_inter, seed=seed)
-        return _finish("sabre", out, info, t_base, qc, stim_ref, backend)
+        out, info = route_from_mapping(qc, backend, base, "sabre_fixed", ps_inter, seed=seed)
+        return _finish("sabre", out, info, t_base, qc, stim_ref, backend, {"initial_layout": dict(base)})
     attempt("chipmunq_sabre_default", run_sabre_default)
 
-    # Mapping ablations, all routed with Tradeoff
-    def tradeoff_from(mapping, t_map, extra=None):
-        out, info = route_from_mapping(qc, backend, mapping, "tradeoff", ps_inter)
-        return _finish("tradeoff", out, info, t_map, qc, stim_ref, backend, extra)
+    # Mapping ablations, all routed with Basic (the reference router), so only the mapping stage changes
+    def basic_from(mapping, t_map, extra=None):
+        out, info = route_from_mapping(qc, backend, mapping, "basic", ps_inter)
+        return _finish("basic", out, info, t_map, qc, stim_ref, backend,
+                       {**(extra or {}), "initial_layout": dict(mapping)})
 
     def run_no_partitioning(r):
         import time
@@ -200,20 +292,20 @@ def compile_instance(qc, stim_ref, partitions, backend, n_defects, cfg, seed) ->
         parts = kahypar_grid_partitions(qc, partitions, seed=42 + r)
         t_part = time.perf_counter() - t0
         m, t = chipmunq_mapping(qc, backend, parts)
-        return tradeoff_from(m, t + t_part)
+        return basic_from(m, t + t_part)
     attempt("no_partitioning", run_no_partitioning, cfg["max_variant_retries"])
 
     def run_no_contraction(r):
         import time
         t0 = time.perf_counter()
         m = intra_chiplet_sabre_mapping(base, qc, backend, seed=seed + r)
-        return tradeoff_from(m, t_base + time.perf_counter() - t0)
+        return basic_from(m, t_base + time.perf_counter() - t0)
     attempt("no_patch_contraction", run_no_contraction, cfg["max_variant_retries"])
 
     def run_no_sequencing(r):
         m, t = chipmunq_mapping(qc, backend, partitions, mapper_cls=RandomSequenceMapper,
                                 mapper_kwargs={"seed": 1000 * seed + r})
-        return tradeoff_from(m, t)
+        return basic_from(m, t)
     attempt("no_sequencing", run_no_sequencing, cfg["max_variant_retries"])
 
     def run_no_global(r):
@@ -224,61 +316,119 @@ def compile_instance(qc, stim_ref, partitions, backend, n_defects, cfg, seed) ->
             if m != base:
                 break
         m, moved = repair_defects(m, backend)
-        return tradeoff_from(m, t_base + time.perf_counter() - t0, {"repaired_qubits": moved})
+        return basic_from(m, t_base + time.perf_counter() - t0, {"repaired_qubits": moved})
     attempt("no_global_mapping", run_no_global, cfg["max_variant_retries"])
 
-    if n_defects > 0:
-        def run_no_defect(_):
-            import time
-            m, t = chipmunq_mapping(qc, backend, partitions, mapper_cls=DefectBlindMapper)
-            t0 = time.perf_counter()
-            m, moved = repair_defects(m, backend)
-            return tradeoff_from(m, t + time.perf_counter() - t0, {"repaired_qubits": moved})
-        attempt("no_defect_aware", run_no_defect)
-
-    def run_sabre_tradeoff(_):
-        m, t = sabre_mapping(qc, backend, seed=seed)
-        return tradeoff_from(m, t)
-    attempt("sabre_tradeoff", run_sabre_tradeoff)
-
     def run_lightsabre(_):
-        out, info = lightsabre(qc, backend, seed=seed)
-        return _finish("sabre", out, info, info["mapping_s"], qc, stim_ref, backend)
+        # = ablation_utils.lightsabre (SabreLayout on the working qubits + SabreSwap), keeping the placement
+        mapping, t_map = sabre_mapping(qc, backend, seed=seed)
+        out, info = route_from_mapping(qc, backend, mapping, "sabre", 0.0, seed=seed)
+        return _finish("sabre", out, info, t_map, qc, stim_ref, backend, {"initial_layout": dict(mapping)})
     attempt("lightsabre", run_lightsabre)
+
+    # Full baselines, each in its own process with a wall-clock limit (mapping + routing in one call,
+    # so the whole runtime is reported as mapping time)
+    # Baselines. Serial compilation (compile_workers == 1): one after another, each with the whole machine,
+    # as in a standalone run. Parallel compilation: concurrently (each is its own killable process, the
+    # threads here only wait), so an instance takes as long as its slowest baseline.
+    run = lambda m: run_with_timeout(compile_baseline, m, qc, backend, seed,  # noqa: E731
+                                     timeout=cfg["baseline_timeout_s"])
+    if cfg.get("compile_workers") == 1:
+        futures = {}
+        for m in BASELINES:
+            f = Future()
+            f.set_result(run(m))
+            futures[m] = f
+    else:
+        with ThreadPoolExecutor(max_workers=len(BASELINES)) as pool:
+            futures = {m: pool.submit(run, m) for m in BASELINES}
+    for method in BASELINES:
+        def run_baseline(_, method=method):
+            out, runtime, status = futures[method].result()
+            if status != "ok":
+                raise RuntimeError("timeout" if status == TIMEOUT else f"{method} failed")
+            routed, stim_s, layout = out
+            return _finish(method, routed, {"routing_s": 0.0, "trials": 1}, runtime, qc, stim_ref, backend,
+                           {"initial_layout": layout}, stim_circuit=stim.Circuit(stim_s))
+        attempt(method, run_baseline)
 
     res["_budget_s"] = budget
     return res
 
 
+def _compile_config(job):
+    """One experiment configuration (backend kind, seed): find a valid backend, compile every variant.
+    Module level so it can run in a spawned worker process."""
+    bkind, n_def, s, cfg, circuit_str, partitions = job
+    circuit = stim.Circuit(circuit_str)
+    qc = StimCodeCircuit(stim_circuit=circuit).qc
+    # Retry backend seeds until Chipmunq itself compiles a valid circuit (same protocol as
+    # experiment_defective_qubits). Every retry is recorded.
+    retries = []
+    for attempt in range(cfg["max_backend_retries"]):
+        bseed = 1000 * s + attempt
+        backend = make_backend(cfg["k"], n_def, bseed, cfg)
+        try:
+            base, _ = chipmunq_mapping(qc, backend, partitions)
+            out, _ = route_from_mapping(qc, backend, base, "basic", cfg["ps_inter"])
+            check_routed(out, circuit, backend)
+            break
+        except Exception as e:
+            retries.append(f"seed {bseed}: {type(e).__name__}: {str(e)[:120]}")
+    else:
+        raise RuntimeError(f"No valid {bkind} backend after {cfg['max_backend_retries']} tries")
+    print(f"[{bkind} #{s}] backend seed {bseed} ({len(retries)} rejected)", flush=True)
+    inst = compile_instance(qc, circuit, partitions, backend, n_def, cfg, seed=s)
+    inst["_backend_seed"] = bseed
+    inst["_rejected_backends"] = retries
+    inst["_remote"] = symmetric_remote_noise(backend)
+    print(f"[{bkind} #{s}] done", flush=True)
+    return (bkind, s), inst
+
+
 def compile_all(cfg: dict) -> dict:
+    """Compile all configurations (backend kind x seed) in parallel worker processes.
+
+    Each worker also starts up to len(BASELINES) baseline processes, so the default worker count is
+    #CPUs / (1 + len(BASELINES)) and every compiler process gets a capped thread count. Baselines are
+    slower under these caps; use ``compile_workers=1`` (--compile-workers 1) for the paper run, where
+    configurations and baselines run one after another, each with the whole machine."""
     with quiet():
         circuit, partitions = get_tqec_cnot_rotated(distance_scale=cfg["k"], n1=1, n2=0)
-    qc = StimCodeCircuit(stim_circuit=circuit).qc
-    results = {"config": {k: v for k, v in cfg.items()}, "instances": {}}
-    for bkind, n_def in cfg["defects"].items():
-        for s in range(cfg["n_seeds"]):
-            # Retry backend seeds until Chipmunq itself compiles a valid circuit (same protocol as
-            # experiment_defective_qubits). Every retry is recorded.
-            retries = []
-            for attempt in range(cfg["max_backend_retries"]):
-                bseed = 1000 * s + attempt
-                backend = make_backend(cfg["k"], n_def, bseed, cfg)
-                try:
-                    base, _ = chipmunq_mapping(qc, backend, partitions)
-                    out, _ = route_from_mapping(qc, backend, base, "basic", cfg["ps_inter"])
-                    check_routed(out, circuit, backend)
-                    break
-                except Exception as e:
-                    retries.append(f"seed {bseed}: {type(e).__name__}: {str(e)[:120]}")
-            else:
-                raise RuntimeError(f"No valid {bkind} backend after {cfg['max_backend_retries']} tries")
-            print(f"[{bkind} #{s}] backend seed {bseed} ({len(retries)} rejected)")
-            inst = compile_instance(qc, circuit, partitions, backend, n_def, cfg, seed=s)
-            inst["_backend_seed"] = bseed
-            inst["_rejected_backends"] = retries
-            inst["_remote"] = symmetric_remote_noise(backend)
-            results["instances"][(bkind, s)] = inst
-    return results
+    jobs = [(bkind, n_def, s, cfg, str(circuit), partitions)
+            for bkind, n_def in cfg["defects"].items() for s in range(cfg["n_seeds"])]
+    workers = cfg.get("compile_workers") or max(1, (os.cpu_count() or 1) // (1 + len(BASELINES)))
+    workers = min(workers, len(jobs))
+    print(f"Compiling {len(jobs)} configurations on {workers} worker(s)", flush=True)
+    instances = {}
+    if workers == 1:
+        for job in jobs:
+            key, inst = _compile_config(job)
+            instances[key] = inst
+    else:
+        # Cap the threads of every compiler process (Qiskit's Rust passes otherwise start a pool of #CPUs
+        # threads each), so workers x baselines processes do not oversubscribe the machine. The spawned
+        # workers and their baseline processes inherit these variables.
+        threads = max(1, (os.cpu_count() or 1) // (workers * (1 + len(BASELINES))))
+        caps = ("RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+        saved = {v: os.environ.get(v) for v in caps}
+        os.environ.update({v: str(threads) for v in caps})
+        print(f"  {threads} thread(s) per compiler process; use --compile-workers 1 for unconstrained "
+              "baselines (e.g. when they time out)", flush=True)
+        try:
+            ctx = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as pool:
+                for key, inst in pool.map(_compile_config, jobs):
+                    instances[key] = inst
+        finally:
+            for v, old in saved.items():
+                if old is None:
+                    os.environ.pop(v, None)
+                else:
+                    os.environ[v] = old
+    # Same order as the serial loop (backend kind, then seed)
+    order = [(b, s) for b in cfg["defects"] for s in range(cfg["n_seeds"])]
+    return {"config": {k: v for k, v in cfg.items()}, "instances": {k: instances[k] for k in order}}
 
 
 # --------------------------------------------------------------------------------------
@@ -439,7 +589,7 @@ def plot_compile_metrics(results, filename):
 
 
 def plot_ler_cross(results, stats, filename,
-                   variants=("chipmunq_tradeoff", "chipmunq_basic", "chipmunq_sabre", "sabre_tradeoff", "lightsabre")):
+                   variants=("chipmunq_basic", "chipmunq_sabre_default", "no_global_mapping", "lightsabre", "seqc", "murali")):
     """The todo figure: Chipmunq map + SABRE routing vs SABRE map + noise routing, 2 backends."""
     _rc()
     t = ler_table(stats)
@@ -486,31 +636,29 @@ def ler_ratio(t, b, v, ref, ps):
 # Tick labels for the paper figure (a): at 7 pt and 2/3 text width each bar pair gets ~0.3 in, so labels
 # are two short lines; the one-word group names carry the context (spell the abbreviations out in the caption).
 SHORT = {
-    "chipmunq_focus": "Focus",
     "chipmunq_basic": "Basic",
-    "chipmunq_sabre": "SABRE\n(equal)",
-    "chipmunq_sabre_default": "SABRE\n(Qiskit)",
+    "chipmunq_sabre_default": "SABRE-\nSWAP",
     "no_partitioning": "w/o\nPart.",
     "no_patch_contraction": "w/o\nContr.",
     "no_sequencing": "w/o\nSeq.",
-    "no_global_mapping": "w/o\nGlobal",
-    "no_defect_aware": "w/o\nDefect",
-    "sabre_tradeoff": "SABRE\n+Trade.",
+    "no_global_mapping": "w/o\nMapper",
     "lightsabre": "Light-\nSABRE",
+    "seqc": "SEQC",
+    "olsq2": "OLSQ2",
+    "murali": "Murali\net al.",
 }
-# Routing: other routers on the Chipmunq mapping. Mapping: one mapping stage removed (Tradeoff routing).
-# Baselines: SABRE mapping (+ Tradeoff routing) and LightSABRE.
+# Routing: Basic (reference) and SABRE-SWAP on the Chipmunq mapping. Mapping: one mapping stage removed (Basic routing).
+# Baselines: full compilers (own mapping and routing).
 RATIO_GROUPS = [
-    ("Routing", ["chipmunq_focus", "chipmunq_basic", "chipmunq_sabre", "chipmunq_sabre_default"]),
-    ("Mapping", ["no_partitioning", "no_patch_contraction", "no_sequencing", "no_global_mapping",
-                 "no_defect_aware"]),
-    ("Baselines", ["sabre_tradeoff", "lightsabre"]),
+    ("Routing", ["chipmunq_basic", "chipmunq_sabre_default"]),
+    ("Mapping", ["no_partitioning", "no_patch_contraction", "no_sequencing", "no_global_mapping"]),
+    ("Baselines", ["lightsabre", "seqc", "olsq2", "murali"]),
 ]
 GROUP_GAP = 0.4                       # extra space between groups [bar slots]
 
 
 def plot_ler_ratio(results, stats, filename):
-    """Paper figure a): LER of each variant relative to full Chipmunq (Tradeoff), per backend."""
+    """Paper figure a): LER of each variant relative to Chipmunq with Basic routing, per backend."""
     from matplotlib.patches import Patch
     from matplotlib.ticker import FuncFormatter, LogLocator
 
@@ -539,8 +687,17 @@ def plot_ler_ratio(results, stats, filename):
     w = 0.8 / len(bkinds)
     for j, b in enumerate(bkinds):
         vals = [ler_ratio(t, b, v, REFERENCE, ps) for v in order]
-        ax.bar(xs + (j - (len(bkinds) - 1) / 2) * w, vals, w, color=[COLOR[v] for v in order],
+        bx = xs + (j - (len(bkinds) - 1) / 2) * w
+        ax.bar(bx, vals, w, color=[COLOR[v] for v in order],
                edgecolor="black", linewidth=0.4, hatch="" if j == 0 else "////", label=b)
+        # No result: T/O if every run of this variant hit the time limit, N/A otherwise
+        for xb, v, val in zip(bx, order, vals):
+            if np.isfinite(val):
+                continue
+            recs = [inst[v] for (bk, _), inst in results["instances"].items() if bk == b and v in inst]
+            label = "T/O" if recs and all("timeout" in str(r.get("error", "")) for r in recs) else "N/A"
+            ax.text(xb, 0.04, label, transform=ax.get_xaxis_transform(), rotation=90, ha="center",
+                    va="bottom", fontsize=FONT_PT - 1.5)
 
     ax.axhline(1, color="black", linestyle="--", linewidth=0.6)
     ax.set_yscale("log")
@@ -548,7 +705,7 @@ def plot_ler_ratio(results, stats, filename):
     ax.set_xticklabels([SHORT[v] for v in order], linespacing=0.95)
     ax.tick_params(axis="x", length=0)
     ax.set_xlim(xs[0] - 0.55, xs[-1] + 0.55)
-    ax.set_ylabel("Relative LER")  # LER_variant / LER_Chipmunq(Tradeoff), geometric mean over p (caption)
+    ax.set_ylabel("Relative LER")  # LER_variant / LER_Chipmunq(Basic) at p = ps[0] (caption)
     ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
     ax.yaxis.set_minor_formatter(FuncFormatter(lambda y, _: ""))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
@@ -562,17 +719,120 @@ def plot_ler_ratio(results, stats, filename):
         if i:
             ax.axvline(a - (1 + GROUP_GAP) / 2, color="grey", linewidth=0.6, alpha=0.6)
     lo, hi = ax.get_ylim()
-    ax.set_ylim(lo, hi * 2.5)              # headroom for the group names and the legend (log axis)
+    # start below 1 so the reference bars (= 1) stay visible, headroom for group names and legend (log axis)
+    ax.set_ylim(min(lo, 0.6), hi * 2.5)
 
-    # Backend legend (hatching = backend; colour = variant), below the first group name
-    ax.legend(handles=[Patch(facecolor="white", edgecolor="black", linewidth=0.4,
-                             hatch="" if j == 0 else "////", label=f"{b} backend")
-                       for j, b in enumerate(bkinds)],
-              loc="upper left", bbox_to_anchor=(0.0, 0.86), ncols=1, frameon=False, handlelength=1.2,
-              handletextpad=0.35, labelspacing=0.2, borderaxespad=0.2)
+    # Backend legend (hatching = backend; colour = variant), above the axes right of the title.
+    # Not needed when only one backend is shown.
+    if len(bkinds) > 1:
+        ax.legend(handles=[Patch(facecolor="white", edgecolor="black", linewidth=0.4,
+                                 hatch="" if j == 0 else "////", label=f"{b} backend")
+                           for j, b in enumerate(bkinds)],
+                  loc="lower right", bbox_to_anchor=(1.0, 1.0), ncols=1, frameon=False, handlelength=1.2,
+                  handletextpad=0.35, labelspacing=0.15, borderaxespad=0.1)
     _title(fig, ax, "a) Contribution of each stage")
     fig.savefig(filename, format="pdf")
     plt.close(fig)
+
+
+# --------------------------------------------------------------------------------------
+# Diagnostic: mapping and routing paths of every method
+# --------------------------------------------------------------------------------------
+PATCH_COLORS = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3", "#937860", "#DA8BC3", "#8C8C8C"]
+
+
+def _swap_counts(stim_str: str) -> Counter:
+    """SWAPs per coupler (unordered physical qubit pair) in a compiled circuit."""
+    c = Counter()
+    for inst in stim.Circuit(stim_str).flattened():
+        if inst.name == "SWAP":
+            t = [x.value for x in inst.targets_copy()]
+            c.update(tuple(sorted(e)) for e in zip(t[::2], t[1::2]))
+    return c
+
+
+def plot_layouts(results: dict, out_dir: Path) -> None:
+    """One figure per configuration (backend kind, seed), one panel per method: qubits at their initial
+    position coloured by patch (partition), couplers coloured by the number of SWAPs routed over them,
+    inter-chiplet links dashed, defective qubits as red crosses."""
+    from matplotlib.colors import LogNorm
+    from matplotlib.lines import Line2D
+
+    _rc()
+    cfg = results["config"]
+    from experiments.exp_utils.ablation_utils import ANNOTATIONS
+
+    with quiet():
+        circuit, partitions = get_tqec_cnot_rotated(distance_scale=cfg["k"], n1=1, n2=0)
+    qc = StimCodeCircuit(stim_circuit=circuit).qc
+    # only virtual qubits the circuit acts on (the patch specification also lists unused indices)
+    used = {qc.find_bit(q).index for ins in qc.data if ins.operation.name not in ANNOTATIONS | {"barrier"}
+            for q in ins.qubits}
+    patch_of = {int(q): i for i, part in enumerate(partitions) for q in part["indices"]}
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    for (bkind, seed), inst in results["instances"].items():
+        backend = make_backend(cfg["k"], cfg["defects"][bkind], inst["_backend_seed"], cfg)
+        xy = np.asarray(generate_coordinates(backend), dtype=float)
+        edges = {tuple(sorted(map(int, e))) for e in backend.coupling_map.get_edges()}
+        links = {tuple(sorted(e)) for e in inst["_remote"]}
+        defective = sorted(set(backend.all_defective_qubits))
+        variants = [v for v, *_ in VARIANTS if v in inst]
+        swaps = {v: _swap_counts(inst[v]["stim"]) for v in variants if inst[v].get("ok")}
+        vmax = max([max(c.values()) for c in swaps.values() if c] or [1])
+        norm = LogNorm(vmin=1, vmax=max(vmax, 2))
+        cmap = plt.cm.inferno_r
+
+        ncol = min(5, len(variants))
+        nrow = -(-len(variants) // ncol)
+        span = np.ptp(xy, axis=0) + 1
+        w = 3.6
+        fig, axes = plt.subplots(nrow, ncol, figsize=(w * ncol, w * nrow * span[1] / span[0] + 0.6),
+                                 squeeze=False)
+        for ax in axes.flat:
+            ax.set_axis_off()
+        for ax, v in zip(axes.flat, variants):
+            rec = inst[v]
+            for a, b in edges:  # hardware couplers
+                ax.plot(*xy[[a, b]].T, color="#7B2CBF" if (a, b) in links else "#D0D0D0",
+                        ls="--" if (a, b) in links else "-", lw=0.6 if (a, b) in links else 0.4, zorder=1)
+            ax.scatter(*xy.T, s=3, color="#E0E0E0", zorder=2)
+            if not rec.get("ok"):
+                msg = "T/O" if "timeout" in str(rec.get("error", "")) else "failed"
+                ax.text(0.5, 0.5, msg, transform=ax.transAxes, ha="center", va="center", fontsize=14,
+                        fontweight="bold", color="#555555")
+            else:
+                for (a, b), n in swaps[v].items():  # routing paths
+                    ax.plot(*xy[[a, b]].T, color=cmap(norm(n)), lw=0.8 + 1.6 * norm(n), zorder=3,
+                            solid_capstyle="round")
+                lay = rec.get("initial_layout") or {}
+                if lay:  # mapping: initial position of every virtual qubit, coloured by patch
+                    vq = [q for q in lay if int(q) in used]
+                    ph = [lay[q] for q in vq]
+                    cols = [PATCH_COLORS[patch_of.get(int(q), -1) % len(PATCH_COLORS)] if int(q) in patch_of
+                            else "#000000" for q in vq]
+                    ax.scatter(*xy[ph].T, s=9, c=cols, edgecolors="black", linewidths=0.2, zorder=4)
+                ax.set_title(f"{LABEL[v]}\n2q ovh {rec['2q_overhead']}, link 2q {rec['inter_chiplet_2q']}, "
+                             f"SWAPs {sum(swaps[v].values())}", fontsize=7)
+            if defective:
+                ax.scatter(*xy[defective].T, marker="x", s=18, color="red", linewidths=1.0, zorder=5)
+            if not rec.get("ok"):
+                ax.set_title(LABEL[v], fontsize=7)
+            ax.set_aspect("equal")
+
+        handles = [Line2D([], [], marker="o", ls="none", color=PATCH_COLORS[i % len(PATCH_COLORS)],
+                          markeredgecolor="black", markeredgewidth=0.3, label=f"patch {i}")
+                   for i in range(len(partitions))]
+        handles += [Line2D([], [], color="#7B2CBF", ls="--", label="inter-chiplet link"),
+                    Line2D([], [], marker="x", ls="none", color="red", label="defective qubit")]
+        fig.legend(handles=handles, loc="lower center", ncols=len(handles), frameon=False, fontsize=8)
+        sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        fig.colorbar(sm, ax=axes, shrink=0.6, pad=0.01, label="SWAPs on coupler")
+        fig.suptitle(f"Mapping (initial positions) and routing (SWAPs): {bkind} backend, seed {seed}",
+                     fontweight="bold")
+        fig.savefig(out_dir / f"layouts_{bkind}_{seed}.pdf", format="pdf", bbox_inches="tight")
+        fig.savefig(out_dir / f"layouts_{bkind}_{seed}.png", dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
 
 def summary_table(results, stats) -> str:
@@ -591,7 +851,9 @@ def summary_table(results, stats) -> str:
         for v in present_variants(results, b):
             recs = [inst[v] for inst in insts if v in inst]
             ok = [r for r in recs if r.get("ok")]
-            f = lambda k: np.mean([r[k] for r in ok]) if ok else np.nan  # noqa: E731
+            def f(k):  # mean over successful runs; missing / None values (e.g. baseline trials) -> nan
+                vals = [np.nan if r.get(k) is None else r[k] for r in ok]
+                return np.nanmean(vals) if vals and not np.all(np.isnan(vals)) else np.nan
             ratio = ler_ratio(t, b, v, REFERENCE, ps) if t else np.nan
             lines.append(f"| {LABEL[v]} | {len(ok)}/{len(recs)} | {f('mapping_s') * 1e3:.0f} | "
                          f"{f('routing_s') * 1e3:.0f} | {f('trials'):.0f} | {f('2q_overhead'):.0f} | "
@@ -600,11 +862,29 @@ def summary_table(results, stats) -> str:
 
 
 # --------------------------------------------------------------------------------------
-def run_mapping_routing_ablation(reproduce: bool = True, quick: bool = False) -> None:
+def _only_backends(results: dict, stats, keep: list[str]):
+    """Restrict compiled results and LER stats to the given backend kinds (for plotting)."""
+    res = dict(results)
+    res["config"] = dict(results["config"], defects={b: n for b, n in results["config"]["defects"].items()
+                                                     if b in keep})
+    res["instances"] = {k: v for k, v in results["instances"].items() if k[0] in keep}
+    return res, [s_ for s_ in stats if s_.json_metadata["backend"] in keep]
+
+
+def run_mapping_routing_ablation(reproduce: bool = True, quick: bool = False, clean_only: bool = False,
+                                 compile_workers: int | None = None) -> None:
+    """clean_only: compile/simulate (and plot) only the clean backend. Results go to separate files with
+    suffix ``_clean``; with --plot-only, a full run's results are used (restricted to clean) if no
+    clean-only results exist."""
     cfg = QUICK_CONFIG if quick else FULL_CONFIG
+    if clean_only:
+        cfg = dict(cfg, defects={"clean": cfg["defects"]["clean"]})
+    if compile_workers:
+        cfg = dict(cfg, compile_workers=compile_workers)
     out = OUTPUT_DIR / ("quick" if quick else "")
     out.mkdir(parents=True, exist_ok=True)
-    tag = f"k{cfg['k']}_pinter{cfg['ps_inter']}"
+    base_tag = f"k{cfg['k']}_pinter{cfg['ps_inter']}"
+    tag = base_tag + ("_clean" if clean_only else "")
     if reproduce:
         results = compile_all(cfg)
         with open(out / f"compile_{tag}.pkl", "wb") as f:
@@ -612,14 +892,18 @@ def run_mapping_routing_ablation(reproduce: bool = True, quick: bool = False) ->
         stats = simulate(results, cfg)
         with open(out / f"ler_{tag}.pkl", "wb") as f:
             pickle.dump(stats, f)
-    with open(out / f"compile_{tag}.pkl", "rb") as f:
+    src = tag if (out / f"compile_{tag}.pkl").exists() else base_tag
+    with open(out / f"compile_{src}.pkl", "rb") as f:
         results = pickle.load(f)
-    with open(out / f"ler_{tag}.pkl", "rb") as f:
+    with open(out / f"ler_{src}.pkl", "rb") as f:
         stats = pickle.load(f)
+    if clean_only:
+        results, stats = _only_backends(results, stats, ["clean"])
 
     plot_compile_metrics(results, out / f"ablation_compile_{tag}.pdf")
     plot_ler_cross(results, stats, out / f"ablation_ler_cross_{tag}.pdf")
     plot_ler_ratio(results, stats, out / f"ablation_ler_ratio_{tag}.pdf")
+    plot_layouts(results, out / f"layouts_{tag}")
     table = summary_table(results, stats)
     (out / f"ablation_summary_{tag}.md").write_text(table)
     print(table)
@@ -629,9 +913,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="d=3, 1 seed, 2 error rates, few shots")
     ap.add_argument("--plot-only", action="store_true")
+    ap.add_argument("--clean-only", action="store_true",
+                    help="only the clean backend (run and plot); with --plot-only, also replots a full run")
+    ap.add_argument("--compile-workers", type=int, default=None,
+                    help="configurations compiled in parallel (default: #CPUs / 4, 1 = serial)")
     a = ap.parse_args()
     try:
-        run_mapping_routing_ablation(reproduce=not a.plot_only, quick=a.quick)
+        run_mapping_routing_ablation(reproduce=not a.plot_only, quick=a.quick, clean_only=a.clean_only,
+                                     compile_workers=a.compile_workers)
     except Exception:
         traceback.print_exc()
         raise

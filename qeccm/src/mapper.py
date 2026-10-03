@@ -660,19 +660,6 @@ class TrivialMapper(GenericMapper):
                             partition_id, pw, ph, anchor_id, "above"
                         )
                         print(pos)
-                        if pos == None:
-                            # If it is not possible to place the partition to the bottom on this QPU, try to place it
-                            # on the QPU below
-                            for new_x in range(current_x, width):
-                                for new_y in range(current_y + 1, height):
-                                    pos = qpu_blocks[(new_x, new_y)].place_partition(partition_id, pw, ph)
-
-                                    if pos != None:
-                                        current_y = new_y
-                                        break
-                                if pos != None:
-                                    current_x = new_x
-                                    break
                     else:
                         # place to the right
                         direction = "right"
@@ -684,24 +671,13 @@ class TrivialMapper(GenericMapper):
                             partition_id, pw, ph, anchor_id, "right"
                         )
 
-                        if pos == None:
-                            # If it is not possible to place the partition to the right on this QPU, select the QPU
-                            # to the right of the current one.
-                            for new_y in range(current_y, height):
-                                for new_x in range(current_x + 1, width):
-                                    pos = qpu_blocks[(new_x, new_y)].place_partition(partition_id, pw, ph)
-
-                                    if pos != None:
-                                        current_x = new_x
-                                        break
-                                if pos != None:
-                                    current_y = new_y
-                                    break
 
                     if pos is None:
-                        # The directional search only walks right/down and fails at the edge of the chiplet grid.
-                        # Fall back to the free QPU closest to the anchor (preferring the intended direction).
-                        print(f"Directional placement of {partition_id} failed, searching nearest free QPU")
+                        # The partition does not fit next to its anchor on the anchor's QPU (e.g. a defect blocks
+                        # the region). Use the free QPU closest to the anchor, preferring the intended direction.
+                        # The previous row/column scan could jump to a diagonal QPU although an adjacent one had
+                        # space, separating interacting patches by two inter-chiplet hops.
+                        print(f"Relative placement of {partition_id} failed, searching nearest free QPU")
                         (current_x, current_y), pos = self._place_on_nearest_qpu(
                             qpu_blocks, partition_id, pw, ph, partition_qpu[anchor_id], direction
                         )
