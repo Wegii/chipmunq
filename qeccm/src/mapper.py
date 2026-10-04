@@ -253,29 +253,15 @@ class TrivialMapper(GenericMapper):
                     if rotated_full:
                         # Place a rotated_surface_code patch (either memory or ancilla region) to the QPU
 
-                        # Calculate starting row and column given the code distance
-                        if code_distance == 3:
-                            start_row = local_y + 6
-                            column_length = 8
-                        elif code_distance == 5:
-                            # start_row = local_y + 8
-                            start_row = local_y + 10
-                            column_length = 12
-                        elif code_distance == 7:
-                            start_row = local_y + 14
-                            column_length = 16
-                        elif code_distance == 9:
-                            start_row = local_y + 18
-                            column_length = 20
-                        elif code_distance == 9:
-                            start_row = local_y + 22
-                            column_length = 24
-                        elif code_distance == 9:
-                            start_row = local_y + 26
-                            column_length = 28
-                        elif code_distance == 15:
-                            start_row = local_y + 30
-                            column_length = 32
+                        # Calculate starting row and column given the code distance. The former per-distance
+                        # table (d = 3, 5, 7, 9, 15) follows start_row = local_y + 2d and
+                        # column_length = 2d + 2; its d = 11 and d = 13 entries were mislabelled "d == 9"
+                        # and never reached, which left start_row undefined for those distances.
+                        if code_distance < 3 or code_distance % 2 == 0:
+                            raise ValueError(f"Unsupported surface-code distance {code_distance} for partition "
+                                             f"{partition_id}")
+                        start_row = local_y + 2 * code_distance
+                        column_length = 2 * code_distance + 2
 
                         # Define starting row and column
                         # TODO: Fix this mess

@@ -27,6 +27,7 @@ from experiments.exp_utils.ghz_circuit_generator import get_tqec_ghz
 from experiments.exp_utils.bv_circuit_generator import get_tqec_bv
 from experiments.exp_utils.gross_bridge_circuit_generator import get_gross_bridge
 from experiments.exp_utils.bv_color_code_circuit_generator import get_color_code_bv, chiplet_long_range_offsets
+from experiments.exp_utils.qft_color_code_circuit_generator import get_color_code_qft
 
 # MECH
 sys.path.append(os.path.join(os.getcwd(), "./external/baseline/MECH"))
@@ -171,6 +172,7 @@ def n_inter(ks: int) -> int:
     return min(NUM_INTER_CHIPLET_CONNECTIONS, distance(ks) + 3)
 
 GHZ_N = 12  # same number of logical qubits as the old 6x CNOT (6 x 2)
+QFT_N = 48  # logical qubits of the Clifford QFT (all-to-all: QFT_N (QFT_N - 1) transversal CNOTs in 2 QFT_N - 3 parallel steps)
 BV_SECRET = "110100111010110100111010110100111010110100111010110100111010110100111010110100111010110100111010"  # 12-bit secret with mixed 0/1 so the bus is partially trimmed
 GROSS_BRIDGE_N_INTER = 6  # links between neighbouring chiplets of the Gross-bridge backend (max 6)
 
@@ -178,19 +180,23 @@ GROSS_BRIDGE_N_INTER = 6  # links between neighbouring chiplets of the Gross-bri
 # SEQC, Murali et al.). Process start-up is not counted; a run exceeding the limit is killed (with all its
 # child processes) and reported as T/O. Set in transpilation_utils (TIMEOUT_S = 50 s).
 METHOD_TIMEOUT_S = TIMEOUT_S
+# Longer limits for individual benchmarks (overrides METHOD_TIMEOUT_S / --timeout for these keys): the 48-qubit
+# Clifford QFT is ~10-100x larger than the other circuits.
+BENCHMARK_TIMEOUT_S = {"qft_color": TIMEOUT_S}
 
 RESULTS_DIR = Path("experiments/evaluation/scalability")
 PLOT_PREFIX = RESULTS_DIR / "cnot_scaling_overhead_split"
 
 # Order = order of the bar groups in the plot.
-BENCHMARKS = ["cnot", "ghz", "bv", "bv_color", "gross_bridge"]
+BENCHMARKS = ["cnot", "qft_color", "bv", "bv_color", "gross_bridge"]  # QFT (color) replaces GHZ
 # Short names: used as x tick labels (two lines where needed) and in the console output.
-# Logical-qubit counts (GHZ_N, len(BV_SECRET)) go in the caption.
+# Logical-qubit counts (QFT_N, len(BV_SECRET)) go in the caption. "ghz" stays generatable but is not plotted.
 TITLES = {
     "cnot": "CNOT",
     "ghz": "GHZ",
     "bv": "BV",
     "bv_color": "BV\n(color)",
+    "qft_color": "QFT\n(color)",
     "gross_bridge": "Gross\nsurgery",
     "gross": "Gross",  # memory only; no longer in BENCHMARKS
 }
@@ -259,6 +265,10 @@ def generate_circuit(key: str, ks: int):
         # Same secret as "bv", but on flagged color-code patches with transversal H / CNOT (no lattice
         # surgery), d = 2ks + 1.
         return get_color_code_bv(BV_SECRET, distance=distance(ks))
+    if key == "qft_color":
+        # Clifford QFT (controlled-phase rotations replaced by S / S_DAG) on flagged color-code patches with
+        # transversal H / S / CNOT, d = 2ks + 1. Keeps the QFT's all-to-all logical interaction structure.
+        return get_color_code_qft(QFT_N, distance=distance(ks))
     if key == "gross_bridge":
         # Two [[144,12,12]] modules + bridge measuring Zbar_a Zbar_b (fixed d = 12, ks is not used).
         return get_gross_bridge()
@@ -277,7 +287,7 @@ def make_backend(key: str, ks: int, partitions: list[dict]):
     if key in ("ghz", "bv"):
         return _chipmunq_backend(_chiplet_grid_for(partitions, ks), ks), {"mode": "run", "side": None}
 
-    if key == "bv_color":
+    if key in ("bv_color", "qft_color"):
         # One chiplet per patch; the chiplets have the extra links under which a patch needs no SWAPs
         # (no wrap-around), so all routing overhead comes from the transversal CNOTs between patches.
         size = max(max(p["height"], p["width"]) for p in partitions)
@@ -824,6 +834,7 @@ def generation_job(key: str, ks: int, cache: str | None) -> dict:
 def method_job(key: str, ks: int, method: str, cache: str | None, timeout: float) -> dict:
     """Run one method on a cached (or regenerated) circuit. Never raises: a crash is returned as an error
     entry *without* depth/overhead, so it is drawn as N/A and --run-missing retries it."""
+    timeout = BENCHMARK_TIMEOUT_S.get(key, timeout)
     t0 = time.time()
     try:
         if cache and os.path.exists(cache):
@@ -973,7 +984,8 @@ def run_exp_statistics(reproduce: list[str] | None = None, ks_list: list[int] | 
     to_run = dict(sorted(to_run.items(), key=lambda kv: (order[kv[0][0]], kv[0][1])))
 
     if to_run:
-        print(f"Running (limit {timeout:.0f} s per method): "
+        print(f"Running (limit {timeout:.0f} s per method"
+              + "".join(f", {k}: {v:.0f} s" for k, v in BENCHMARK_TIMEOUT_S.items()) + "): "
               + "; ".join(f"{k} d={distance(ks)} [{', '.join(ms)}]" for (k, ks), ms in to_run.items()))
         execute_jobs(to_run, results, jobs, timeout, threads_per_job)
 
