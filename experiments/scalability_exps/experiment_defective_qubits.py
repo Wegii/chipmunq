@@ -5,7 +5,12 @@ Part 1 -- a) circuit depth, b) #2q gates, c) chiplet utilization:
     Chipmunq vs. LightSABRE on backends with defective qubits (single-/multi-patch chiplets, center /
     size-aware placement).
 
-Part 2 -- d) LER, e) utilization tradeoff:
+Part 3 -- d) LER of the two placement strategies:
+    LER of the distributed lattice-surgery CNOT after Chipmunq compilation with center and size-aware placement on
+    the single-patch chiplet backend of a-c, for several code distances and numbers of defective qubits. Both
+    strategies are compiled on the same backend (same defects) for every defect placement.
+
+Part 2 -- c) LER of avoiding vs. deforming (own figure, own legend), plus the utilization tradeoff:
     Defect avoidance (Chipmunq) vs. patch deformation with super-stabilizers (Lin et al., ASPLOS'24 [1]).
     Reviewer request (Comment #6 / B4): compare Chipmunq's regular-patch defect avoidance with prior work that
     deforms patches around defects, and discuss the tradeoff between preserving patch structure and resource
@@ -36,13 +41,15 @@ Part 2 -- d) LER, e) utilization tradeoff:
         only needed to run part 2)
 
 All panels are drawn at their printed size for four panels side by side across the full page width. One legend
-(combined_overheadlegend.pdf) covers all panels a-e; it only depends on the styles below, so it is written on
-every run, also with --plot-only and for a single --part.
+(combined_overheadlegend.pdf) covers panels a-d, the deformation comparison has its own
+(combined_overhead_deformationlegend.pdf); both depend only on the styles below, so they are written on every run,
+also with --plot-only and for a single --part.
 
 Run from the repo root:
     python experiments/scalability_exps/experiment_defective_qubits.py                    # both parts
     python experiments/scalability_exps/experiment_defective_qubits.py --plot-only        # replot both
     python experiments/scalability_exps/experiment_defective_qubits.py --part compile     # a-c only
+    python experiments/scalability_exps/experiment_defective_qubits.py --part placement [--quick]  # d only
     python experiments/scalability_exps/experiment_defective_qubits.py --part deformation [--jobs N] [--quick]
 """
 from __future__ import annotations
@@ -62,6 +69,7 @@ from glue.qiskit_qec.stim_code_circuit import StimCodeCircuit
 from experiments.exp_utils.simulation_utils import *
 from experiments.exp_utils.transpilation_utils import *
 from experiments.exp_utils.utils import *
+from experiments.exp_utils.circuit_noise import get_noise_model
 
 # Plotting
 import pickle
@@ -70,6 +78,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pymatching
 import stim
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from pathlib import Path
 
@@ -466,7 +475,7 @@ def plot_combined_backends(
     fig.subplots_adjust(**MARGINS)
     fig.savefig(f"{filename}_utilization.pdf", format="pdf")
     plt.close(fig)
-    # The legend for all panels is written by save_legend()
+    # The legends are written by save_legend() (a-d) and save_deformation_legend()
 
 
 def calculate_qpu_utilization(circuit, backend):
@@ -511,7 +520,45 @@ def recursive_dict() -> defaultdict:
     return defaultdict(recursive_dict)
 
 
-def run_exp_defective(reproduce: bool = False) -> None:
+def _num_2q_gates(circuit):
+    ops = circuit.count_ops()
+    return sum(ops.get(g, 0) for g in ("cx", "cz", "swap"))
+
+
+def _defective_job(job):
+    """One (compiler, backend config, placement, #defects, run) compilation of Fig. 10 a-c. Module level so it
+    runs in a spawned worker; the tqec circuit is generated once by the parent (concurrent tqec generation
+    writes the same temporary files). Retries backend seeds until the placement succeeds, as before."""
+    comp, bc, pp, ks, df, run, circuit_str, partitions, size, n_inter, ps_inter = job
+    qc = StimCodeCircuit(stim_circuit=stim.Circuit(circuit_str)).qc
+    ic = 0
+    while True:
+        try:
+            backend = BackendChipletV2(
+                size=size, n_inter=n_inter, connectivity="nn", topology="rotated_grid",
+                inter_chiplet_noise=ps_inter, inter_chiplet_amplification=1, inter_chiplet_noise_type="constant",
+                num_defective_qubits=df, rng_seed=run + 42 + ic, sabre_defective=comp == "sabre",
+            )
+            if comp == "sabre":
+                out = sabre_transpilation(qc, backend)
+            else:
+                out = custom_cost_transpilation(qc, backend, pre_defined_partitions=partitions,
+                                                patch_initialization=pp)
+            break
+        except Exception:
+            ic += 1  # placement failed for these defects: retry with the next backend seed
+    return ((comp, bc, pp, ks, df, run),
+            (calculate_qpu_utilization(out, backend), out.depth() - qc.depth(), _num_2q_gates(out) - _num_2q_gates(qc)))
+
+
+def _capped_pool(jobs: int):
+    """Spawn pool whose workers use one thread each (no oversubscription by Qiskit's / numpy's thread pools)."""
+    for var in ("RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ.setdefault(var, "1")
+    return multiprocessing.get_context("spawn").Pool(jobs)
+
+
+def run_exp_defective(reproduce: bool = False, jobs: int | None = None) -> None:
 
     # Backend configuration
     num_inter_chiplet_connections = 8
@@ -527,6 +574,7 @@ def run_exp_defective(reproduce: bool = False) -> None:
     # - Backend fits a single patch
     # - Backend fits multiple patches
     backend_config = ["single_patch", "multi_patch"]
+    chiplet_dims = {"single_patch": (15, 8), "multi_patch": (23, 14)}
 
     # Number of defective qubits
     defective_qubits = [0, 1, 2, 3]
@@ -541,87 +589,46 @@ def run_exp_defective(reproduce: bool = False) -> None:
     code_size = [2]
 
     if reproduce:
+        # Generate every circuit once, then compile all configurations in parallel. LightSABRE has no
+        # placement modes: it is compiled once and stored under both placement keys (as before, a-c only
+        # plot the first one), which halves its compilations.
+        sources = {}
+        for ks in code_size:
+            circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=1, n2=0)
+            sources[ks] = (str(circuit), partitions)
+        job_list = []
         for comp in compilation:
             for bc in backend_config:
-                custom_depth = {}
-                custom_overhead = {}
-
-                custom_depth = recursive_dict()
-                custom_overhead = recursive_dict()
-                custom_utilization = recursive_dict()
-
-                if bc == "single_patch":
-                    nx, nm = 15, 8
-                elif bc == "multi_patch":
-                    nx, nm = 23, 14
-
-                # Iterate over placement methods
-                for pp in patch_placement:
-                    # Iterate over code size
+                size = (num_dupl * 6, num_dupl * 6, *chiplet_dims[bc])
+                for pp in (patch_placement[:1] if comp == "sabre" else patch_placement):
                     for ks in code_size:
-                        # Generate circuit
-                        circuit, partitions = get_tqec_cnot_rotated(distance_scale=ks, n1=1, n2=0)
-                        # Stim to qiskit
-                        stim_code_circuit = StimCodeCircuit(stim_circuit=circuit)
-
-                        # Iterate over number of defective qubits
                         for df in defective_qubits:
-                            # Perform multiple iterations, since defective qubits are selected randomly
-                            for run in range(0, num_iterations):
-                                ic = 0
-                                while True:
-                                    try:
-                                        backend = BackendChipletV2(
-                                            size=(num_dupl * 6, num_dupl * 6, nx, nm),
-                                            n_inter=num_inter_chiplet_connections,
-                                            connectivity="nn",
-                                            topology="rotated_grid",
-                                            inter_chiplet_noise=ps_inter,
-                                            inter_chiplet_amplification=1,
-                                            inter_chiplet_noise_type="constant",
-                                            num_defective_qubits=df,
-                                            rng_seed=run + 42 + ic,
-                                            sabre_defective=comp == "sabre",
-                                        )
+                            for run in range(num_iterations):
+                                job_list.append((comp, bc, pp, ks, df, run, *sources[ks], size,
+                                                 num_inter_chiplet_connections, ps_inter))
+        jobs = jobs or os.cpu_count() or 1
+        print(f"Fig. 10 a-c: {len(job_list)} compilations on {jobs} workers", flush=True)
+        results = {}
+        with _capped_pool(jobs) as pool:
+            for i, (key, val) in enumerate(pool.imap_unordered(_defective_job, job_list, chunksize=1), 1):
+                results[key] = val
+                if i % max(1, len(job_list) // 10) == 0 or i == len(job_list):
+                    print(f"  {i}/{len(job_list)} compiled", flush=True)
 
-                                        # Custom transpilation
-                                        if comp == "sabre":
-                                            # In order to tackle defects into account, it is necessary to
-                                            defective_circuit = sabre_transpilation(stim_code_circuit.qc, backend)
-                                        else:
-                                            defective_circuit = custom_cost_transpilation(
-                                                stim_code_circuit.qc,
-                                                backend,
-                                                pre_defined_partitions=partitions,
-                                                patch_initialization=pp,
-                                            )
-                                        # Compilation succeeded
-                                        break
-                                    except Exception as e:
-                                        # Compilation failed resulting in a retry using a new seed for the RNG
-                                        ic += 1
-                                        print("Unable to place patches given location of defective qubits!")
-                                        print("Retrying...")
-
-                                def num_2q_gates(circuit):
-                                    ops = circuit.count_ops()
-                                    two_qubit_gate_names = ["cx", "cz", "swap"]
-                                    return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
-                                # Calculate qpu utilization
-                                custom_utilization[pp][df][ks][run] = calculate_qpu_utilization(
-                                    defective_circuit, backend
-                                )
-
-                                custom_depth[pp][df][ks][run] = (
-                                    defective_circuit.depth() - (stim_code_circuit.qc).depth()
-                                )
-                                custom_overhead[pp][df][ks][run] = num_2q_gates(defective_circuit) - num_2q_gates(
-                                    stim_code_circuit.qc
-                                )
-
-                output_dir = Path("experiments/evaluation/defective_qubits")
-                output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = Path("experiments/evaluation/defective_qubits")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for comp in compilation:
+            for bc in backend_config:
+                custom_depth, custom_overhead, custom_utilization = recursive_dict(), recursive_dict(), recursive_dict()
+                for pp in patch_placement:
+                    src_pp = patch_placement[0] if comp == "sabre" else pp
+                    for ks in code_size:
+                        for df in defective_qubits:
+                            for run in range(num_iterations):
+                                util, depth, ovh = results[(comp, bc, src_pp, ks, df, run)]
+                                custom_utilization[pp][df][ks][run] = util
+                                custom_depth[pp][df][ks][run] = depth
+                                custom_overhead[pp][df][ks][run] = ovh
                 with open(output_dir / f"{comp}_depth_{bc}.pkl", "wb") as f:
                     pickle.dump(custom_depth, f)
                 with open(output_dir / f"{comp}_overhead_{bc}.pkl", "wb") as f:
@@ -674,7 +681,7 @@ def run_exp_defective(reproduce: bool = False) -> None:
 
 
 # ######################################################################################
-# Part 2: defect avoidance (Chipmunq) vs. patch deformation (Lin et al. [1]) (Fig. 10 d, e)
+# Part 2: defect avoidance (Chipmunq) vs. patch deformation (Lin et al. [1]) (c: own figure and legend)
 # ######################################################################################
 # ======================================================================================
 # Parameters
@@ -950,7 +957,7 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
     ax.set_ylabel("LER")  # per QEC cycle (state in the caption)
     ax.grid(True, which="major", axis="y", linestyle="--", linewidth=0.4, alpha=0.5)
     ax.set_axisbelow(True)
-    _title(ax, "d) Avoid vs. deform", "Lower is better ↓")
+    _title(ax, "c) Avoid vs. deform", "Lower is better ↓")
     fig.savefig(f"{filename}_deformation_ler.pdf", format="pdf")
     plt.close(fig)
 
@@ -974,45 +981,220 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
     ax.set_xlabel("Utilization")  # active code qubits / chiplet qubits (state in the caption)
     ax.set_ylabel("LER")  # per QEC cycle (state in the caption)
     ax.grid(True, which="both", linestyle="--", linewidth=0.4, alpha=0.5)
-    _title(ax, "e) Utilization tradeoff", "Lower, right is better")
+    _title(ax, "f) Utilization tradeoff", "Lower, right is better")
     fig.savefig(f"{filename}_deformation_tradeoff.pdf", format="pdf")
     plt.close(fig)
-    # The legend for all panels is written by save_legend()
+    # The legends are written by save_legend() (a-d) and save_deformation_legend()
 
 
 # ######################################################################################
-# One legend for all panels (a-e)
+# Part 3: placement strategy (center / size-aware) vs. LER (Fig. 10 d)
 # ######################################################################################
+PLACEMENT_KS = [1, 2, 3]                       # d = 2k + 1 -> 3, 5, 7
+PLACEMENT_DEFECTS = [1, 3]                     # defective qubits per chiplet
+PLACEMENT_PS = list(np.logspace(-3, -2, 6))    # 1e-3 ... 1e-2, 6 points
+PLACEMENT_SEEDS = 4                            # defect placements (backends) per (d, #defects)
+PLACEMENT_MAX_SHOTS, PLACEMENT_MAX_ERRORS = 1_000_000, 500
+PLACEMENT_P_INTER = 1e-4                       # inter-chiplet noise, as in a-c
+PLACEMENT_MAX_BACKEND_RETRIES = 20
+PLACEMENT_PKL = OUT_DIR / "placement_ler.pkl"
+PLACEMENTS = [("center", COLORS_CUSTOM[0]), ("size_aware", COLORS_CUSTOM[1])]  # colours of a-c (single patch)
+PLACEMENT_MARKERS = {3: "v", 5: "o", 7: "s", 9: "D"}
+PLACEMENT_DEFECT_LS = {1: "-", 2: "-.", 3: "--", 5: ":"}
+
+
+def _placement_backend(k: int, n_defects: int, seed: int) -> BackendChipletV2:
+    """Single-patch chiplets (one patch per chiplet) as in a-c, sized for distance scale k."""
+    return BackendChipletV2(
+        size=(6, 6, 11 + 4 * (k - 1), 6 + 2 * (k - 1)),
+        n_inter=2 * k + 3,
+        connectivity="nn",
+        topology="rotated_grid",
+        inter_chiplet_noise=PLACEMENT_P_INTER,
+        inter_chiplet_amplification=1,
+        inter_chiplet_noise_type="constant",
+        num_defective_qubits=n_defects,
+        rng_seed=seed,
+    )
+
+
+def _placement_job(job):
+    """Compile one (d, #defects, defect placement) with both strategies on the same backend and build the noisy
+    circuits for every physical error rate. Module level: runs in a spawned worker. If both strategies give the
+    identical circuit, it is returned once (simulated once, counted for both)."""
+    k, n_def, s, circuit_str, partitions, ps = job
+    qc = StimCodeCircuit(stim_circuit=stim.Circuit(circuit_str)).qc
+    retries = 0
+    for attempt in range(PLACEMENT_MAX_BACKEND_RETRIES):
+        seed = 1000 * s + 42 + attempt
+        backend = _placement_backend(k, n_def, seed)
+        try:
+            compiled = {pp: str(get_stim_circuits_with_detectors(custom_cost_transpilation(
+                qc, backend, pre_defined_partitions=partitions, patch_initialization=pp))[0][0])
+                for pp, _ in PLACEMENTS}
+            break
+        except Exception:
+            retries += 1
+    else:
+        raise RuntimeError(f"No backend for d={2 * k + 1} with {n_def} defects could be compiled")
+    groups = {}  # circuit -> placements producing it
+    for pp, circ in compiled.items():
+        groups.setdefault(circ, []).append(pp)
+    out = []
+    for circ, pps in groups.items():
+        c = stim.Circuit(circ)
+        for p in ps:
+            noisy = get_noise_model("modsi1000", None, p, None, remote=backend.inter_chiplet_connections).noisy_circuit(c)
+            out.append((pps, p, str(noisy)))
+    return dict(k=k, n_def=n_def, s=s, seed=seed, retries=retries, circuits=out)
+
+
+def run_placement(quick: bool = False, jobs: int | None = None) -> list:
+    """Compile every (d, #defects, defect placement) with both placement strategies on the same backend (in
+    parallel, noisy circuits built in the workers) and simulate the LER. A backend seed is only used if both
+    strategies can place all patches; identical circuits of the two strategies are simulated once."""
+    ks = [1] if quick else PLACEMENT_KS
+    n_seeds = 1 if quick else PLACEMENT_SEEDS
+    ps = [2e-3, 5e-3] if quick else PLACEMENT_PS
+    max_shots, max_errors = (20_000, 100) if quick else (PLACEMENT_MAX_SHOTS, PLACEMENT_MAX_ERRORS)
+
+    sources = {}
+    for k in ks:
+        circuit, partitions = get_tqec_cnot_rotated(distance_scale=k, n1=1, n2=0)
+        sources[k] = (str(circuit), partitions)
+    job_list = [(k, n_def, s, *sources[k], ps) for k in ks for n_def in PLACEMENT_DEFECTS for s in range(n_seeds)]
+    jobs = min(jobs or os.cpu_count() or 1, len(job_list))
+    print(f"Fig. 10 d: {len(job_list)} backends (x {len(PLACEMENTS)} placements) on {jobs} workers", flush=True)
+    tasks, shared = [], 0
+    with _capped_pool(jobs) as pool:
+        for r in pool.imap_unordered(_placement_job, job_list, chunksize=1):
+            d = 2 * r["k"] + 1
+            print(f"[d={d}, {r['n_def']} defects, sample {r['s']}] backend seed {r['seed']} "
+                  f"({r['retries']} rejected)", flush=True)
+            for pps, p, noisy in r["circuits"]:
+                shared += len(pps) > 1
+                tasks.append(sinter.Task(circuit=stim.Circuit(noisy), json_metadata={
+                    "placements": pps, "placement": pps[0], "d": d, "defects": r["n_def"], "sample": r["s"],
+                    "p": p, "backend_seed": r["seed"]}))
+    print(f"{len(tasks)} sinter tasks ({shared} shared by both placements: identical circuits)", flush=True)
+
+    stats = sinter.collect(num_workers=multiprocessing.cpu_count(), tasks=tasks, max_shots=max_shots,
+                           max_errors=max_errors, decoders=["pymatching"], print_progress=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(PLACEMENT_PKL, "wb") as f:
+        pickle.dump(stats, f)
+    return stats
+
+
+def plot_placement(stats, filename=str(OUT_DIR / "combined_overhead")) -> None:
+    """d) LER vs. physical error rate: colour = placement, marker = code distance, line style = #defects.
+    Each point is the mean LER over the defect placements; points without observed errors are not shown."""
+    ler = defaultdict(list)
+    for st in stats:
+        n = st.shots - st.discards
+        if n > 0:
+            m = st.json_metadata
+            for pp in m.get("placements", [m["placement"]]):  # identical circuits count for both placements
+                ler[(pp, m["d"], m["defects"], m["p"])].append(st.errors / n)
+    ps = sorted({k[3] for k in ler})
+    ds = sorted({k[1] for k in ler})
+    defects = sorted({k[2] for k in ler})
+    _fonts()
+    fig, ax = _panel()
+    for pp, color in PLACEMENTS:
+        for d in ds:
+            for nd in defects:
+                pts = [(p, np.mean(ler[(pp, d, nd, p)])) for p in ps if ler.get((pp, d, nd, p))]
+                pts = [(p, v) for p, v in pts if v > 0]
+                if not pts:
+                    continue
+                xs, ys = zip(*pts)
+                ax.plot(xs, ys, color=color, linestyle=PLACEMENT_DEFECT_LS.get(nd, "-"),
+                        marker=PLACEMENT_MARKERS.get(d, "P"), markerfacecolor=color, markeredgecolor="black",
+                        markeredgewidth=0.4, linewidth=1.1)
+    from matplotlib.ticker import NullFormatter
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(min(PLACEMENT_PS) / 1.15, max(PLACEMENT_PS) * 1.15)
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_minor_formatter(NullFormatter())  # no overlapping labels on ranges below one decade
+    ax.set_xlabel("Physical error rate")
+    ax.set_ylabel("LER")  # per logical CNOT (state in the caption)
+    ax.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
+    ax.text(0.5, 1.03, "d) Placement vs. LER", transform=ax.transAxes, fontweight="bold", ha="center",
+            va="bottom")
+    ax.text(0.5, 1.16, "Lower is better ↓", transform=ax.transAxes, fontweight="bold", color=plot_lib_color,
+            ha="center", va="bottom")
+    fig.savefig(f"{filename}_placement_ler.pdf", format="pdf")
+    plt.close(fig)
+
+
+# ######################################################################################
+# Legends: one for panels a-d, one for the deformation comparison (avoid vs. deform)
+# ######################################################################################
+def _patch(label, color, hatch=""):
+    return Patch(facecolor=color, hatch=hatch, edgecolor="black", linewidth=0.4, label=label)
+
+
+def _blank():
+    return Line2D([], [], linestyle="none", label=" ")
+
+
+def _two_rows(top: list, bottom: list) -> list:
+    """Order handles for a two-row legend (matplotlib fills legends column by column)."""
+    n = max(len(top), len(bottom))
+    top = top + [_blank() for _ in range(n - len(top))]
+    bottom = bottom + [_blank() for _ in range(n - len(bottom))]
+    return [h for col in zip(top, bottom) for h in col]
+
+
 def save_legend(filename=str(OUT_DIR / "combined_overhead")) -> None:
-    """Single legend for panels a-e, full page width, two rows of five entries.
+    """Single legend for panels a-d, full page width, two rows.
 
-    Column by column: Chipmunq single patch (center / size-aware), Chipmunq multi patch (center / size-aware),
-    LightSABRE (single / multi), Avoiding (tight / slack), Deform (tight / slack). matplotlib
-    fills legends column by column, so the entries are listed in that order.
-    Built from the style constants only (no data), so it is written whatever part is run or replotted.
+    Columns: Chipmunq single patch (center / size-aware), Chipmunq multi patch (center / size-aware),
+    LightSABRE (single / multi) for a-c; code distances (markers) and #defects (line styles) for d) -- the
+    placement colours of d) are the Chipmunq single-patch colours. Built from the style constants only (no
+    data), so it is written whatever part is run or replotted.
     """
     _fonts()
-
-    def patch(label, color, hatch=""):
-        return Patch(facecolor=color, hatch=hatch, edgecolor="black", linewidth=0.4, label=label)
-
-    handles = [
-        patch("Chipmunq single, center", COLORS_CUSTOM[0], HATCHES[0]),
-        patch("Chipmunq single, size-aware", COLORS_CUSTOM[1], HATCHES[1]),
-        patch("Chipmunq multi, center", COLORS_CUSTOM[2], HATCHES[0]),
-        patch("Chipmunq multi, size-aware", COLORS_CUSTOM[3], HATCHES[1]),
-        patch("LightSABRE single", COLORS_SABRE[0]),
-        patch("LightSABRE multi", COLORS_SABRE[2]),
-    ]
-    for method in ("chipmunq", "deform"):  # tight above slack
-        handles += [patch(label, color, hatch) for m, _, label, color, hatch in sorted(SERIES, key=lambda s: s[1])
-                    if m == method]
+    grey = "#606060"
+    dist = [Line2D([], [], color=grey, marker=PLACEMENT_MARKERS[2 * k + 1], linestyle="none",
+                   markerfacecolor="white", markeredgecolor="black", markeredgewidth=0.4, label=f"d={2 * k + 1}")
+            for k in PLACEMENT_KS]
+    defects = [Line2D([], [], color=grey, linestyle=PLACEMENT_DEFECT_LS.get(n, "-"),
+                      label=f"{n} defect" + ("s" if n != 1 else "")) for n in PLACEMENT_DEFECTS]
+    top = [_patch("Chipmunq single, center", COLORS_CUSTOM[0], HATCHES[0]),
+           _patch("Chipmunq multi, center", COLORS_CUSTOM[2], HATCHES[0]),
+           _patch("LightSABRE single", COLORS_SABRE[0])] + dist[0::2] + defects[0::2]
+    bottom = [_patch("Chipmunq single, size-aware", COLORS_CUSTOM[1], HATCHES[1]),
+              _patch("Chipmunq multi, size-aware", COLORS_CUSTOM[3], HATCHES[1]),
+              _patch("LightSABRE multi", COLORS_SABRE[2])] + dist[1::2] + defects[1::2]
+    handles = _two_rows(top, bottom)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.4))
-    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=math.ceil(len(handles) / 2),
-                      columnspacing=0.8, handlelength=1.2, handletextpad=0.35)
+    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=len(handles) // 2,
+                      columnspacing=0.8, handlelength=1.6, handletextpad=0.35)
     legend_fig.savefig(f"{filename}legend.pdf", bbox_inches="tight", format="pdf")
+    plt.close(legend_fig)
+
+
+def save_deformation_legend(filename=str(OUT_DIR / "combined_overhead")) -> None:
+    """Own legend of the deformation comparison (c: avoid vs. deform; also the utilization tradeoff): avoiding /
+    deforming on tight and slack chiplets, and the hollow bar for configurations without a valid patch."""
+    _fonts()
+    by_method = {m: [_patch(label, color, hatch) for mm, _, label, color, hatch in sorted(SERIES, key=lambda s: s[1])
+                     if mm == m] for m in ("chipmunq", "deform")}  # tight above slack
+    none_bar = Patch(facecolor="white", hatch="xxx", edgecolor="#808080", linewidth=0.8, linestyle="--",
+                     label="no valid patch")
+    top = [by_method["chipmunq"][0], by_method["deform"][0], none_bar]
+    bottom = [by_method["chipmunq"][1], by_method["deform"][1]]
+    handles = _two_rows(top, bottom)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN / 2, 0.4))
+    legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=len(handles) // 2,
+                      columnspacing=0.8, handlelength=1.6, handletextpad=0.35)
+    legend_fig.savefig(f"{filename}_deformationlegend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
 
@@ -1020,16 +1202,29 @@ def save_legend(filename=str(OUT_DIR / "combined_overhead")) -> None:
 # Entry point
 # ######################################################################################
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Fig. 10: defective qubits (a-c compilation, d-e deformation)")
+    ap = argparse.ArgumentParser(description="Fig. 10: defective qubits (a-c compilation, d placement LER, "
+                                             "c deformation)")
     ap.add_argument("--plot-only", action="store_true", help="only replot the saved results")
-    ap.add_argument("--part", choices=["all", "compile", "deformation"], default="all",
-                    help="compile = a-c (Chipmunq vs. LightSABRE), deformation = d-e (vs. Lin et al.)")
-    ap.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1, help="workers for part 2 sampling")
-    ap.add_argument("--quick", action="store_true", help="part 2: 4 samples, 200k shots (pipeline smoke test)")
+    ap.add_argument("--part", choices=["all", "compile", "placement", "deformation"], default="all",
+                    help="compile = a-c (Chipmunq vs. LightSABRE), placement = d (center vs. size-aware LER), "
+                         "deformation = c (avoid vs. deform, Lin et al.)")
+    ap.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1, help="parallel workers (compilation of a-c and d, sampling of c)")
+    ap.add_argument("--quick", action="store_true",
+                    help="parts 2, 3: few samples / shots (pipeline smoke test)")
     a = ap.parse_args()
 
     if a.part in ("all", "compile"):
-        run_exp_defective(reproduce=not a.plot_only)
+        run_exp_defective(reproduce=not a.plot_only, jobs=a.jobs)
+
+    if a.part in ("all", "placement"):
+        if a.plot_only:
+            if not PLACEMENT_PKL.exists():
+                raise SystemExit(f"No results to plot: {PLACEMENT_PKL} not found. Run without --plot-only first.")
+            with open(PLACEMENT_PKL, "rb") as f:
+                placement_stats = pickle.load(f)
+        else:
+            placement_stats = run_placement(a.quick, jobs=a.jobs)
+        plot_placement(placement_stats)
 
     if a.part in ("all", "deformation"):
         if a.plot_only:
@@ -1042,5 +1237,6 @@ if __name__ == "__main__":
         summarize_deformation(data["rows"])
         plot_deformation(data)
 
-    # One legend for all panels a-e
+    # Legends: panels a-d, and the deformation comparison (written from the style constants on every run)
     save_legend()
+    save_deformation_legend()

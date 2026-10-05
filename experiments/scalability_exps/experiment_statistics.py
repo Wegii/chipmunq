@@ -196,7 +196,7 @@ TITLES = {
     "ghz": "GHZ",
     "bv": "BV",
     "bv_color": "BV\n(color)",
-    "qft_color": "QFT\n(color)",
+    "qft_color": "QFT\n(color)"
     "gross_bridge": "Gross\nsurgery",
     "gross": "Gross",  # memory only; no longer in BENCHMARKS
 }

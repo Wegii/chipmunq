@@ -557,7 +557,7 @@ def plot_evaluation(results, filename):
     xlab = ["0"] + [str(k) if k else "All" for k in K_VALUES]            # 0 = plain SI1000, All = whole chiplet
     xpos = {key: i for i, key in enumerate(xkeys)}
 
-    fig, ax = _panel(TEXT_WIDTH_IN / 3)
+    fig, ax = _panel(TEXT_WIDTH_IN / 4)  # four plots across the full text width (1.75 in each)
     for d in ds:
         for t in comps:
             rows = [r for r in results if r["d"] == d and r["compiler"] == t]
@@ -572,21 +572,21 @@ def plot_evaluation(results, filename):
     ax.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
     ax.set_axisbelow(True)
 
-    # Two legend columns: left = compilers, right = code distances (legend fills column-major,
-    # so pad the shorter column with invisible entries)
-    left = [Line2D([], [], color=colors[t], label=LABELS[t]) for t in comps]
-    right = [Line2D([], [], color="gray", ls=ls[d], marker=mk[d], mfc="gray", mec="black",
-                    markeredgewidth=0.5, label=f"$d={d}$") for d in ds]
-    n = max(len(left), len(right))
-    blank = lambda: Line2D([], [], ls="none", marker="none", label=" ")  # noqa: E731
-    h = left + [blank() for _ in range(n - len(left))] + right + [blank() for _ in range(n - len(right))]
-    lo, hi = ax.get_ylim()
-    ax.set_ylim(lo, hi * 150)              # headroom for the three-row legend (log axis)
-    ax.legend(handles=h, ncol=2, frameon=False, loc="upper right", handlelength=1.8, handletextpad=0.4,
-              columnspacing=0.8, labelspacing=0.2, borderaxespad=0.2)
-    _title(fig, ax, "b) Effect of large-scale correlated errors")
+    _title(fig, ax, "b) Correlated errors")  # long title does not fit the 1.75 in panel (caption has the rest)
     fig.savefig(filename + ".pdf", format="pdf")
     plt.close(fig)
+
+    # Legend outside the plot, in its own file, two rows: compilers on top, code distances below
+    top = [Line2D([], [], color=colors[t], label=LABELS[t]) for t in comps]
+    bottom = [Line2D([], [], color="gray", ls=ls[d], marker=mk[d], mfc="gray", mec="black",
+                     markeredgewidth=0.5, label=f"$d={d}$") for d in ds]
+    # Two separate one-row legends, each centred, so the shorter row sits in the middle under the longer one
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN / 4, 0.4))
+    kw = dict(frameon=False, handlelength=1.8, handletextpad=0.4, columnspacing=1.0, borderaxespad=0.0)
+    legend_fig.legend(handles=top, loc="lower center", bbox_to_anchor=(0.5, 0.5), ncols=len(top), **kw)
+    legend_fig.legend(handles=bottom, loc="upper center", bbox_to_anchor=(0.5, 0.5), ncols=len(bottom), **kw)
+    legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
+    plt.close(legend_fig)
 
 
 if __name__ == "__main__":

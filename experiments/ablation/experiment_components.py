@@ -33,8 +33,9 @@ Reported per variant and backend (clean / defective): mapping + routing runtime,
 Noise: circuit-level ``modsi1000`` with the same inter-chiplet noise ``ps_inter`` on every link,
 applied orientation-independently (see ``symmetric_remote_noise``).
 
-Paper figure (a, next to the cosmic-ray experiment b): ``ablation_ler_ratio_*.pdf``, drawn at its printed
-size (2/3 of the text width, Fig. 10 style) -- include it at its natural width, no scaling.
+Paper figure a): ``ablation_ler_ratio_*.pdf``, drawn at its printed size (half the text width = two of the
+four plot slots of a full-width row, Fig. 10 style) -- include it at its natural width, no scaling. The
+clean/defective legend is written to ``ablation_ler_ratio_*legend.pdf``.
 
 Usage:
     python experiments/ablation/experiment_components.py            # full
@@ -666,7 +667,7 @@ def plot_ler_ratio(results, stats, filename):
     t = ler_table(stats)
     ps = sorted(results["config"]["ps"])
     bkinds = list(results["config"]["defects"])
-    fig, ax = _panel(TEXT_WIDTH_IN * 2 / 3)
+    fig, ax = _panel(TEXT_WIDTH_IN / 2)  # two of the four plot slots of a full-width row (3.5 in)
 
     # x positions with a gap between groups; skip variants that were never compiled
     present = {v for b in bkinds for v in present_variants(results, b)}
@@ -702,7 +703,8 @@ def plot_ler_ratio(results, stats, filename):
     ax.axhline(1, color="black", linestyle="--", linewidth=0.6)
     ax.set_yscale("log")
     ax.set_xticks(xs)
-    ax.set_xticklabels([SHORT[v] for v in order], linespacing=0.95)
+    ax.set_xticklabels([SHORT[v] for v in order], linespacing=0.95,
+                       fontsize=FONT_PT - 1.5)  # ~0.27 in per bar group at half text width
     ax.tick_params(axis="x", length=0)
     ax.set_xlim(xs[0] - 0.55, xs[-1] + 0.55)
     ax.set_ylabel("Relative LER")  # LER_variant / LER_Chipmunq(Basic) at p = ps[0] (caption)
@@ -719,20 +721,26 @@ def plot_ler_ratio(results, stats, filename):
         if i:
             ax.axvline(a - (1 + GROUP_GAP) / 2, color="grey", linewidth=0.6, alpha=0.6)
     lo, hi = ax.get_ylim()
-    # start below 1 so the reference bars (= 1) stay visible, headroom for group names and legend (log axis)
+    # start below 1 so the reference bars (= 1) stay visible, headroom for the group names (log axis)
     ax.set_ylim(min(lo, 0.6), hi * 2.5)
 
-    # Backend legend (hatching = backend; colour = variant), above the axes right of the title.
-    # Not needed when only one backend is shown.
-    if len(bkinds) > 1:
-        ax.legend(handles=[Patch(facecolor="white", edgecolor="black", linewidth=0.4,
-                                 hatch="" if j == 0 else "////", label=f"{b} backend")
-                           for j, b in enumerate(bkinds)],
-                  loc="lower right", bbox_to_anchor=(1.0, 1.0), ncols=1, frameon=False, handlelength=1.2,
-                  handletextpad=0.35, labelspacing=0.15, borderaxespad=0.1)
     _title(fig, ax, "a) Contribution of each stage")
     fig.savefig(filename, format="pdf")
     plt.close(fig)
+
+    # Backend legend (hatching = backend; colour = variant) in its own file, placed outside the plot in
+    # LaTeX. Not needed when only one backend is shown.
+    if len(bkinds) > 1:
+        legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN / 2, 0.3))
+        legend_fig.legend(handles=[Patch(facecolor="white", edgecolor="black", linewidth=0.4,
+                                         hatch="" if j == 0 else "////", label=f"{b} backend")
+                                   for j, b in enumerate(bkinds)],
+                          loc="center", ncols=len(bkinds), frameon=False, handlelength=1.2,
+                          handletextpad=0.35, columnspacing=1.0)
+        legend_fig.savefig(str(filename).replace(".pdf", "") + "legend.pdf", bbox_inches="tight", format="pdf")
+        plt.close(legend_fig)
+
+
 
 
 # --------------------------------------------------------------------------------------
