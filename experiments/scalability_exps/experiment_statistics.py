@@ -210,9 +210,10 @@ def _title(key: str) -> str:
 # "ideal" is the untranspiled circuit; everything else is a method that can be run.
 # The extra baselines are the ones of the related-work comparison that transpilation_utils provides.
 #EXTRA_TOOLS = tuple(k for k in ("mech", "olsq2", "seqc", "murali", ) if k in EXTRA_METHODS)
-EXTRA_TOOLS = tuple(k for k in ("seqc") if k in EXTRA_METHODS)
+# ("seqc",) needs the trailing comma: ("seqc") is a plain string, which iterates over its characters and
+# leaves EXTRA_TOOLS empty (SEQC would silently not run).
+EXTRA_TOOLS = tuple(k for k in ("seqc", "murali", ) if k in EXTRA_METHODS)
 RUN_TOOLS = ("custom", "sabre", *EXTRA_TOOLS)
-
 ALL_TOOLS = ("ideal", *RUN_TOOLS)
 
 # What the extra methods receive as their "cm" argument. The chiplet backend's coupling map matches
@@ -732,6 +733,9 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
             print(f"[{_title(key)} d={d}] depth ideal={di}  " + "  ".join(dep)
                   + f"  | 2q ideal={gi}  " + "  ".join(gat))
 
+    # ---------------- a) compilation time ----------------
+    plot_runtime(results, keys, ks_list, f"{filename}_runtime.pdf", tools)
+
     # ---------------- b) depth ----------------
     _panel_fonts()
     fig = plt.figure(figsize=(PANEL_W, PANEL_H))
@@ -771,6 +775,43 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
 
 
 
+def plot_runtime(results: dict, keys: list[str], ks_list: list[int], filename: str, tools=ALL_TOOLS) -> None:
+    """a) Compilation time of every method per benchmark and distance (same bar layout as b) and c)).
+    Timed-out runs are hollow bars at the time limit; runs without a result (N/A) are left empty."""
+    tools = [t for t in tools if t != "ideal"]  # the ideal circuit is not compiled
+    data, labels = {t: [] for t in tools}, {t: [] for t in tools}
+    for key in keys:
+        for t in tools:
+            vals, labs = {}, {}
+            for ks in _ks_for(key, ks_list, results):
+                entry = results.get(f"{t}_all", {}).get(key, {}).get(ks)
+                lab = _no_result_label(results, t, key, ks)
+                if lab == "T/O":
+                    limit = entry.get("timeout_s") if isinstance(entry, dict) else None
+                    vals[ks] = limit or BENCHMARK_TIMEOUT_S.get(key, METHOD_TIMEOUT_S)
+                    labs[ks] = lab
+                elif lab or not isinstance(entry, dict) or "runtime_s" not in entry:
+                    vals[ks] = float("nan")  # no result (or a legacy entry without runtime): no bar
+                    labs[ks] = lab or "N/A"
+                else:
+                    vals[ks] = entry["runtime_s"]
+            data[t].append(vals)
+            labels[t].append(labs)
+    for i, key in enumerate(keys):
+        for ks in _ks_for(key, ks_list, results):
+            d = DISTANCE_INDEPENDENT.get(key, distance(ks))
+            print(f"[{_title(key)} d={d}] runtime " + "  ".join(
+                f"{TOOL_STYLE[t][0]}={labels[t][i].get(ks) or f'{data[t][i][ks]:.1f} s'}" for t in tools))
+    _panel_fonts()
+    fig = plt.figure(figsize=(PANEL_W, PANEL_H))
+    ax, _ = _draw_bars(fig, data, keys, ks_list, labels, tools)
+    ax.set_ylabel("Runtime [s]")
+    _panel_title(ax, "a) Compilation time")
+    fig.subplots_adjust(**PANEL_MARGINS)
+    fig.savefig(filename, format="pdf")
+    plt.close(fig)
+
+
 def relative_overhead(results: dict, keys: list[str], ks_list: list[int], tool: str) -> dict[str, float]:
     """Mean relative increase over the ideal circuit, (compiled - ideal) / ideal, of depth and #2q gates,
     averaged over all benchmarks and distances where ``tool`` has a result (T/O and N/A runs are left out).
@@ -792,10 +833,19 @@ def relative_overhead(results: dict, keys: list[str], ks_list: list[int], tool: 
 
 def plot_relative_overhead(results: dict, keys: list[str], ks_list: list[int], filename: str, tools) -> None:
     """d) Relative overhead of every method over the ideal circuit, in depth and #2q gates (one bar group per
-    metric, one bar per method in the method colours of b) and c)). Methods without any result get a hollow
-    bar like in b), c)."""
+    metric, one bar per method in the method colours of b) and c)). Averaged only over the benchmarks for which
+    every shown method compiled every code distance, so all methods are compared on the same circuits."""
     tools = [t for t in tools if t != "ideal"]
-    stats = {t: relative_overhead(results, keys, ks_list, t) for t in tools}
+    # Same circuits for every method: only benchmarks where every shown method has a result for every code
+    # distance (a method that times out on the larger circuits would otherwise be averaged over easier ones)
+    complete = [key for key in keys
+                if all(_no_result_label(results, t, key, ks) is None
+                       for t in tools for ks in _ks_for(key, ks_list, results))]
+    left_out = [key for key in keys if key not in complete]
+    print("[relative overhead] circuits: " + (", ".join(_title(k) for k in complete) or "none")
+          + (f" (left out, not every method has every distance: {', '.join(_title(k) for k in left_out)})"
+             if left_out else ""))
+    stats = {t: relative_overhead(results, complete, ks_list, t) for t in tools}
     for t in tools:
         print(f"[relative overhead] {TOOL_STYLE[t][0]}: depth +{100 * stats[t]['depth']:.0f} %, "
               f"#2q gates +{100 * stats[t]['gates']:.0f} % (mean over {stats[t]['n']} runs)")
