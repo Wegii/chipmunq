@@ -196,7 +196,7 @@ TITLES = {
     "ghz": "GHZ",
     "bv": "BV",
     "bv_color": "BV\n(color)",
-    "qft_color": "QFT\n(color)"
+    "qft_color": "QFT\n(color)",
     "gross_bridge": "Gross\nsurgery",
     "gross": "Gross",  # memory only; no longer in BENCHMARKS
 }
@@ -209,8 +209,10 @@ def _title(key: str) -> str:
 # --- Transpilation methods -------------------------------------------------------------
 # "ideal" is the untranspiled circuit; everything else is a method that can be run.
 # The extra baselines are the ones of the related-work comparison that transpilation_utils provides.
-EXTRA_TOOLS = tuple(k for k in ("olsq2", "seqc", "murali") if k in EXTRA_METHODS)
-RUN_TOOLS = ("custom", "sabre", "mech", *EXTRA_TOOLS)
+#EXTRA_TOOLS = tuple(k for k in ("mech", "olsq2", "seqc", "murali", ) if k in EXTRA_METHODS)
+EXTRA_TOOLS = tuple(k for k in ("seqc") if k in EXTRA_METHODS)
+RUN_TOOLS = ("custom", "sabre", *EXTRA_TOOLS)
+
 ALL_TOOLS = ("ideal", *RUN_TOOLS)
 
 # What the extra methods receive as their "cm" argument. The chiplet backend's coupling map matches
@@ -504,6 +506,46 @@ DARKEST = 0.55  # lightness reduction of the largest distance (0 = base colour)
 TIMEOUT_BAR_FACTOR = 1.3  # a timed-out run is drawn as a hollow bar 30 % above the ideal
 
 
+
+# --------------------------------------------------------------------------------------
+# Paper panels b) - d): drawn at their printed size for four panels side by side across the full text width
+# (Fig. 10 style; include at natural width, no scaling). Titles are centred on the plot rectangle.
+# --------------------------------------------------------------------------------------
+TEXT_WIDTH_IN = 7.0                   # full text width of the paper (two-column IEEE/ACM: ~7.0 in)
+PANEL_W = TEXT_WIDTH_IN / 4           # 1.75 in
+PANEL_H = 1.6
+FONT_PT = 7
+PANEL_MARGINS = dict(left=0.27, right=0.97, top=0.80, bottom=0.24)  # identical for all panels -> axes line up
+PANEL_TICKS = {"cnot": "CNOT", "ghz": "GHZ", "qft_color": "QFT\ncolor", "bv": "BV", "bv_color": "BV\ncolor",
+               "gross_bridge": "Gross", "gross": "Gross"}
+
+
+def _panel_fonts() -> None:
+    plt.rcParams.update({
+        "font.family": "serif",
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "hatch.linewidth": 0.4,
+        "lines.linewidth": 1.0,
+        "errorbar.capsize": 1.5,
+    })
+
+
+def _panel_title(ax, text: str, better: str = "Lower is better ↓") -> None:
+    """Panel title and the "better" hint, centred on the plot rectangle (axes)."""
+    ax.text(0.5, 1.03, text, transform=ax.transAxes, fontweight="bold", ha="center", va="bottom")
+    ax.text(0.5, 1.16, better, transform=ax.transAxes, fontweight="bold", color=plot_lib_color,
+            ha="center", va="bottom")
+
+
 def _shade(color, level: float):
     """Base colour darkened by ``level`` in [0, 1] (0 = base colour, 1 = DARKEST)."""
     import colorsys
@@ -572,20 +614,21 @@ def _draw_bars(fig, data, keys, ks_list, labels, tools, ylim=None):
             for rank, ks in enumerate(sorted(per_ks, reverse=True)):  # largest d first (back)
                 lvl = 1.0 if key in DISTANCE_INDEPENDENT else levels[ks]
                 bar = ax.bar(xpos[i], per_ks[ks], width, color=_shade(color, lvl), hatch=hatch,
-                             edgecolor="black", linewidth=0.8, zorder=2 + rank)[0]
+                             edgecolor="black", linewidth=0.4, zorder=2 + rank)[0]
                 if ks in no_result:  # no result: white, hatched, dashed outline
                     bar.set_facecolor("white")
                     bar.set_linestyle("--")
                     bar.set_hatch("xxx")
-                    bar.set_linewidth(2)
+                    bar.set_linewidth(0.8)
                     bar.set_edgecolor(_shade(color, lvl))
 
     ax.set_yscale("log", nonpositive="clip")
     ax.set_ylim(ymin, ymax)
     ax.set_xticks(x)
-    ax.set_xticklabels([TITLES[k] for k in keys])
+    # Short labels: at 1.75 in each benchmark group gets ~0.24 in (full names in the caption)
+    ax.set_xticklabels([PANEL_TICKS.get(k, TITLES[k]) for k in keys], fontsize=FONT_PT - 1.5, linespacing=0.95)
     ax.tick_params(axis="x", which="both", top=False)
-    ax.tick_params(axis="y", length=5)
+    ax.tick_params(axis="y", length=2.5)
     ax.grid(True, which="major", axis="y", linestyle="--", alpha=0.5)
     ax.set_axisbelow(True)
 
@@ -689,37 +732,27 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
             print(f"[{_title(key)} d={d}] depth ideal={di}  " + "  ".join(dep)
                   + f"  | 2q ideal={gi}  " + "  ".join(gat))
 
-    # ---------------- depth ----------------
-    plt.rcParams.update(_tex_fonts(1.5))
-    fig = plt.figure(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    # ---------------- b) depth ----------------
+    _panel_fonts()
+    fig = plt.figure(figsize=(PANEL_W, PANEL_H))
     ax, _ = _draw_bars(fig, depth, keys, ks_list, labels, tools, ylim_depth)
-    ax.set_xlabel("Circuit type", fontsize=FONTSIZE * 1.5)
-    fig.text(0.03, 0.5, "Circuit depth", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
-    title = ax.text(-0.18, 1.04, "b) Compilation overhead on circuit depth", transform=ax.transAxes,
-                    fontweight="bold", va="bottom", ha="left")
-    # "Lower is better" centred directly above the title, independent of figure size
-    ax.annotate("Lower is better ↓", xy=(0.5, 1.0), xycoords=title, xytext=(0, 2), textcoords="offset points",
-                fontweight="bold", color=plot_lib_color, va="bottom", ha="center")
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.72, bottom=0.21)
-    _fit_vertical(fig, ax)  # fill the height, nothing cut off
+    ax.set_ylabel("Circuit depth")
+    _panel_title(ax, "b) Circuit depth")
+    fig.subplots_adjust(**PANEL_MARGINS)
     fig.savefig(f"{filename}_depth.pdf", format="pdf")
     plt.close(fig)
 
-    # ---------------- 2q gates ----------------
-    plt.rcParams.update(_tex_fonts(1.3))
-    fig = plt.figure(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
+    # ---------------- c) 2q gates ----------------
+    fig = plt.figure(figsize=(PANEL_W, PANEL_H))
     ax, handles = _draw_bars(fig, gates, keys, ks_list, labels, tools, ylim_gates)
-    ax.set_xlabel("Circuit type", fontsize=FONTSIZE * 1.5)
-    fig.text(0.025, 0.5, "#2q gates", va="center", rotation="vertical", fontsize=FONTSIZE * 1.5)
-    title = ax.text(-0.075, 1.04, "c) Compilation overhead on #2q gates", transform=ax.transAxes,
-                    fontweight="bold", va="bottom", ha="left")
-    # "Lower is better" centred directly above the title, independent of figure size
-    ax.annotate("Lower is better ↓", xy=(0.5, 1.0), xycoords=title, xytext=(0, 2), textcoords="offset points",
-                fontweight="bold", color=plot_lib_color, va="bottom", ha="center")
-    fig.subplots_adjust(left=0.24, right=0.95, top=0.72, bottom=0.21)
-    _fit_vertical(fig, ax)  # fill the height, nothing cut off
+    ax.set_ylabel("#2q gates")
+    _panel_title(ax, "c) #2q gates")
+    fig.subplots_adjust(**PANEL_MARGINS)
     fig.savefig(f"{filename}_overhead.pdf", format="pdf")
     plt.close(fig)
+
+    # ---------------- d) relative overhead vs. the ideal circuit ----------------
+    plot_relative_overhead(results, keys, ks_list, f"{filename}_relative.pdf", tools)
 
     # ---------------- legend ----------------
     # Two rows with the same number of entries: methods first, then code distances, filled row by row.
@@ -730,10 +763,73 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
     row1, row2 = handles[:ncols], handles[ncols:]
     row2 += [Patch(visible=False, label="") for _ in range(ncols - len(row2))]
     two_rows = [h for pair in zip(row1, row2) for h in pair]
-    legend_fig = plt.figure(figsize=(4, 2))
-    legend_fig.legend(handles=two_rows, loc="center", frameon=False, ncols=ncols, columnspacing=1.5)
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.4))  # one legend for panels b) - d)
+    legend_fig.legend(handles=two_rows, loc="center", frameon=False, ncols=ncols, columnspacing=1.0,
+                      handlelength=1.2, handletextpad=0.35)
     legend_fig.savefig(f"{filename}legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
+
+
+
+def relative_overhead(results: dict, keys: list[str], ks_list: list[int], tool: str) -> dict[str, float]:
+    """Mean relative increase over the ideal circuit, (compiled - ideal) / ideal, of depth and #2q gates,
+    averaged over all benchmarks and distances where ``tool`` has a result (T/O and N/A runs are left out).
+    Returns {"depth": ..., "gates": ..., "n": #runs}."""
+    rel = {"depth": [], "gates": []}
+    for key in keys:
+        for ks in _ks_for(key, ks_list, results):
+            if _no_result_label(results, tool, key, ks):
+                continue
+            for name, overall, suffix in (("depth", "depth_overall", "depth"), ("gates", "gate_overall", "overhead")):
+                ideal = results[overall][key][ks]
+                extra = results[f"{tool}_{suffix}"].get(key, {}).get(ks)
+                if ideal and extra is not None and extra >= 0:
+                    rel[name].append(extra / ideal)
+    return {"depth": float(np.mean(rel["depth"])) if rel["depth"] else float("nan"),
+            "gates": float(np.mean(rel["gates"])) if rel["gates"] else float("nan"),
+            "n": len(rel["depth"])}
+
+
+def plot_relative_overhead(results: dict, keys: list[str], ks_list: list[int], filename: str, tools) -> None:
+    """d) Relative overhead of every method over the ideal circuit, in depth and #2q gates (one bar group per
+    metric, one bar per method in the method colours of b) and c)). Methods without any result get a hollow
+    bar like in b), c)."""
+    tools = [t for t in tools if t != "ideal"]
+    stats = {t: relative_overhead(results, keys, ks_list, t) for t in tools}
+    for t in tools:
+        print(f"[relative overhead] {TOOL_STYLE[t][0]}: depth +{100 * stats[t]['depth']:.0f} %, "
+              f"#2q gates +{100 * stats[t]['gates']:.0f} % (mean over {stats[t]['n']} runs)")
+    _panel_fonts()
+    fig = plt.figure(figsize=(PANEL_W, PANEL_H))
+    ax = fig.add_subplot(111)
+    x = np.arange(2)
+    width = 0.8 / len(tools)
+    vals = [100 * stats[t][m] for t in tools for m in ("depth", "gates") if stats[t][m] > 0]
+    ymin = 10 ** math.floor(math.log10(min(vals))) if vals else 1
+    ymax = 10 ** math.ceil(math.log10(1.3 * max(vals))) if vals else 100
+    for j, t in enumerate(tools):
+        label, color, hatch = TOOL_STYLE[t]
+        for i, m in enumerate(("depth", "gates")):
+            v = 100 * stats[t][m]
+            xpos = x[i] + (j - (len(tools) - 1) / 2) * width
+            if np.isfinite(v) and v > 0:
+                ax.bar(xpos, v, width, color=color, hatch=hatch, edgecolor="black", linewidth=0.4,
+                       zorder=2)  # pastel base colour of the method (b, c shade it per code distance)
+            else:  # no result in any benchmark: hollow bar, as in b), c)
+                ax.bar(xpos, ymin * 2, width, color="white", hatch="xxx", edgecolor=color,
+                       linewidth=0.8, linestyle="--", zorder=2)
+    ax.set_yscale("log")
+    ax.set_ylim(ymin, ymax)
+    ax.set_xticks(x, ["Depth", "#2q gates"])
+    ax.tick_params(axis="x", which="both", length=0)
+    ax.tick_params(axis="y", length=2.5)
+    ax.set_ylabel("Overhead vs. ideal [%]")
+    ax.grid(True, which="major", axis="y", linestyle="--", linewidth=0.4, alpha=0.5)
+    ax.set_axisbelow(True)
+    _panel_title(ax, "d) Relative overhead")
+    fig.subplots_adjust(**PANEL_MARGINS)
+    fig.savefig(filename, format="pdf")
+    plt.close(fig)
 
 
 # --------------------------------------------------------------------------------------
@@ -741,10 +837,83 @@ def plot_combined_split(results: dict, keys: list[str], ks_list: list[int], file
 # --------------------------------------------------------------------------------------
 
 
+# Stim annotations carried through the Qiskit circuit (and barriers = Stim TICKs). They are not operations, but
+# Qiskit's depth() counts them, and they roughly triple the depth of the input circuits. Methods that drop them
+# (SEQC, MECH) would then look better than the ideal circuit, so depth counts real operations only.
+NON_OPS = {"DETECTOR", "OBSERVABLE_INCLUDE", "SHIFT_COORDS", "QUBIT_COORDS", "TICK", "barrier"}
+
+
+def circuit_depth(circuit) -> int:
+    """Depth over real operations only (no Stim annotations, no barriers), identical for every method."""
+    return circuit.depth(filter_function=lambda ins: ins.operation.name not in NON_OPS)
+
+
 def num_2q_gates(circuit) -> int:
     """All 2-qubit operations (cx, cz, swap, ecr, ...), so every method's native output is counted."""
     return sum(1 for inst in circuit.data
                if inst.operation.num_qubits == 2 and inst.operation.name != "barrier")
+
+
+# --- Stored circuits ----------------------------------------------------------------------
+# Every compiled circuit (and the ideal one) is stored, so metrics can be recomputed later without rerunning
+# the compilations (--recompute-metrics). MECH yields no Qiskit circuit; its saved result holds its own depth.
+CIRCUIT_DIR = RESULTS_DIR / "circuits"
+STORE_CIRCUITS = True  # --no-store-circuits to skip (the QFT circuits are large)
+
+
+def circuit_path(key: str, ks: int, method: str) -> Path:
+    """File of the stored circuit of (benchmark, distance, method); method "ideal" = untranspiled circuit."""
+    return CIRCUIT_DIR / f"{key}_d{DISTANCE_INDEPENDENT.get(key, distance(ks))}_{method}.pkl.gz"
+
+
+def save_circuit(path: Path, circuit) -> None:
+    """gzip-compressed pickle, written to a temp file and moved into place (parallel workers, no half files)."""
+    import gzip
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    with gzip.open(tmp, "wb", compresslevel=3) as f:
+        pickle.dump(circuit, f, protocol=pickle.HIGHEST_PROTOCOL)
+    os.replace(tmp, path)
+
+
+def load_circuit(path: Path):
+    import gzip
+    with gzip.open(path, "rb") as f:
+        return pickle.load(f)
+
+
+def recompute_metrics(results: dict, ks_list: list[int], methods=RUN_TOOLS) -> int:
+    """Recompute depth and #2q-gate metrics of the ideal circuits and every method from the stored circuits
+    (MECH: from the depth in its saved result). Returns the number of updated entries; results are saved."""
+    updated = 0
+    for key in BENCHMARKS:
+        kss = ks_list[:1] if key in DISTANCE_INDEPENDENT else ks_list
+        if key in DISTANCE_INDEPENDENT and results["depth_overall"].get(key):
+            kss = list(results["depth_overall"][key])[:1]
+        for ks in kss:
+            ideal_path = circuit_path(key, ks, "ideal")
+            if not ideal_path.exists():
+                continue
+            qc = load_circuit(ideal_path)
+            depth0, gates0 = circuit_depth(qc), num_2q_gates(qc)
+            results["depth_overall"].setdefault(key, {})[ks] = depth0
+            results["gate_overall"].setdefault(key, {})[ks] = gates0
+            updated += 1
+            for m in methods:
+                if m == "mech":
+                    entry = results["mech_all"].get(key, {}).get(ks)
+                    if isinstance(entry, dict) and entry.get("status") == "ok" and "depth" in entry:
+                        results["mech_depth"].setdefault(key, {})[ks] = entry["depth"] - depth0
+                        updated += 1
+                    continue
+                path = circuit_path(key, ks, m)
+                if path.exists():
+                    circ = load_circuit(path)
+                    results[f"{m}_depth"].setdefault(key, {})[ks] = circuit_depth(circ) - depth0
+                    results[f"{m}_overhead"].setdefault(key, {})[ks] = num_2q_gates(circ) - gates0
+                    updated += 1
+    _save_results(results)
+    return updated
 
 
 def _load_results() -> dict:
@@ -775,13 +944,20 @@ def _save_results(results: dict) -> None:
 # return {metric: value} dicts; only the main process touches `results` and the pickles.
 
 
-def _run_method(method: str, qc, partitions, backend, mech_cfg, timeout: float) -> dict:
-    """Run one transpilation method under the wall-clock limit ``timeout``; return the metrics to store."""
-    depth0, gates0 = qc.depth(), num_2q_gates(qc)
+def _run_method(method: str, qc, partitions, backend, mech_cfg, timeout: float,
+                store: Path | None = None) -> dict:
+    """Run one transpilation method under the wall-clock limit ``timeout``; return the metrics to store.
+    ``store``: file to keep the compiled circuit in (None = do not store)."""
+    depth0, gates0 = circuit_depth(qc), num_2q_gates(qc)
 
     def from_circuit(circ, entry: dict) -> dict:
+        if circ is not None and store is not None:
+            try:
+                save_circuit(store, circ)
+            except Exception as e:  # storing is a convenience; never lose the run because of it
+                print(f"  could not store the circuit ({e!r})")
         return {f"{method}_all": entry,
-                f"{method}_depth": circ.depth() - depth0 if circ is not None else -1,
+                f"{method}_depth": circuit_depth(circ) - depth0 if circ is not None else -1,
                 f"{method}_overhead": num_2q_gates(circ) - gates0 if circ is not None else -1}
 
     if method == "custom":
@@ -801,7 +977,9 @@ def _run_method(method: str, qc, partitions, backend, mech_cfg, timeout: float) 
             mech = {"status": "timeout", "note": "not rerun"}
         ok = mech["status"] == "ok"
         return {"mech_all": mech,
-                "mech_depth": mech["depth_overhead"] if ok else -1,
+                # MECH's own depth has no annotations: compare it with the annotation-free ideal depth
+                # (its "depth_overhead" subtracts the annotated depth and understates the overhead)
+                "mech_depth": mech["depth"] - depth0 if ok else -1,
                 "mech_overhead": mech["2q_gates_overhead"] if ok else -1}
 
     if method in EXTRA_TOOLS:
@@ -810,12 +988,15 @@ def _run_method(method: str, qc, partitions, backend, mech_cfg, timeout: float) 
     raise ValueError(f"Unknown method '{method}' (known: {RUN_TOOLS}).")
 
 
-def generation_job(key: str, ks: int, cache: str | None) -> dict:
-    """Generate the circuit, cache (qc, partitions) for the method jobs, return the ideal statistics."""
+def generation_job(key: str, ks: int, cache: str | None, store: bool = True) -> dict:
+    """Generate the circuit, cache (qc, partitions) for the method jobs, return the ideal statistics.
+    ``store``: also keep the ideal circuit in CIRCUIT_DIR (for --recompute-metrics)."""
     t0 = time.time()
     try:
         circuit, partitions = generate_circuit(key, ks)
         qc = StimCodeCircuit(stim_circuit=circuit).qc
+        if store:
+            save_circuit(circuit_path(key, ks, "ideal"), qc)
         if cache:
             try:
                 with open(cache + ".tmp", "wb") as f:
@@ -826,12 +1007,12 @@ def generation_job(key: str, ks: int, cache: str | None) -> dict:
                 if os.path.exists(cache + ".tmp"):
                     os.remove(cache + ".tmp")
         return {"ok": True, "elapsed_s": time.time() - t0,
-                "metrics": {"depth_overall": qc.depth(), "gate_overall": num_2q_gates(qc)}}
+                "metrics": {"depth_overall": circuit_depth(qc), "gate_overall": num_2q_gates(qc)}}
     except Exception:
         return {"ok": False, "elapsed_s": time.time() - t0, "error": traceback.format_exc()}
 
 
-def method_job(key: str, ks: int, method: str, cache: str | None, timeout: float) -> dict:
+def method_job(key: str, ks: int, method: str, cache: str | None, timeout: float, store: bool = True) -> dict:
     """Run one method on a cached (or regenerated) circuit. Never raises: a crash is returned as an error
     entry *without* depth/overhead, so it is drawn as N/A and --run-missing retries it."""
     timeout = BENCHMARK_TIMEOUT_S.get(key, timeout)
@@ -844,7 +1025,8 @@ def method_job(key: str, ks: int, method: str, cache: str | None, timeout: float
             circuit, partitions = generate_circuit(key, ks)
             qc = StimCodeCircuit(stim_circuit=circuit).qc
         backend, mech_cfg = make_backend(key, ks, partitions)
-        metrics = _run_method(method, qc, partitions, backend, mech_cfg, timeout)
+        metrics = _run_method(method, qc, partitions, backend, mech_cfg, timeout,
+                              store=circuit_path(key, ks, method) if store else None)
         return {"ok": True, "elapsed_s": time.time() - t0, "metrics": metrics}
     except Exception:
         err = traceback.format_exc()
@@ -890,11 +1072,12 @@ def execute_jobs(to_run: dict[tuple[str, int], list[str]], results: dict, jobs: 
     try:
         if jobs <= 1:  # in-process, one job after the other (easiest to debug)
             for (key, ks), methods in to_run.items():
-                gen = generation_job(key, ks, cache_of[(key, ks)])
+                gen = generation_job(key, ks, cache_of[(key, ks)], STORE_CIRCUITS)
                 merge(key, ks, "circuit", gen)
                 if gen["ok"]:
                     for method in methods:
-                        merge(key, ks, method, method_job(key, ks, method, cache_of[(key, ks)], timeout))
+                        merge(key, ks, method, method_job(key, ks, method, cache_of[(key, ks)], timeout,
+                                                          STORE_CIRCUITS))
             return
 
         _limit_threads(threads_per_job)
@@ -903,7 +1086,7 @@ def execute_jobs(to_run: dict[tuple[str, int], list[str]], results: dict, jobs: 
         # still start their own child processes for the time limits.
         ex = ProcessPoolExecutor(max_workers=jobs, mp_context=mp.get_context("spawn"))
         try:
-            pending = {ex.submit(generation_job, key, ks, cache_of[(key, ks)]): (key, ks, "circuit")
+            pending = {ex.submit(generation_job, key, ks, cache_of[(key, ks)], STORE_CIRCUITS): (key, ks, "circuit")
                        for key, ks in to_run}
             while pending:
                 finished, _ = wait(pending, return_when=FIRST_COMPLETED)
@@ -917,7 +1100,8 @@ def execute_jobs(to_run: dict[tuple[str, int], list[str]], results: dict, jobs: 
                     merge(key, ks, what, out)
                     if what == "circuit" and out["ok"]:
                         for method in to_run[(key, ks)]:
-                            f = ex.submit(method_job, key, ks, method, cache_of[(key, ks)], timeout)
+                            f = ex.submit(method_job, key, ks, method, cache_of[(key, ks)], timeout,
+                                          STORE_CIRCUITS)
                             pending[f] = (key, ks, method)
         except KeyboardInterrupt:
             print("Interrupted: finished jobs are saved; rerun with --run-missing to continue.")
@@ -956,7 +1140,8 @@ def _missing(results: dict, ks_list: list[int], methods) -> dict[tuple[str, int]
 
 def run_exp_statistics(reproduce: list[str] | None = None, ks_list: list[int] | None = None,
                        run_missing: bool = False, methods=RUN_TOOLS, show=ALL_TOOLS,
-                       jobs: int = 1, threads_per_job: int = 1, timeout: float | None = None) -> None:
+                       jobs: int = 1, threads_per_job: int = 1, timeout: float | None = None,
+                       recompute: bool = False) -> None:
     """Plot the saved results for all distances in ``ks_list``. By default nothing is run.
 
     :param reproduce: benchmarks to (re)run with ``methods`` before plotting, for every distance in ``ks_list``
@@ -971,6 +1156,10 @@ def run_exp_statistics(reproduce: list[str] | None = None, ks_list: list[int] | 
     methods = [t for t in RUN_TOOLS if t in methods]
     timeout = METHOD_TIMEOUT_S if timeout is None else timeout
     results = _load_results()
+
+    if recompute:  # metrics from the stored circuits, no compilation
+        n = recompute_metrics(results, ks_list)
+        print(f"Recomputed {n} entries from the stored circuits in {CIRCUIT_DIR}")
 
     to_run: dict[tuple[str, int], list[str]] = {}
     for key in reproduce or []:
@@ -1025,10 +1214,16 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", type=float, default=METHOD_TIMEOUT_S,
                         help=f"wall-clock limit per method run in seconds, for all methods "
                              f"(default {METHOD_TIMEOUT_S:.0f}); longer runs are killed and shown as T/O")
+    parser.add_argument("--recompute-metrics", action="store_true",
+                        help="recompute depth / #2q gates from the stored circuits (no compilation), then plot")
+    parser.add_argument("--no-store-circuits", action="store_true",
+                        help=f"do not keep the compiled circuits in {CIRCUIT_DIR}")
     args = parser.parse_args()
+    STORE_CIRCUITS = not args.no_store_circuits
     if any(d < 3 or d % 2 == 0 for d in args.distances):
         parser.error("--distances must be odd and >= 3")
     to_run = None if args.reproduce is None else (args.reproduce or BENCHMARKS)
     run_exp_statistics(reproduce=to_run, ks_list=[(d - 1) // 2 for d in args.distances],
                        run_missing=args.run_missing, methods=args.methods, show=args.show,
-                       jobs=args.jobs, threads_per_job=args.threads_per_job, timeout=args.timeout)
+                       jobs=args.jobs, threads_per_job=args.threads_per_job, timeout=args.timeout,
+                       recompute=args.recompute_metrics)

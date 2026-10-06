@@ -188,7 +188,8 @@ def calc_circuit_qiskit_stats(
     cross_chip_gate_weight = 7.4
 
     # Decompose swap gates
-    filter_function = lambda gate: gate.operation.num_qubits >= 2
+    # Two-qubit depth; barriers (multi-qubit, kept by some methods only) and annotations are not counted
+    filter_function = lambda gate: gate.operation.num_qubits >= 2 and gate.operation.name not in NON_OPS
     swap_decomposed_circuit = transpiled_circuit.decompose("swap")
 
     # Calculate depth
@@ -199,8 +200,8 @@ def calc_circuit_qiskit_stats(
     within_chip_cnots = 0
     cross_chip_cnots = 0
     for instr, qargs, cargs in swap_decomposed_circuit.data:
-        # Only care about 2-qubit gates
-        if instr.num_qubits < 2:
+        # Only care about 2-qubit gates (not barriers / annotations)
+        if instr.num_qubits != 2 or instr.name in NON_OPS:
             continue
 
         # Extract physical qubit indices
@@ -210,14 +211,13 @@ def calc_circuit_qiskit_stats(
         idx_qubit_dict = gen_idx_qubit_dict(G)
         edge = (idx_qubit_dict[q1], idx_qubit_dict[q2])
 
-        if instr.name in ["cx", "cp"] and G.edges[edge]["type"] == "on_chip":
-            within_chip_cnots += 1
-        elif instr.name == "swap" and G.edges[edge]["type"] == "on_chip":
-            within_chip_cnots += 3
-        elif instr.name in ["cx", "cp"] and G.edges[edge]["type"] == "cross_chip":
-            cross_chip_cnots += 1
-        elif instr.name == "swap" and G.edges[edge]["type"] == "cross_chip":
-            cross_chip_cnots += 3
+        # Every two-qubit gate counts (cx, cz, cp, ...: the input counter counts all of them too); a SWAP that
+        # survived the decomposition counts as 3
+        weight = 3 if instr.name == "swap" else 1
+        if G.edges[edge]["type"] == "on_chip":
+            within_chip_cnots += weight
+        elif G.edges[edge]["type"] == "cross_chip":
+            cross_chip_cnots += weight
 
     # Calculate effective number of CNOT gates (for calculation, see section 7.1 of "MECH: Multi-Entry Communication Highway for Superconducting Quantum Chiplets")
     norm_cnots = within_chip_cnots + cross_chip_cnots * cross_chip_gate_weight
@@ -225,12 +225,7 @@ def calc_circuit_qiskit_stats(
     if qeccsynth_result == None and initial_circuit != None:
         # Calculate gate overhead using initial circuit
 
-        def num_2q_gates(circuit):
-            ops = circuit.count_ops()
-            two_qubit_gate_names = ["cx", "cz", "swap"]
-            return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
-        two_qubit_overhead = (within_chip_cnots + cross_chip_cnots) - num_2q_gates(initial_circuit)
+        two_qubit_overhead = (within_chip_cnots + cross_chip_cnots) - count_2q_gates(initial_circuit)
 
         result_qiskit = {
             "2q_gates_overhead": two_qubit_overhead,
@@ -262,6 +257,27 @@ def calc_circuit_qiskit_stats(
         }
 
     return result_qiskit
+
+
+# Stim annotations carried through the Qiskit circuit (and barriers = Stim TICKs). They are not operations,
+# and some methods drop them (SEQC, OLSQ2, MECH) while others keep them (SABRE, Murali et al.). Depths and gate
+# counts therefore ignore them, so every method is measured the same way.
+NON_OPS = {"DETECTOR", "OBSERVABLE_INCLUDE", "SHIFT_COORDS", "QUBIT_COORDS", "TICK", "barrier"}
+
+
+def _is_op(ins) -> bool:
+    return ins.operation.name not in NON_OPS
+
+
+def count_2q_gates(circuit) -> int:
+    """Every two-qubit operation (cx, cz, cp, swap, ecr, ...), barriers and annotations excluded; the same
+    count for the input and every method's output."""
+    return sum(1 for ins in circuit.data if ins.operation.num_qubits == 2 and _is_op(ins))
+
+
+def circuit_depth(circuit) -> int:
+    """Depth over real operations only (no annotations, no barriers)."""
+    return circuit.depth(filter_function=_is_op)
 
 
 def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
@@ -313,12 +329,7 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
                 else:
                     on_chip_gate_num += 1
 
-    def num_2q_gates(circuit):
-        ops = circuit.count_ops()
-        two_qubit_gate_names = ["cx", "cz", "swap"]
-        return sum(ops.get(g, 0) for g in two_qubit_gate_names)
-
-    initial_2q_gates = num_2q_gates(initial_circuit)
+    initial_2q_gates = count_2q_gates(initial_circuit)
 
     # Calculate effective number of CNOT gates (for calculation, see section 7.1 of "MECH: Multi-Entry Communication Highway for Superconducting Quantum Chiplets")
     eff_gate_num = on_chip_gate_num + cross_chip_gate_num * cross_chip_gate_weight + meas_num * meas_weight
@@ -327,7 +338,8 @@ def calc_circuit_mech_stats(router: Router, initial_circuit) -> dict:
     result_mech = {
         "initial_2q_gates": initial_2q_gates,
         "depth": router.circuit.depth,
-        "depth_overhead": router.circuit.depth - initial_circuit.depth(),
+        # MECH's own depth has no annotations: compare with the annotation-free depth of the input
+        "depth_overhead": router.circuit.depth - circuit_depth(initial_circuit),
         "2q_gates_overhead": (on_chip_gate_num + cross_chip_gate_num) - initial_2q_gates,
         "eff_gate_num": eff_gate_num,
         "on-chip": on_chip_gate_num,

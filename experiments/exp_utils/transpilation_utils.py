@@ -40,7 +40,7 @@ from qiskit.transpiler import CouplingMap, Target  # noqa: E402
 
 # Wall-clock limit per (method, distance) for *every* method: a run that takes longer is killed and
 # marked TIMEOUT. Timed-out bars in the runtime plots are drawn at this height.
-TIMEOUT_S = 30000.0
+TIMEOUT_S = 10000.0
 
 # Time a child process may spend starting up (spawn, imports, unpickling the arguments) before the
 # transpilation clock starts. Not counted towards TIMEOUT_S.

@@ -20,6 +20,13 @@ from matplotlib.ticker import MaxNLocator
 from pathlib import Path
 
 
+# Panel geometry, identical to experiment_statistics (panels b - d): four panels across the full text width
+TEXT_WIDTH_IN = 7.0
+PANEL_W = TEXT_WIDTH_IN / 4           # 1.75 in
+PANEL_H = 1.6
+FONT_PT = 7
+PANEL_MARGINS = dict(left=0.27, right=0.97, top=0.80, bottom=0.24)
+
 def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     # Extract sorted x values
     np_values = sorted(custom_time_storage.keys())
@@ -28,30 +35,28 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     # Gather all ks values
     ks_values = sorted({ks for d in custom_time_storage.values() for ks in d.keys()})
 
-    tex_fonts = {
-        # Use LaTeX to write all text
-        # "text.usetex": True,
+    # Panel a) of the statistics row: drawn at its printed size like panels b) - d) of experiment_statistics
+    # (1.75 x 1.6 in, 7 pt, same margins), so the four panels line up; include at natural width, no scaling.
+    plt.rcParams.update({
         "font.family": "serif",
-        # Font sizes
-        "axes.labelsize": FONTSIZE * 1.5,
-        "font.size": FONTSIZE * 1.2,
-        "legend.fontsize": (FONTSIZE - 2) * 1.5,
-        "xtick.labelsize": (FONTSIZE - 1) * 1.5,
-        "ytick.labelsize": (FONTSIZE - 1) * 1.5,
-        "axes.titlesize": 10,
-        # Line and marker styles
-        "lines.linewidth": 2,
-        "lines.markersize": 6,
-        "lines.markeredgewidth": 1.5,
+        "font.size": FONT_PT,
+        "axes.labelsize": FONT_PT,
+        "axes.titlesize": FONT_PT,
+        "legend.fontsize": FONT_PT,
+        "xtick.labelsize": FONT_PT - 1,
+        "ytick.labelsize": FONT_PT - 1,
+        "xtick.major.size": 2.5, "ytick.major.size": 2.5, "ytick.minor.size": 1.5,
+        "xtick.major.pad": 2, "ytick.major.pad": 2,
+        "axes.labelpad": 2,
+        "axes.linewidth": 0.6,
+        "lines.linewidth": 1.0,
+        "lines.markersize": 3,
+        "lines.markeredgewidth": 0.6,
         "lines.markeredgecolor": "black",
-        # Error bar cap size
-        "errorbar.capsize": 3,
-    }
+        "errorbar.capsize": 1.5,
+    })
 
-    plt.rcParams.update(tex_fonts)
-
-    fig, ax = plt.subplots(figsize=(HEIGHT_FIGSIZE * 2.5, WIDTH_FIGSIZE * 0.5))
-    #fig, ax = plt.subplots(figsize=((HEIGHT_FIGSIZE * 2.5)*2, (WIDTH_FIGSIZE * 0.5)))
+    fig, ax = plt.subplots(figsize=(PANEL_W, PANEL_H))
 
     colors_custom = ["#8FB7E1", "#5E97CC", "#3B6FA8", "#2D5682"]
     colors_sabre = ["#E38E8A", "#C85E59", "#9F3B36", "#6D2926"]
@@ -89,16 +94,10 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
 
     # plt.axvline(x=3)
 
-    ax.text(-0.01, 1.025, "a) Number of CNOTs affecting runtime", transform=ax.transAxes, fontweight="bold")
-
-    ax.text(
-        0.3,
-        1.15,
-        "Lower is better ↓",
-        transform=ax.transAxes,
-        fontweight="bold",
-        color=plot_lib_color,
-    )
+    # Title and "better" hint centred on the plot rectangle, as in panels b) - d)
+    ax.text(0.5, 1.03, "a) Runtime scaling", transform=ax.transAxes, fontweight="bold", ha="center", va="bottom")
+    ax.text(0.5, 1.16, "Lower is better ↓", transform=ax.transAxes, fontweight="bold", color=plot_lib_color,
+            ha="center", va="bottom")
 
     # description = ("routing_method = basic")
     # ax.text(
@@ -110,22 +109,21 @@ def plot_combined(custom_time_storage, sabre_time_storage, filename: str = ""):
     plt.ylim(0.05, 1e4)
 
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.tick_params(axis="both", labelsize=14)
-
-    plt.xlabel("Number of CNOTs", fontsize=FONTSIZE * 1.5)
-    plt.ylabel("Runtime [s]", fontsize=FONTSIZE * 1.5)
+    plt.xlabel("Number of CNOTs")
+    plt.ylabel("Runtime [s]")
     plt.yscale("log")
 
     # plt.grid(True)
-    plt.grid(True, which="major", linestyle="--", alpha=0.5)
+    plt.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
     # ax.legend(loc='lower right', ncol=2)
     # plt.tight_layout()
-    fig.subplots_adjust(left=0.16, right=0.95, top=0.83, bottom=0.21)
+    fig.subplots_adjust(**PANEL_MARGINS)
     plt.savefig(filename, format="pdf")
     plt.close(fig)
 
-    legend_fig = plt.figure(figsize=(3, 2))
-    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=4, columnspacing=1.5)
+    legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN, 0.4))
+    legend = legend_fig.legend(handles=handles, loc="center", frameon=False, ncols=4, columnspacing=1.0,
+                               handlelength=1.8, handletextpad=0.4)
     legend_fig.savefig(filename + "legend.pdf", bbox_inches="tight", format="pdf")
     plt.close(legend_fig)
 
@@ -349,7 +347,11 @@ def run_single_run():
 
 
 if __name__ == "__main__":
-    run_exp_scalability(reproduce=False)
-    #run_exp_scalability(reproduce=False)
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Panel a): Chipmunq vs. LightSABRE runtime for #CNOTs and distances")
+    ap.add_argument("--plot-only", action="store_true", help="only replot the saved timings (no compilation)")
+    a = ap.parse_args()
+    run_exp_scalability(reproduce=not a.plot_only)
 
     # run_single_run()

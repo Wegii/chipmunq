@@ -6,9 +6,17 @@ Part 1 -- a) circuit depth, b) #2q gates, c) chiplet utilization:
     size-aware placement).
 
 Part 3 -- d) LER of the two placement strategies:
-    LER of the distributed lattice-surgery CNOT after Chipmunq compilation with center and size-aware placement on
-    the single-patch chiplet backend of a-c, for several code distances and numbers of defective qubits. Both
-    strategies are compiled on the same backend (same defects) for every defect placement.
+    LER of the distributed lattice-surgery CNOT after Chipmunq compilation with center and size-aware placement,
+    for several code distances and numbers of defective qubits, on the single-patch chiplet backend of a-c
+    (one patch per chiplet) and/or the multi-patch backend (several patches share a chiplet). Both strategies
+    are compiled on the same backend (same defects) for every defect placement. The LER is plotted relative to
+    the untranspiled CNOT circuit (same d, p and noise model); the absolute LER goes to *_abs.pdf. The untranspiled
+    reference is simulated only for (d, p) points missing from the saved results. One panel per backend:
+        single patch -> combined_overhead_placement_ler.pdf
+        multi patch  -> combined_overhead_placement_ler_multi.pdf
+    Select the backends with --placement-backends single multi (default: both). Results of backends that are
+    not rerun are kept in the pickle, so e.g. `--part placement --placement-backends multi` adds the multi-patch
+    results to existing single-patch results.
 
 Part 2 -- c) LER of avoiding vs. deforming (own figure, own legend), plus the utilization tradeoff:
     Defect avoidance (Chipmunq) vs. patch deformation with super-stabilizers (Lin et al., ASPLOS'24 [1]).
@@ -40,16 +48,19 @@ Part 2 -- c) LER of avoiding vs. deforming (own figure, own legend), plus the ut
     [2] https://github.com/SophLin/superstabilizer_demo  (clone into external/baseline/superstabilizer_demo;
         only needed to run part 2)
 
+Sampling: at most 100k shots per circuit by default (parts 2 and 3); override with --max-shots.
+
 All panels are drawn at their printed size for four panels side by side across the full page width. One legend
 (combined_overheadlegend.pdf) covers panels a-d, the deformation comparison has its own
 (combined_overhead_deformationlegend.pdf); both depend only on the styles below, so they are written on every run,
 also with --plot-only and for a single --part.
 
 Run from the repo root:
-    python experiments/scalability_exps/experiment_defective_qubits.py                    # both parts
-    python experiments/scalability_exps/experiment_defective_qubits.py --plot-only        # replot both
+    python experiments/scalability_exps/experiment_defective_qubits.py                    # all parts
+    python experiments/scalability_exps/experiment_defective_qubits.py --plot-only        # replot all
     python experiments/scalability_exps/experiment_defective_qubits.py --part compile     # a-c only
-    python experiments/scalability_exps/experiment_defective_qubits.py --part placement [--quick]  # d only
+    python experiments/scalability_exps/experiment_defective_qubits.py --part placement [--quick]  # d, both backends
+    python experiments/scalability_exps/experiment_defective_qubits.py --part placement --placement-backends multi
     python experiments/scalability_exps/experiment_defective_qubits.py --part deformation [--jobs N] [--quick]
 """
 from __future__ import annotations
@@ -77,6 +88,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pymatching
+import sinter
 import stim
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
@@ -94,6 +106,9 @@ PANEL_H = 1.6
 FONT_PT = 7
 # identical margins for all panels, so the axes line up when placed next to each other
 MARGINS = dict(left=0.27, right=0.97, top=0.80, bottom=0.24)
+
+# Maximum shots per simulated circuit (parts 2 and 3); --max-shots overrides it
+DEFAULT_MAX_SHOTS = 100_000
 
 # --------------------------------------------------------------------------------------
 # Bar styles of panels a-c, shared with the single legend (save_legend). Every entry of the legend must have
@@ -691,7 +706,7 @@ L_VALUES = [D_TARGET, D_TARGET + 2]   # tight chiplet / chiplet with slack
 DEFECTS = [0, 1, 2, 3, 5, 8]          # defective qubits per chiplet (0-3 as in Fig. 10 a-c, plus higher)
 N_SAMPLES = 20                        # random defect placements per (L, k)
 P_PHYS = 1e-3                         # 2q gate error; 1q = 0.8 p, readout = 8/15 p (noise model of [1])
-MAX_SHOTS, MAX_ERRORS, BATCH = 2_000_000, 100, 50_000
+MAX_SHOTS, MAX_ERRORS, BATCH = DEFAULT_MAX_SHOTS, 100, 50_000
 OUT_DIR = Path("experiments/evaluation/defective_qubits")
 DEFORM_PKL = OUT_DIR / "defect_deformation.pkl"
 
@@ -772,9 +787,9 @@ def per_cycle(errors: int, shots: int, cycles: int) -> float:
     return 1 - (1 - P) ** (1 / cycles)
 
 
-def run_deformation(jobs: int, quick: bool) -> dict:
+def run_deformation(jobs: int, quick: bool, max_shots: int | None = None) -> dict:
     n_samples = 4 if quick else N_SAMPLES
-    max_shots = 200_000 if quick else MAX_SHOTS
+    max_shots = max_shots or (20_000 if quick else MAX_SHOTS)
     rounds = D_TARGET
 
     # --- Build all circuits (cheap, serial) ------------------------------------------
@@ -823,8 +838,8 @@ def run_deformation(jobs: int, quick: bool) -> dict:
     circ_list = sorted(circuits, key=circuits.get)
     seeds = np.random.SeedSequence(994).generate_state(len(circ_list), dtype=np.uint32)
     tasks = [(c, int(seed), max_shots, MAX_ERRORS, BATCH) for c, seed in zip(circ_list, seeds)]
-    print(f"{len(rows)} (method, L, k, sample) points, {len(tasks)} distinct circuits on {jobs} workers",
-          flush=True)
+    print(f"{len(rows)} (method, L, k, sample) points, {len(tasks)} distinct circuits on {jobs} workers, "
+          f"<= {max_shots} shots each", flush=True)
     t0 = time.time()
     for var in ("RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ.setdefault(var, "1")
@@ -991,22 +1006,47 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
 # Part 3: placement strategy (center / size-aware) vs. LER (Fig. 10 d)
 # ######################################################################################
 PLACEMENT_KS = [1, 2, 3]                       # d = 2k + 1 -> 3, 5, 7
-PLACEMENT_DEFECTS = [1, 3]                     # defective qubits per chiplet
+PLACEMENT_DEFECTS = [0, 1, 3]                  # defective qubits per chiplet (0 = compilation overhead only)
 PLACEMENT_PS = list(np.logspace(-3, -2, 6))    # 1e-3 ... 1e-2, 6 points
 PLACEMENT_SEEDS = 4                            # defect placements (backends) per (d, #defects)
-PLACEMENT_MAX_SHOTS, PLACEMENT_MAX_ERRORS = 1_000_000, 500
+PLACEMENT_MAX_SHOTS, PLACEMENT_MAX_ERRORS = DEFAULT_MAX_SHOTS, 500
 PLACEMENT_P_INTER = 1e-4                       # inter-chiplet noise, as in a-c
 PLACEMENT_MAX_BACKEND_RETRIES = 20
 PLACEMENT_PKL = OUT_DIR / "placement_ler.pkl"
-PLACEMENTS = [("center", COLORS_CUSTOM[0]), ("size_aware", COLORS_CUSTOM[1])]  # colours of a-c (single patch)
+PLACEMENT_MODES = ["center", "size_aware"]
+# Backends: single patch (one patch per chiplet) and multi patch (several patches share a chiplet), as in a-c.
+# Colours per backend match a-c: single patch = blues, multi patch = greys (same legend entries).
+PLACEMENT_BACKENDS = ["single_patch", "multi_patch"]
+PLACEMENT_COLORS = {
+    "single_patch": {"center": COLORS_CUSTOM[0], "size_aware": COLORS_CUSTOM[1]},
+    "multi_patch": {"center": COLORS_CUSTOM[2], "size_aware": COLORS_CUSTOM[3]},
+}
+# Output file and panel title per backend (single patch keeps the file name of the previous version)
+PLACEMENT_FILES = {"single_patch": "_placement_ler.pdf", "multi_patch": "_placement_ler_multi.pdf"}
+PLACEMENT_TITLES = {"single_patch": "d) Mapping effect on LER", "multi_patch": "d) Mapping effect on LER"}
 PLACEMENT_MARKERS = {3: "v", 5: "o", 7: "s", 9: "D"}
-PLACEMENT_DEFECT_LS = {1: "-", 2: "-.", 3: "--", 5: ":"}
+PLACEMENT_DEFECT_LS = {0: ":", 1: "-", 2: "-.", 3: "--", 5: (0, (3, 1, 1, 1))}
+IDEAL_COLOR = "black"  # untranspiled reference
+IDEAL_LS = (0, (4, 1.5, 1, 1.5, 1, 1.5))  # dash-dot-dot: distinct from the #defects line styles
 
 
-def _placement_backend(k: int, n_defects: int, seed: int) -> BackendChipletV2:
-    """Single-patch chiplets (one patch per chiplet) as in a-c, sized for distance scale k."""
+def _chiplet_dims(k: int, bc: str) -> tuple[int, int]:
+    """Chiplet rows x cols for distance scale k (d = 2k + 1).
+
+    single patch: (11 + 4(k-1)) x (6 + 2(k-1)) -> 15 x 8 at d = 5 (a-c), fits one patch.
+    multi patch:  single + (4k, 2k + 2)        -> 23 x 14 at d = 5 (a-c); the extra rows/columns scale
+                  with d, so several patches fit on one chiplet at every distance.
+    """
+    rows, cols = 11 + 4 * (k - 1), 6 + 2 * (k - 1)
+    if bc == "multi_patch":
+        rows, cols = rows + 4 * k, cols + 2 * k + 2
+    return rows, cols
+
+
+def _placement_backend(k: int, n_defects: int, seed: int, bc: str = "single_patch") -> BackendChipletV2:
+    """Chiplet backend for distance scale k with one (single_patch) or several (multi_patch) patches per chiplet."""
     return BackendChipletV2(
-        size=(6, 6, 11 + 4 * (k - 1), 6 + 2 * (k - 1)),
+        size=(6, 6, *_chiplet_dims(k, bc)),
         n_inter=2 * k + 3,
         connectivity="nn",
         topology="rotated_grid",
@@ -1019,24 +1059,24 @@ def _placement_backend(k: int, n_defects: int, seed: int) -> BackendChipletV2:
 
 
 def _placement_job(job):
-    """Compile one (d, #defects, defect placement) with both strategies on the same backend and build the noisy
-    circuits for every physical error rate. Module level: runs in a spawned worker. If both strategies give the
-    identical circuit, it is returned once (simulated once, counted for both)."""
-    k, n_def, s, circuit_str, partitions, ps = job
+    """Compile one (backend, d, #defects, defect placement) with both strategies on the same backend and build
+    the noisy circuits for every physical error rate. Module level: runs in a spawned worker. If both strategies
+    give the identical circuit, it is returned once (simulated once, counted for both)."""
+    bc, k, n_def, s, circuit_str, partitions, ps = job
     qc = StimCodeCircuit(stim_circuit=stim.Circuit(circuit_str)).qc
     retries = 0
     for attempt in range(PLACEMENT_MAX_BACKEND_RETRIES):
         seed = 1000 * s + 42 + attempt
-        backend = _placement_backend(k, n_def, seed)
+        backend = _placement_backend(k, n_def, seed, bc)
         try:
             compiled = {pp: str(get_stim_circuits_with_detectors(custom_cost_transpilation(
                 qc, backend, pre_defined_partitions=partitions, patch_initialization=pp))[0][0])
-                for pp, _ in PLACEMENTS}
+                for pp in PLACEMENT_MODES}
             break
         except Exception:
             retries += 1
     else:
-        raise RuntimeError(f"No backend for d={2 * k + 1} with {n_def} defects could be compiled")
+        raise RuntimeError(f"No {bc} backend for d={2 * k + 1} with {n_def} defects could be compiled")
     groups = {}  # circuit -> placements producing it
     for pp, circ in compiled.items():
         groups.setdefault(circ, []).append(pp)
@@ -1046,87 +1086,384 @@ def _placement_job(job):
         for p in ps:
             noisy = get_noise_model("modsi1000", None, p, None, remote=backend.inter_chiplet_connections).noisy_circuit(c)
             out.append((pps, p, str(noisy)))
-    return dict(k=k, n_def=n_def, s=s, seed=seed, retries=retries, circuits=out)
+    return dict(bc=bc, k=k, n_def=n_def, s=s, seed=seed, retries=retries, circuits=out)
 
 
-def run_placement(quick: bool = False, jobs: int | None = None) -> list:
-    """Compile every (d, #defects, defect placement) with both placement strategies on the same backend (in
-    parallel, noisy circuits built in the workers) and simulate the LER. A backend seed is only used if both
-    strategies can place all patches; identical circuits of the two strategies are simulated once."""
+def _stat_backend(st) -> str:
+    """Backend of a sinter stat; results from before the multi-patch option are single-patch."""
+    return st.json_metadata.get("backend", "single_patch")
+
+
+def run_placement(quick: bool = False, jobs: int | None = None, backends=None,
+                  max_shots: int | None = None, defects=None) -> list:
+    """Compile every (backend, d, #defects, defect placement) with both placement strategies on the same backend
+    (in parallel, noisy circuits built in the workers) and simulate the LER. A backend seed is only used if both
+    strategies can place all patches; identical circuits of the two strategies are simulated once.
+
+    Saved results of other (backend, #defects) combinations are kept, so backends and defect counts can be run
+    separately (e.g. only the 0-defect baseline)."""
+    backends = list(backends or PLACEMENT_BACKENDS)
+    defects = list(PLACEMENT_DEFECTS if defects is None else defects)
     ks = [1] if quick else PLACEMENT_KS
     n_seeds = 1 if quick else PLACEMENT_SEEDS
     ps = [2e-3, 5e-3] if quick else PLACEMENT_PS
-    max_shots, max_errors = (20_000, 100) if quick else (PLACEMENT_MAX_SHOTS, PLACEMENT_MAX_ERRORS)
+    max_errors = 100 if quick else PLACEMENT_MAX_ERRORS
+    max_shots = max_shots or (20_000 if quick else PLACEMENT_MAX_SHOTS)
 
     sources = {}
     for k in ks:
         circuit, partitions = get_tqec_cnot_rotated(distance_scale=k, n1=1, n2=0)
         sources[k] = (str(circuit), partitions)
-    job_list = [(k, n_def, s, *sources[k], ps) for k in ks for n_def in PLACEMENT_DEFECTS for s in range(n_seeds)]
-    jobs = min(jobs or os.cpu_count() or 1, len(job_list))
-    print(f"Fig. 10 d: {len(job_list)} backends (x {len(PLACEMENTS)} placements) on {jobs} workers", flush=True)
+    # Without defects all seeds give the same backend: one sample is enough for the baseline
+    job_list = [(bc, k, n_def, s, *sources[k], ps) for bc in backends for k in ks
+                for n_def in defects for s in range(n_seeds if n_def > 0 else 1)]
+    jobs = jobs or os.cpu_count() or 1
+    print(f"Fig. 10 d ({', '.join(backends)}; defects {defects}): {len(job_list)} backends "
+          f"(x {len(PLACEMENT_MODES)} placements) "
+          f"on {min(jobs, len(job_list))} workers, <= {max_shots} shots per circuit", flush=True)
     tasks, shared = [], 0
-    with _capped_pool(jobs) as pool:
+    with _capped_pool(max(1, min(jobs, len(job_list)))) as pool:
         for r in pool.imap_unordered(_placement_job, job_list, chunksize=1):
             d = 2 * r["k"] + 1
-            print(f"[d={d}, {r['n_def']} defects, sample {r['s']}] backend seed {r['seed']} "
+            print(f"[{r['bc']}, d={d}, {r['n_def']} defects, sample {r['s']}] backend seed {r['seed']} "
                   f"({r['retries']} rejected)", flush=True)
             for pps, p, noisy in r["circuits"]:
                 shared += len(pps) > 1
                 tasks.append(sinter.Task(circuit=stim.Circuit(noisy), json_metadata={
-                    "placements": pps, "placement": pps[0], "d": d, "defects": r["n_def"], "sample": r["s"],
-                    "p": p, "backend_seed": r["seed"]}))
+                    "backend": r["bc"], "placements": pps, "placement": pps[0], "d": d, "defects": r["n_def"],
+                    "sample": r["s"], "p": p, "backend_seed": r["seed"]}))
     print(f"{len(tasks)} sinter tasks ({shared} shared by both placements: identical circuits)", flush=True)
 
-    stats = sinter.collect(num_workers=multiprocessing.cpu_count(), tasks=tasks, max_shots=max_shots,
+    # Untranspiled reference (baseline of the relative LER): the original CNOT circuit with the same noise model,
+    # without routing and without inter-chiplet links. Independent of backend, placement and defects, so it is
+    # only simulated for (d, p) points that are not in the saved results yet.
+    old = []
+    if PLACEMENT_PKL.exists():
+        with open(PLACEMENT_PKL, "rb") as f:
+            old = pickle.load(f)
+    have_ideal = {(st.json_metadata["d"], st.json_metadata["p"]) for st in old if _stat_backend(st) == "ideal"}
+    n_ideal = 0
+    for k in ks:
+        d = 2 * k + 1
+        ideal = get_stim_circuits_with_detectors(StimCodeCircuit(stim_circuit=stim.Circuit(sources[k][0])).qc)[0][0]
+        for p in ps:
+            if (d, p) in have_ideal:
+                continue
+            noisy = get_noise_model("modsi1000", None, p, None, remote=[]).noisy_circuit(ideal)
+            tasks.append(sinter.Task(circuit=noisy, json_metadata={
+                "backend": "ideal", "placements": ["ideal"], "placement": "ideal", "d": d, "defects": -1,
+                "sample": 0, "p": p, "backend_seed": None}))
+            n_ideal += 1
+    print(f"{n_ideal} untranspiled reference tasks", flush=True)
+
+    stats = sinter.collect(num_workers=jobs, tasks=tasks, max_shots=max_shots,
                            max_errors=max_errors, decoders=["pymatching"], print_progress=True)
+    stats = list(stats)
+
+    # Keep the saved results of the (backend, #defects) combinations that were not rerun (and the untranspiled
+    # reference, which is only ever added for missing (d, p) points)
+    if old:
+        kept = [st for st in old
+                if not (_stat_backend(st) in backends and st.json_metadata["defects"] in defects)]
+        if kept:
+            combos = sorted({(_stat_backend(st), st.json_metadata["defects"]) for st in kept})
+            print(f"Keeping {len(kept)} saved results of " + ", ".join(f"{b}/{n} defects" for b, n in combos),
+                  flush=True)
+        stats = kept + stats
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(PLACEMENT_PKL, "wb") as f:
         pickle.dump(stats, f)
     return stats
 
 
-def plot_placement(stats, filename=str(OUT_DIR / "combined_overhead")) -> None:
-    """d) LER vs. physical error rate: colour = placement, marker = code distance, line style = #defects.
-    Each point is the mean LER over the defect placements; points without observed errors are not shown."""
+def _placement_ler(stats, bc: str) -> dict:
+    """{(placement, d, #defects, p): [LER per defect placement]} for one backend."""
     ler = defaultdict(list)
     for st in stats:
+        if _stat_backend(st) != bc:
+            continue
         n = st.shots - st.discards
         if n > 0:
             m = st.json_metadata
             for pp in m.get("placements", [m["placement"]]):  # identical circuits count for both placements
                 ler[(pp, m["d"], m["defects"], m["p"])].append(st.errors / n)
-    ps = sorted({k[3] for k in ler})
-    ds = sorted({k[1] for k in ler})
-    defects = sorted({k[2] for k in ler})
-    _fonts()
-    fig, ax = _panel()
-    for pp, color in PLACEMENTS:
-        for d in ds:
-            for nd in defects:
-                pts = [(p, np.mean(ler[(pp, d, nd, p)])) for p in ps if ler.get((pp, d, nd, p))]
-                pts = [(p, v) for p, v in pts if v > 0]
-                if not pts:
-                    continue
-                xs, ys = zip(*pts)
-                ax.plot(xs, ys, color=color, linestyle=PLACEMENT_DEFECT_LS.get(nd, "-"),
-                        marker=PLACEMENT_MARKERS.get(d, "P"), markerfacecolor=color, markeredgecolor="black",
-                        markeredgewidth=0.4, linewidth=1.1)
+    return ler
+
+
+def _centered_title(fig, ax, text: str, y: float = 1.03, margin_in: float = 0.03):
+    """Bold panel title centred over the axes, shifted just enough to stay inside the figure when it is wider
+    than the axes (the 1.75 in panels leave little room on the right)."""
+    from matplotlib.transforms import blended_transform_factory
+    trans = blended_transform_factory(fig.transFigure, ax.transAxes)
+    pos = ax.get_position()
+    t = ax.text((pos.x0 + pos.x1) / 2, y, text, transform=trans, fontweight="bold", ha="center", va="bottom")
+    fig.canvas.draw()
+    half = t.get_window_extent().width / fig.bbox.width / 2   # half title width, figure fraction
+    margin = margin_in / fig.get_figwidth()
+    t.set_x(min(max(t.get_position()[0], half + margin), 1 - half - margin))
+    return t
+
+
+def plot_placement(stats, filename=str(OUT_DIR / "combined_overhead"), backends=None) -> None:
+    """d) LER relative to the untranspiled circuit vs. physical error rate, one panel per backend:
+    colour = placement, marker = code distance, line style = #defects (0 defects = compilation overhead only).
+
+    Each point is mean LER(placement, d, #defects, p) over the defect placements divided by the LER of the
+    untranspiled CNOT circuit (same d, p and noise model, no routing / inter-chiplet links); 1 = no LER increase
+    due to compilation and defects. Points without observed errors are not shown. The absolute LER, including the
+    untranspiled reference in black, is also written (file name with "_abs")."""
+    ideal = _placement_ler(stats, "ideal")
+    ideal = {(d, p): np.mean(v) for (_, d, _, p), v in ideal.items()}
+    available = [b for b in PLACEMENT_BACKENDS if any(_stat_backend(st) == b for st in stats)]
+    for bc in (b for b in (backends or PLACEMENT_BACKENDS) if b not in available):
+        print(f"No placement results for {bc}: run --part placement --placement-backends "
+              f"{bc.split('_')[0]} first")
+    if not ideal:
+        print("No untranspiled reference in the results, so no relative LER (rerun --part placement; only the "
+              "missing reference points are simulated in addition); writing the absolute LER only")
     from matplotlib.ticker import NullFormatter
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlim(min(PLACEMENT_PS) / 1.15, max(PLACEMENT_PS) * 1.15)
-    for axis in (ax.xaxis, ax.yaxis):
-        axis.set_minor_formatter(NullFormatter())  # no overlapping labels on ranges below one decade
-    ax.set_xlabel("Physical error rate")
-    ax.set_ylabel("LER")  # per logical CNOT (state in the caption)
-    ax.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
-    ax.text(0.5, 1.03, "d) Placement vs. LER", transform=ax.transAxes, fontweight="bold", ha="center",
-            va="bottom")
-    ax.text(0.5, 1.16, "Lower is better ↓", transform=ax.transAxes, fontweight="bold", color=plot_lib_color,
-            ha="center", va="bottom")
-    fig.savefig(f"{filename}_placement_ler.pdf", format="pdf")
-    plt.close(fig)
+    for bc in [b for b in (backends or PLACEMENT_BACKENDS) if b in available]:
+        ler = _placement_ler(stats, bc)
+        ps = sorted({k[3] for k in ler})
+        ds = sorted({k[1] for k in ler})
+        defects = sorted({k[2] for k in ler if k[2] > 0})  # 0-defect results are kept but not drawn
+
+        for relative in ([True, False] if ideal else [False]):
+            _fonts()
+            fig, ax = _panel()
+            for pp in PLACEMENT_MODES:
+                color = PLACEMENT_COLORS[bc][pp]
+                for d in ds:
+                    for nd in defects:
+                        pts = []
+                        for p in ps:
+                            vals = ler.get((pp, d, nd, p))
+                            if not vals or np.mean(vals) <= 0:
+                                continue
+                            v = np.mean(vals)
+                            if relative:
+                                base = ideal.get((d, p), 0)
+                                if base <= 0:
+                                    continue
+                                v /= base
+                            pts.append((p, v))
+                        if not pts:
+                            continue
+                        xs, ys = zip(*pts)
+                        ax.plot(xs, ys, color=color, linestyle=PLACEMENT_DEFECT_LS.get(nd, "-"),
+                                marker=PLACEMENT_MARKERS.get(d, "P"), markerfacecolor=color,
+                                markeredgecolor="black", markeredgewidth=0.4, linewidth=1.1)
+            if not relative:  # untranspiled reference
+                for d in ds:
+                    pts = [(p, ideal[(d, p)]) for p in ps if ideal.get((d, p), 0) > 0]
+                    if pts:
+                        xs, ys = zip(*pts)
+                        ax.plot(xs, ys, color=IDEAL_COLOR, linestyle=IDEAL_LS, marker=PLACEMENT_MARKERS.get(d, "P"),
+                                markerfacecolor="white", markeredgecolor=IDEAL_COLOR, markeredgewidth=0.6,
+                                linewidth=0.8, zorder=5)
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlim(min(PLACEMENT_PS) / 1.15, max(PLACEMENT_PS) * 1.15)
+            for axis in (ax.xaxis, ax.yaxis):
+                axis.set_minor_formatter(NullFormatter())  # no overlapping labels on ranges below one decade
+            ax.set_xlabel("Physical error rate")
+            if relative:
+                ax.axhline(1.0, color=IDEAL_COLOR, linewidth=0.6, linestyle=":", zorder=1)  # = untranspiled LER
+                ax.set_ylabel("LER / LER$_{\\mathrm{untranspiled}}$")
+            else:
+                ax.set_ylabel("LER")  # per logical CNOT (state in the caption)
+            ax.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
+            _centered_title(fig, ax, PLACEMENT_TITLES[bc])
+            ax.text(0.5, 1.16, "Lower is better ↓", transform=ax.transAxes, fontweight="bold",
+                    color=plot_lib_color, ha="center", va="bottom")
+            out = PLACEMENT_FILES[bc] if relative else PLACEMENT_FILES[bc].replace(".pdf", "_abs.pdf")
+            fig.savefig(f"{filename}{out}", format="pdf")
+            plt.close(fig)
+
+
+# ######################################################################################
+# Layouts: mapping and routing solutions of the placement experiment (inspection plots, not a paper panel)
+# ######################################################################################
+# For every (backend, d, #defects) the backend of defect placement `sample` is rebuilt with exactly the seeds of
+# the placement experiment (same retry rule), compiled with center and size-aware placement, and drawn side by
+# side: chiplet grid, coupling edges, inter-chiplet links, defective qubits, the qubits of every patch (colour =
+# partition) and the SWAP edges inserted by routing (line width ~ #SWAPs on that edge). Only compilation, no
+# sampling, so this is cheap. One PDF per (backend, d, #defects) in experiments/evaluation/defective_qubits/layouts.
+LAYOUT_DIR = OUT_DIR / "layouts"
+LAYOUT_PKL = LAYOUT_DIR / "layouts.pkl"
+LAYOUT_CHIPLET_GAP = 2  # empty grid units between neighbouring chiplets in the drawing
+
+
+def _backend_defects(backend, all_nodes, edges) -> set:
+    """Defective physical qubits. BackendChipletV2's attribute name is not fixed here, so try the usual names and
+    fall back to qubits without any coupling edge (defective qubits are cut out of the coupling map)."""
+    for attr in ("defective_qubits", "defect_qubits", "defects", "defective_nodes"):
+        val = getattr(backend, attr, None)
+        if val is not None and not callable(val):
+            try:
+                return {int(q) for q in val}
+            except TypeError:
+                pass
+    connected = {q for e in edges for q in e}
+    return {q for q in all_nodes if q not in connected}
+
+
+def _layout_extract(qc, backend, partitions, size) -> dict:
+    """Picklable summary of one compiled circuit: patch -> physical qubits, SWAP edge counts, depth."""
+    lay = qc.layout.initial_index_layout(filter_ancillas=True)
+    patches = [dict(type=p.get("type", ""), phys=sorted(int(lay[i]) for i in p["indices"])) for p in partitions]
+    swaps = defaultdict(int)
+    for inst in qc.data:
+        if inst.operation.name == "swap":
+            a, b = sorted(qc.find_bit(q).index for q in inst.qubits)
+            swaps[(a, b)] += 1
+    return dict(patches=patches, swaps=dict(swaps), n_swaps=int(sum(swaps.values())), depth=qc.depth(),
+                twoq=_num_2q_gates(qc))
+
+
+def _layout_job(job):
+    """Compile one (backend, d, #defects, sample) with both placements; same seeds / retries as _placement_job."""
+    bc, k, n_def, s, circuit_str, partitions = job
+    qc = StimCodeCircuit(stim_circuit=stim.Circuit(circuit_str)).qc
+    for attempt in range(PLACEMENT_MAX_BACKEND_RETRIES):
+        seed = 1000 * s + 42 + attempt
+        backend = _placement_backend(k, n_def, seed, bc)
+        try:
+            compiled = {pp: custom_cost_transpilation(qc, backend, pre_defined_partitions=partitions,
+                                                      patch_initialization=pp) for pp in PLACEMENT_MODES}
+            break
+        except Exception:
+            continue
+    else:
+        return dict(bc=bc, k=k, n_def=n_def, s=s, error="no backend seed could be compiled")
+    edges = sorted({tuple(sorted(map(int, e))) for e in backend.coupling_map.get_edges() if e[0] != e[1]})
+    chiplet_of = {int(q): int(c) for q, c in backend.node_to_chiplet.items()}
+    return dict(bc=bc, k=k, n_def=n_def, s=s, seed=seed, size=(6, 6, *_chiplet_dims(k, bc)),
+                chiplet_of=chiplet_of, edges=edges, defects=sorted(_backend_defects(backend, chiplet_of, edges)),
+                layouts={pp: _layout_extract(c, backend, partitions, None) for pp, c in compiled.items()})
+
+
+def run_layouts(backends=None, defects=None, sample: int = 0, jobs: int | None = None, quick: bool = False) -> list:
+    backends = list(backends or PLACEMENT_BACKENDS)
+    defects = list(PLACEMENT_DEFECTS if defects is None else defects)
+    ks = [1] if quick else PLACEMENT_KS
+    sources = {}
+    for k in ks:
+        circuit, partitions = get_tqec_cnot_rotated(distance_scale=k, n1=1, n2=0)
+        sources[k] = (str(circuit), partitions)
+    job_list = [(bc, k, n, sample, *sources[k]) for bc in backends for k in ks for n in defects]
+    jobs = max(1, min(jobs or os.cpu_count() or 1, len(job_list)))
+    print(f"Layouts: {len(job_list)} backends (x {len(PLACEMENT_MODES)} placements) on {jobs} workers", flush=True)
+    with _capped_pool(jobs) as pool:
+        out = list(pool.imap_unordered(_layout_job, job_list, chunksize=1))
+    # Keep saved layouts of other configurations
+    key = lambda r: (r["bc"], r["k"], r["n_def"], r["s"])  # noqa: E731
+    if LAYOUT_PKL.exists():
+        with open(LAYOUT_PKL, "rb") as f:
+            old = {key(r): r for r in pickle.load(f)}
+        old.update({key(r): r for r in out})
+        out = list(old.values())
+    LAYOUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(LAYOUT_PKL, "wb") as f:
+        pickle.dump(out, f)
+    return out
+
+
+def _grid_positions(r) -> dict:
+    """Drawing position of every physical qubit: chiplets on their (row, col) grid, qubits inside a chiplet on a
+    rows x cols grid in index order. Rotated-grid couplings are drawn on this square grid (diagonal edges)."""
+    R, C, n, m = r["size"]
+    by_chip = defaultdict(list)
+    for q, c in r["chiplet_of"].items():
+        by_chip[c].append(q)
+    pos = {}
+    for c, qs in by_chip.items():
+        qs.sort()
+        cr, cc = divmod(c, C)
+        cols = m if len(qs) == n * m else math.ceil(math.sqrt(len(qs)))
+        for i, q in enumerate(qs):
+            lr, lc = divmod(i, cols)
+            pos[q] = (cc * (m + LAYOUT_CHIPLET_GAP) + lc, -(cr * (n + LAYOUT_CHIPLET_GAP) + lr))
+    return pos
+
+
+def plot_layouts(results, backends=None) -> None:
+    from matplotlib.collections import LineCollection
+    from matplotlib.patches import Rectangle
+    LAYOUT_DIR.mkdir(parents=True, exist_ok=True)
+    plt.rcParams.update({"font.family": "serif", "font.size": 8})
+    for r in sorted(results, key=lambda r: (r["bc"], r["k"], r["n_def"], r["s"])):
+        if backends and r["bc"] not in backends:
+            continue
+        d = 2 * r["k"] + 1
+        if "error" in r:
+            print(f"[layout] {r['bc']} d={d} {r['n_def']} defects: {r['error']}")
+            continue
+        pos = _grid_positions(r)
+        R, C, n, m = r["size"]
+        chiplet_of = r["chiplet_of"]
+        defects = set(r["defects"])
+
+        # Crop to the chiplets used by either placement (+1 chiplet margin)
+        used = {chiplet_of[q] for lay in r["layouts"].values() for p in lay["patches"] for q in p["phys"]}
+        used |= {chiplet_of[q] for lay in r["layouts"].values() for e in lay["swaps"] for q in e}
+        rows = [c // C for c in used]
+        cols = [c % C for c in used]
+        r0, r1 = max(min(rows) - 1, 0), min(max(rows) + 1, R - 1)
+        c0, c1 = max(min(cols) - 1, 0), min(max(cols) + 1, C - 1)
+        shown = {q for q, c in chiplet_of.items() if r0 <= c // C <= r1 and c0 <= c % C <= c1}
+
+        intra = [(pos[a], pos[b]) for a, b in r["edges"]
+                 if a in shown and b in shown and chiplet_of[a] == chiplet_of[b]]
+        inter = [(pos[a], pos[b]) for a, b in r["edges"]
+                 if a in shown and b in shown and chiplet_of[a] != chiplet_of[b]]
+        w = (c1 - c0 + 1) * (m + LAYOUT_CHIPLET_GAP)
+        h = (r1 - r0 + 1) * (n + LAYOUT_CHIPLET_GAP)
+        scale = 7.0 / max(w * 2, 1)
+        fig, axes = plt.subplots(1, 2, figsize=(14, max(3.0, h * scale + 1.0)))
+        for ax, pp in zip(axes, PLACEMENT_MODES):
+            lay = r["layouts"][pp]
+            # chiplet outlines
+            for c in {chiplet_of[q] for q in shown}:
+                cr, cc = divmod(c, C)
+                ax.add_patch(Rectangle((cc * (m + LAYOUT_CHIPLET_GAP) - 0.5, -(cr * (n + LAYOUT_CHIPLET_GAP) + n) + 0.5),
+                                       m, n, fill=False, edgecolor="#B0B0B0", linewidth=0.6))
+            ax.add_collection(LineCollection(intra, colors="#D8D8D8", linewidths=0.3, zorder=1))
+            ax.add_collection(LineCollection(inter, colors="#E68A5C", linewidths=0.8, linestyles="--", zorder=2))
+            xs, ys = zip(*(pos[q] for q in shown))
+            ax.scatter(xs, ys, s=3, c="#C8C8C8", zorder=3, linewidths=0)
+            cmap = plt.get_cmap("tab20")
+            for i, p in enumerate(lay["patches"]):
+                pts = [pos[q] for q in p["phys"] if q in pos]
+                if pts:
+                    ax.scatter(*zip(*pts), s=10, color=cmap((2 * i + (i // 10) % 2) % 20), zorder=4, linewidths=0,
+                               label=f"{i}: {p['type']}")
+            if lay["swaps"]:
+                mx = max(lay["swaps"].values())
+                segs = [(pos[a], pos[b]) for a, b in lay["swaps"]]
+                lw = [0.8 + 2.2 * cnt / mx for cnt in lay["swaps"].values()]
+                ax.add_collection(LineCollection(segs, colors="black", linewidths=lw, zorder=5))
+            dq = [pos[q] for q in defects if q in shown]
+            if dq:
+                ax.scatter(*zip(*dq), marker="x", s=30, color="red", linewidths=1.2, zorder=6)
+            ax.set_title(f"{pp.replace('_', '-')}: {lay['n_swaps']} SWAPs, depth {lay['depth']}, "
+                         f"{lay['twoq']} 2q gates", fontsize=9)
+            ax.set_aspect("equal")
+            ax.axis("off")
+            ax.autoscale_view()
+        handles = [Line2D([], [], color="#E68A5C", ls="--", label="inter-chiplet link"),
+                   Line2D([], [], color="black", lw=2, label="SWAP edge (width ~ #SWAPs)"),
+                   Line2D([], [], marker="x", color="red", ls="none", label="defective qubit"),
+                   Line2D([], [], marker="o", color="#C8C8C8", ls="none", ms=3, label="unused qubit")]
+        fig.legend(handles=handles, loc="lower center", ncols=4, frameon=False)
+        fig.suptitle(f"{r['bc'].replace('_', ' ')}, d={d}, {r['n_def']} defective qubits "
+                     f"(sample {r['s']}, backend seed {r['seed']}; colour = patch)", fontsize=10)
+        fig.tight_layout(rect=(0, 0.05, 1, 0.95))
+        out = LAYOUT_DIR / f"layout_{r['bc']}_d{d}_def{r['n_def']}_s{r['s']}.pdf"
+        fig.savefig(out, format="pdf")
+        plt.close(fig)
+        print(f"[layout] {out}  center: {r['layouts']['center']['n_swaps']} SWAPs, "
+              f"size-aware: {r['layouts']['size_aware']['n_swaps']} SWAPs")
 
 
 # ######################################################################################
@@ -1153,8 +1490,8 @@ def save_legend(filename=str(OUT_DIR / "combined_overhead")) -> None:
 
     Columns: Chipmunq single patch (center / size-aware), Chipmunq multi patch (center / size-aware),
     LightSABRE (single / multi) for a-c; code distances (markers) and #defects (line styles) for d) -- the
-    placement colours of d) are the Chipmunq single-patch colours. Built from the style constants only (no
-    data), so it is written whatever part is run or replotted.
+    placement colours of d) are the Chipmunq colours of the same backend (single patch: blues, multi patch:
+    greys). Built from the style constants only (no data), so it is written whatever part is run or replotted.
     """
     _fonts()
     grey = "#606060"
@@ -1162,13 +1499,13 @@ def save_legend(filename=str(OUT_DIR / "combined_overhead")) -> None:
                    markerfacecolor="white", markeredgecolor="black", markeredgewidth=0.4, label=f"d={2 * k + 1}")
             for k in PLACEMENT_KS]
     defects = [Line2D([], [], color=grey, linestyle=PLACEMENT_DEFECT_LS.get(n, "-"),
-                      label=f"{n} defect" + ("s" if n != 1 else "")) for n in PLACEMENT_DEFECTS]
+                      label=f"{n} defect" + ("s" if n != 1 else "")) for n in PLACEMENT_DEFECTS if n > 0]
     top = [_patch("Chipmunq single, center", COLORS_CUSTOM[0], HATCHES[0]),
            _patch("Chipmunq multi, center", COLORS_CUSTOM[2], HATCHES[0]),
-           _patch("LightSABRE single", COLORS_SABRE[0])] + dist[0::2] + defects[0::2]
+           _patch("LightSABRE single", COLORS_SABRE[0])] + dist  # first row: all code distances
     bottom = [_patch("Chipmunq single, size-aware", COLORS_CUSTOM[1], HATCHES[1]),
               _patch("Chipmunq multi, size-aware", COLORS_CUSTOM[3], HATCHES[1]),
-              _patch("LightSABRE multi", COLORS_SABRE[2])] + dist[1::2] + defects[1::2]
+              _patch("LightSABRE multi", COLORS_SABRE[2])] + defects  # second row: #defects
     handles = _two_rows(top, bottom)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1205,13 +1542,27 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Fig. 10: defective qubits (a-c compilation, d placement LER, "
                                              "c deformation)")
     ap.add_argument("--plot-only", action="store_true", help="only replot the saved results")
-    ap.add_argument("--part", choices=["all", "compile", "placement", "deformation"], default="all",
+    ap.add_argument("--part", choices=["all", "compile", "placement", "deformation", "layouts"], default="all",
                     help="compile = a-c (Chipmunq vs. LightSABRE), placement = d (center vs. size-aware LER), "
-                         "deformation = c (avoid vs. deform, Lin et al.)")
-    ap.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1, help="parallel workers (compilation of a-c and d, sampling of c)")
+                         "deformation = c (avoid vs. deform, Lin et al.), layouts = draw the mapping/routing "
+                         "solutions of the placement experiment (not part of 'all')")
+    ap.add_argument("--layout-sample", type=int, default=0,
+                    help="layouts part: which defect placement (sample index of the placement experiment) to draw")
+    ap.add_argument("--placement-backends", nargs="+", choices=["single", "multi"], default=["single", "multi"],
+                    help="placement part: chiplet backends to run / plot (single = one patch per chiplet, "
+                         "multi = several patches per chiplet; default: both)")
+    ap.add_argument("--placement-defects", nargs="*", type=int, default=None,
+                    help=f"placement part: #defective qubits to run (default {PLACEMENT_DEFECTS}). Saved results of "
+                         f"other defect counts are kept. Without values only the missing untranspiled reference "
+                         f"points are simulated")
+    ap.add_argument("--max-shots", type=int, default=None,
+                    help=f"maximum shots per simulated circuit, parts 2 and 3 (default {DEFAULT_MAX_SHOTS}; "
+                         f"--quick: 20000)")
+    ap.add_argument("--jobs", "-j", type=int, default=os.cpu_count() or 1, help="parallel workers (compilation of a-c and d, sampling of c and d)")
     ap.add_argument("--quick", action="store_true",
                     help="parts 2, 3: few samples / shots (pipeline smoke test)")
     a = ap.parse_args()
+    placement_backends = [f"{b}_patch" for b in a.placement_backends]
 
     if a.part in ("all", "compile"):
         run_exp_defective(reproduce=not a.plot_only, jobs=a.jobs)
@@ -1223,8 +1574,9 @@ if __name__ == "__main__":
             with open(PLACEMENT_PKL, "rb") as f:
                 placement_stats = pickle.load(f)
         else:
-            placement_stats = run_placement(a.quick, jobs=a.jobs)
-        plot_placement(placement_stats)
+            placement_stats = run_placement(a.quick, jobs=a.jobs, backends=placement_backends,
+                                            max_shots=a.max_shots, defects=a.placement_defects)
+        plot_placement(placement_stats, backends=placement_backends)
 
     if a.part in ("all", "deformation"):
         if a.plot_only:
@@ -1233,9 +1585,19 @@ if __name__ == "__main__":
             with open(DEFORM_PKL, "rb") as f:
                 data = pickle.load(f)
         else:
-            data = run_deformation(a.jobs, a.quick)
+            data = run_deformation(a.jobs, a.quick, max_shots=a.max_shots)
         summarize_deformation(data["rows"])
         plot_deformation(data)
+
+    if a.part == "layouts":
+        if a.plot_only:
+            if not LAYOUT_PKL.exists():
+                raise SystemExit(f"No layouts to plot: {LAYOUT_PKL} not found. Run without --plot-only first.")
+            with open(LAYOUT_PKL, "rb") as f:
+                layouts = pickle.load(f)
+        else:
+            layouts = run_layouts(placement_backends, a.placement_defects, a.layout_sample, a.jobs, a.quick)
+        plot_layouts(layouts, backends=placement_backends)
 
     # Legends: panels a-d, and the deformation comparison (written from the style constants on every run)
     save_legend()
