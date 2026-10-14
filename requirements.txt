@@ -10,3 +10,4 @@ kahypar
 matplotlib
 fastjsonschema
 sympy
+tqdm

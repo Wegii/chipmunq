@@ -572,7 +572,7 @@ def plot_evaluation(results, filename):
     ax.grid(True, which="major", linestyle="--", linewidth=0.4, alpha=0.5)
     ax.set_axisbelow(True)
 
-    _title(fig, ax, "b) Correlated errors")  # long title does not fit the 1.75 in panel (caption has the rest)
+    _title(fig, ax, "a) Correlated errors")  # long title does not fit the 1.75 in panel (caption has the rest)
     fig.savefig(filename + ".pdf", format="pdf")
     plt.close(fig)
 

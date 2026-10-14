@@ -972,7 +972,7 @@ def plot_deformation(data, filename=str(OUT_DIR / "combined_overhead")):
     ax.set_ylabel("LER")  # per QEC cycle (state in the caption)
     ax.grid(True, which="major", axis="y", linestyle="--", linewidth=0.4, alpha=0.5)
     ax.set_axisbelow(True)
-    _title(ax, "c) Avoid vs. deform", "Lower is better ↓")
+    _title(ax, "b) Avoid vs. deform", "Lower is better ↓")
     fig.savefig(f"{filename}_deformation_ler.pdf", format="pdf")
     plt.close(fig)
 

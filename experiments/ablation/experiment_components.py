@@ -33,8 +33,9 @@ Reported per variant and backend (clean / defective): mapping + routing runtime,
 Noise: circuit-level ``modsi1000`` with the same inter-chiplet noise ``ps_inter`` on every link,
 applied orientation-independently (see ``symmetric_remote_noise``).
 
-Paper figure a): ``ablation_ler_ratio_*.pdf``, drawn at its printed size (half the text width = two of the
-four plot slots of a full-width row, Fig. 10 style) -- include it at its natural width, no scaling. The
+Paper figure a): ``ablation_ler_ratio_*.pdf``, drawn at its printed size (a quarter of the text width = one of
+the four plot slots of a full-width row, same 1.75 x 1.6 in panel as Fig. 10) -- include it at its natural
+width, no scaling. The
 clean/defective legend is written to ``ablation_ler_ratio_*legend.pdf``.
 
 Usage:
@@ -634,28 +635,30 @@ def ler_ratio(t, b, v, ref, ps):
     return float(np.exp(np.mean(np.log(r)))) if r else np.nan
 
 
-# Tick labels for the paper figure (a): at 7 pt and 2/3 text width each bar pair gets ~0.3 in, so labels
-# are two short lines; the one-word group names carry the context (spell the abbreviations out in the caption).
+# Tick labels for the paper figure (a): at a quarter of the text width each bar pair gets ~0.11 in, so the
+# labels are rotated and one short line each; the group names carry the context (spell the abbreviations out
+# in the caption).
 SHORT = {
     "chipmunq_basic": "Basic",
-    "chipmunq_sabre_default": "SABRE-\nSWAP",
-    "no_partitioning": "w/o\nPart.",
-    "no_patch_contraction": "w/o\nContr.",
-    "no_sequencing": "w/o\nSeq.",
-    "no_global_mapping": "w/o\nMapper",
-    "lightsabre": "Light-\nSABRE",
+    "chipmunq_sabre_default": "SABRE",
+    "no_partitioning": "w/o Part.",
+    "no_patch_contraction": "w/o Contr.",
+    "no_sequencing": "w/o Seq.",
+    "no_global_mapping": "w/o Map.",
+    "lightsabre": "L-SABRE",
     "seqc": "SEQC",
     "olsq2": "OLSQ2",
-    "murali": "Murali\net al.",
+    "murali": "Murali",
 }
 # Routing: Basic (reference) and SABRE-SWAP on the Chipmunq mapping. Mapping: one mapping stage removed (Basic routing).
 # Baselines: full compilers (own mapping and routing).
 RATIO_GROUPS = [
-    ("Routing", ["chipmunq_basic", "chipmunq_sabre_default"]),
+    ("Route", ["chipmunq_basic", "chipmunq_sabre_default"]),
     ("Mapping", ["no_partitioning", "no_patch_contraction", "no_sequencing", "no_global_mapping"]),
     ("Baselines", ["lightsabre", "seqc", "olsq2", "murali"]),
 ]
-GROUP_GAP = 0.4                       # extra space between groups [bar slots]
+GROUP_GAP = 0.5                       # extra space between groups [bar slots]
+RATIO_SMALL_PT = FONT_PT - 2          # tick labels and group names of the narrow panel
 
 
 def plot_ler_ratio(results, stats, filename):
@@ -667,7 +670,7 @@ def plot_ler_ratio(results, stats, filename):
     t = ler_table(stats)
     ps = sorted(results["config"]["ps"])
     bkinds = list(results["config"]["defects"])
-    fig, ax = _panel(TEXT_WIDTH_IN / 2)  # two of the four plot slots of a full-width row (3.5 in)
+    fig, ax = _panel(TEXT_WIDTH_IN / 4)  # one of the four plot slots of a full-width row (1.75 in)
 
     # x positions with a gap between groups; skip variants that were never compiled
     present = {v for b in bkinds for v in present_variants(results, b)}
@@ -697,16 +700,15 @@ def plot_ler_ratio(results, stats, filename):
                 continue
             recs = [inst[v] for (bk, _), inst in results["instances"].items() if bk == b and v in inst]
             label = "T/O" if recs and all("timeout" in str(r.get("error", "")) for r in recs) else "N/A"
-            ax.text(xb, 0.04, label, transform=ax.get_xaxis_transform(), rotation=90, ha="center",
-                    va="bottom", fontsize=FONT_PT - 1.5)
+            ax.text(xb, 1.15, label, transform=ax.transData, rotation=90,
+                    ha="center", va="bottom", fontsize=RATIO_SMALL_PT)  # just above the reference line
 
     ax.axhline(1, color="black", linestyle="--", linewidth=0.6)
     ax.set_yscale("log")
     ax.set_xticks(xs)
-    ax.set_xticklabels([SHORT[v] for v in order], linespacing=0.95,
-                       fontsize=FONT_PT - 1.5)  # ~0.27 in per bar group at half text width
-    ax.tick_params(axis="x", length=0)
-    ax.set_xlim(xs[0] - 0.55, xs[-1] + 0.55)
+    ax.set_xticklabels([SHORT[v] for v in order], rotation=90, fontsize=RATIO_SMALL_PT)  # ~0.11 in per group
+    ax.tick_params(axis="x", length=0, pad=1.5)
+    ax.set_xlim(xs[0] - 0.6, xs[-1] + 0.6)
     ax.set_ylabel("Relative LER")  # LER_variant / LER_Chipmunq(Basic) at p = ps[0] (caption)
     ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
     ax.yaxis.set_minor_formatter(FuncFormatter(lambda y, _: ""))
@@ -717,21 +719,21 @@ def plot_ler_ratio(results, stats, filename):
     # Group names inside the axes (top) and separators between the groups
     for i, (name, a, b) in enumerate(spans):
         ax.text((a + b) / 2, 0.97, name, transform=ax.get_xaxis_transform(), ha="center", va="top",
-                fontweight="bold")
+                fontweight="bold", fontsize=RATIO_SMALL_PT)
         if i:
             ax.axvline(a - (1 + GROUP_GAP) / 2, color="grey", linewidth=0.6, alpha=0.6)
     lo, hi = ax.get_ylim()
     # start below 1 so the reference bars (= 1) stay visible, headroom for the group names (log axis)
     ax.set_ylim(min(lo, 0.6), hi * 2.5)
 
-    _title(fig, ax, "a) Contribution of each stage")
+    _title(fig, ax, "a) Stage contribution")
     fig.savefig(filename, format="pdf")
     plt.close(fig)
 
     # Backend legend (hatching = backend; colour = variant) in its own file, placed outside the plot in
     # LaTeX. Not needed when only one backend is shown.
     if len(bkinds) > 1:
-        legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN / 2, 0.3))
+        legend_fig = plt.figure(figsize=(TEXT_WIDTH_IN / 4, 0.3))
         legend_fig.legend(handles=[Patch(facecolor="white", edgecolor="black", linewidth=0.4,
                                          hatch="" if j == 0 else "////", label=f"{b} backend")
                                    for j, b in enumerate(bkinds)],
